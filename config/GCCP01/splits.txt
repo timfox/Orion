@@ -1074,6 +1074,7 @@ pppYmBreath.cpp:
 	extabindex  start:0x8000EA88 end:0x8000EADC
 	.text       start:0x800BFE78 end:0x800C17B8
 	.rodata     start:0x801DA9B0 end:0x801DA9C0
+	.sdata2     start:0x80330C98 end:0x80330CD0
 
 memorycard.cpp:
 	extab       start:0x800083F8 end:0x800084E0
@@ -1177,6 +1178,7 @@ pppYmMoveParabola.cpp:
 	extab       start:0x80008AF4 end:0x80008B04
 	extabindex  start:0x8000F538 end:0x8000F550
 	.text       start:0x800D4278 end:0x800D467C
+	.sdata2     start:0x80330E30 end:0x80330E50
 
 pppParMoveMatrix.cpp:
 	extab       start:0x80008B04 end:0x80008B0C
