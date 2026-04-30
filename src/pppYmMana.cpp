@@ -72,12 +72,12 @@ struct Vec2d {
 
 extern "C" const char s_pppYmMana_cpp_801DB4D8[] = "pppYmMana.cpp";
 
-struct pppYmManaOffsetsRaw {
-    u8 _pad0[0xc];
-    s32* m_serializedDataOffsets;
-};
-
 static inline unsigned char* MaterialManRaw() { return reinterpret_cast<unsigned char*>(&MaterialMan); }
+
+static inline float LoadFloat(const float& value)
+{
+    return value;
+}
 
 extern "C" {
 void _GXSetBlendMode__F12_GXBlendMode14_GXBlendFactor14_GXBlendFactor10_GXLogicOp(int, int, int, int);
@@ -272,10 +272,17 @@ void Chara_DrawShadowMeshDLCallback(CChara::CModel* model, void* work, void* vYm
     s32 meshData = *(s32*)((u8*)model + 0xAC);
     u8 alpha = *(u8*)((u8*)vYmMana + 0x3B);
 
-    *(u8*)((u8*)work + 0xFC) = 0xFF;
-    *(u8*)((u8*)work + 0xFD) = 0xFF;
-    *(u8*)((u8*)work + 0xFE) = 0xFF;
-    *(u8*)((u8*)work + 0xFF) = alpha == 0 ? 0xFF : alpha;
+    if (alpha != 0) {
+        *(u8*)((u8*)work + 0xFC) = 0xFF;
+        *(u8*)((u8*)work + 0xFD) = 0xFF;
+        *(u8*)((u8*)work + 0xFE) = 0xFF;
+        *(u8*)((u8*)work + 0xFF) = alpha;
+    } else {
+        *(u8*)((u8*)work + 0xFC) = 0xFF;
+        *(u8*)((u8*)work + 0xFD) = 0xFF;
+        *(u8*)((u8*)work + 0xFE) = 0xFF;
+        *(u8*)((u8*)work + 0xFF) = 0xFF;
+    }
 
     DCFlushRange((u8*)work + 0xFC, 4);
     GXSetArray((GXAttr)0xB, (u8*)work + 0xFC, 4);
@@ -432,7 +439,7 @@ void Mana_DrawMeshDLCallback(CChara::CModel* model, void* work, void* step, int 
  */
 void pppConstructYmMana(PYmMana* ymMana, pppYmManaUnkC* param_2)
 {
-    s32* offsets = ((pppYmManaOffsetsRaw*)param_2)->m_serializedDataOffsets;
+    s32* offsets = param_2->m_serializedDataOffsets;
     s32 workOffset = offsets[2];
     u32* work = (u32*)((u8*)ymMana + workOffset + 0x80);
     CGObject* gObject = *(CGObject**)((u8*)pppMngStPtr + 0xD8);
@@ -444,7 +451,7 @@ void pppConstructYmMana(PYmMana* ymMana, pppYmManaUnkC* param_2)
     }
 
     if (Game.m_currentMapId != 0x21) {
-        gObject->m_stepSlopeLimit = FLOAT_80330eb8;
+        gObject->m_stepSlopeLimit = LoadFloat(FLOAT_80330eb8);
     }
 
     handle = GetCharaHandlePtr__FP8CGObjectl(gObject, 0);
@@ -517,7 +524,7 @@ void pppConstructYmMana(PYmMana* ymMana, pppYmManaUnkC* param_2)
  */
 void pppDestructYmMana(PYmMana* ymMana, pppYmManaUnkC* param_2)
 {
-    u32* work = (u32*)((u8*)ymMana + 8 + param_2->m_serializedDataOffsets[2]);
+    u32* work = (u32*)((u8*)ymMana + 0x80 + param_2->m_serializedDataOffsets[2]);
     CGObject* gObject = (CGObject*)work[0];
     void* handle;
     s32 model;
@@ -534,8 +541,8 @@ void pppDestructYmMana(PYmMana* ymMana, pppYmManaUnkC* param_2)
     *(u32*)(model + 0xF0) = 0;
     *(u32*)(model + 0xFC) = 0;
     _WaitDrawDone__8CGraphicFPci(&Graphic, const_cast<char*>(s_pppYmMana_cpp_801DB4D8), 0x2CE);
-    *(u32*)(MaterialManRaw() + 0x208) = 0;
-    *(u32*)(MaterialManRaw() + 0x220) = 0;
+    *(u32*)(MaterialManRaw() + 0xD0) = 0;
+    *(u32*)(MaterialManRaw() + 0xDC) = 0;
 
     if (work[10] != 0) {
         pppHeapUseRate((CMemory::CStage*)work[10]);
@@ -621,7 +628,7 @@ void pppDestructYmMana(PYmMana* ymMana, pppYmManaUnkC* param_2)
     meshEntry = *(s32*)(model + 0xAC);
     step = work[0x1D];
     for (i = 0; i < *(u32*)(*(s32*)(model + 0xA4) + 0xC); i++) {
-        char stepType = *(char*)(step + 0x1C);
+        u8 stepType = *(u8*)(step + 0x1C);
         s32 shape = *(s32*)(meshEntry + 8);
 
         if (stepType == 1) {
@@ -696,7 +703,7 @@ void pppFrameYmMana(PYmMana* pppYmMana, pppYmManaUnkB* param_2, pppYmManaUnkC* p
 
     gObject = *(CGObject**)((u8*)pppMngStPtr + 0xDC);
     setupOffset = param_3->m_serializedDataOffsets[1];
-    work = (u32*)((u8*)pppYmMana + 8 + param_3->m_serializedDataOffsets[2]);
+    work = (u32*)((u8*)pppYmMana + 0x80 + param_3->m_serializedDataOffsets[2]);
     if (gObject == NULL) {
         return;
     }
