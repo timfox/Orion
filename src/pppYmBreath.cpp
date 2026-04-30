@@ -26,6 +26,8 @@ extern const float FLOAT_80330c80;
 
 extern const float FLOAT_80330c80;
 
+extern const float FLOAT_80330c80;
+
 struct pppYmBreathUnkC {
     unsigned char _pad[0xC];
     int* m_serializedDataOffsets;
