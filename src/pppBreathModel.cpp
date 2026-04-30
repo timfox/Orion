@@ -401,8 +401,9 @@ extern "C" void pppRenderBreathModel(pppBreathModel* breathModel, PBreathModel* 
     }
 
     if ((*(u32*)(CFlat + 0x129C) & 0x200000) != 0) {
+        int* debugGroupData = groupData;
         for (i = 0; i < (int)pBreathModel->m_groupCount; i++) {
-            if (groupData[0] == 1) {
+            if (debugGroupData[0] == 1) {
                 _GXColor debugColor;
                 int firstParticle;
                 int j;
@@ -413,7 +414,6 @@ extern "C" void pppRenderBreathModel(pppBreathModel* breathModel, PBreathModel* 
 
                 switch (i) {
                 case 0:
-                case 2:
                     debugColor.r = 0x80;
                     debugColor.g = 0x00;
                     debugColor.b = 0x00;
@@ -423,6 +423,12 @@ extern "C" void pppRenderBreathModel(pppBreathModel* breathModel, PBreathModel* 
                     debugColor.r = 0x80;
                     debugColor.g = 0x80;
                     debugColor.b = 0xFF;
+                    debugColor.a = 0xFF;
+                    break;
+                case 2:
+                    debugColor.r = 0x80;
+                    debugColor.g = 0x00;
+                    debugColor.b = 0x00;
                     debugColor.a = 0xFF;
                     break;
                 case 3:
@@ -440,10 +446,10 @@ extern "C" void pppRenderBreathModel(pppBreathModel* breathModel, PBreathModel* 
                 }
 
                 firstParticle = -1;
-                groupScale = *(float*)(groupData + 10);
+                groupScale = *(float*)(debugGroupData + 10);
                 for (j = 0; j < (int)pBreathModel->m_slotCount; j++) {
-                    if (*(signed char*)(groupData[2] + j) != -1) {
-                        firstParticle = (int)*(signed char*)(groupData[1] + j);
+                    if (*(signed char*)(debugGroupData[2] + j) != -1) {
+                        firstParticle = (int)*(signed char*)(debugGroupData[1] + j);
                         break;
                     }
                 }
@@ -454,7 +460,7 @@ extern "C" void pppRenderBreathModel(pppBreathModel* breathModel, PBreathModel* 
                 sphereMtx[2][2] = groupScale;
                 PSMTXConcat(*reinterpret_cast<Mtx*>(&work->m_particleWmats[firstParticle]), object->m_localMatrix.value, tempMtx);
                 PSMTXConcat(ppvCameraMatrix, tempMtx, tempMtx);
-                PSMTXMultVec(tempMtx, (Vec*)(groupData + 3), &pos);
+                PSMTXMultVec(tempMtx, (Vec*)(debugGroupData + 3), &pos);
                 sphereMtx[0][3] = pos.x;
                 sphereMtx[1][3] = pos.y;
                 sphereMtx[2][3] = pos.z;
@@ -462,7 +468,7 @@ extern "C" void pppRenderBreathModel(pppBreathModel* breathModel, PBreathModel* 
                 pppSetBlendMode(1);
                 DrawSphere__8CGraphicFPA4_f8_GXColor(&Graphic, sphereMtx, debugColor);
             }
-            groupData += 0x17;
+            debugGroupData += 0x17;
         }
 
         pppInitBlendMode();
@@ -481,7 +487,6 @@ extern "C" void pppFrameBreathModel(pppBreathModel* breathModel, PBreathModel* p
     int* dataOffsets;
     VBreathModel* work;
     VColor* color;
-    int* groupData;
     Mtx* particleWMat;
     Mtx* particleMtx;
     int i;
@@ -574,10 +579,9 @@ extern "C" void pppFrameBreathModel(pppBreathModel* breathModel, PBreathModel* p
     UpdateAllParticle(reinterpret_cast<_pppPObject*>(breathModel), work, pBreathModel, color);
 
     particleWMat = reinterpret_cast<Mtx*>(work->m_particleWmats);
-    groupData = (int*)work->m_groups;
     for (groupIndex = 0; groupIndex < (int)pBreathModel->m_groupCount; groupIndex++) {
         slotCount = pBreathModel->m_slotCount;
-        groupTable = (int)groupData;
+        groupTable = (int)((unsigned char*)work->m_groups + groupIndex * 0x5C);
         for (slotIndex = 0; slotIndex < (int)slotCount; slotIndex++) {
             if ((*(signed char*)(*(int*)(groupTable + 4) + slotIndex) == -1) ||
                 (*(signed char*)(*(int*)(groupTable + 8) + slotIndex) != 1)) {
@@ -619,8 +623,6 @@ group_ready:
             pppSubVector(hitVector, target, origin);
             pppHitCylinderSendSystem(mngSt, &origin, &hitVector, scaledOwner, pBreathModel->m_groupRadius);
         }
-
-        groupData += 0x17;
     }
 }
 
@@ -674,7 +676,8 @@ void UpdateAllParticle(_pppPObject* pppObject, VBreathModel* vBreathModel, PBrea
                 foundSlot = -1;
                 for (short groupIndex = 0; groupIndex < (int)params->m_groupCount; groupIndex++) {
                     for (short slotIndex = 0; slotIndex < (int)params->m_slotCount; slotIndex++) {
-                        if ((int)(short)i == (int)*(signed char*)(*(int*)(groupTableWork + 4) + (int)slotIndex)) {
+                        signed char* particleIndices = *(signed char**)(groupTableWork + 4);
+                        if ((int)(short)i == (int)particleIndices[(int)slotIndex]) {
                             foundGroup = groupIndex;
                             foundSlot = slotIndex;
                             found = true;
@@ -722,24 +725,26 @@ void UpdateAllParticle(_pppPObject* pppObject, VBreathModel* vBreathModel, PBrea
                 }
 
                 if ((params->m_emitInterval <= *emitFrameCounter) && (spawnCount < (int)params->m_emitCount)) {
+                    bool placing;
+
                     BirthParticle(
                         pppObject, vBreathModel, pBreathModel, vColor, (PARTICLE_DATA*)particleData,
                         (PARTICLE_WMAT*)particleWmat, (PARTICLE_COLOR*)particleColor);
-                    found = true;
+                    placing = true;
                     spawnCount += 1;
                     groupData = groupTable;
                     for (j = 0; j < (int)params->m_groupCount; j++) {
                         for (k = 0; k < (int)params->m_slotCount; k++) {
                             if ((groupData->particleIndices[k] == -1) && (groupData->particleStates[k] == -1)) {
                                 groupData->particleIndices[k] = (signed char)i;
-                                found = false;
+                                placing = false;
                                 groupData->particleStates[k] = 1;
                             }
-                            if (!found) {
+                            if (!placing) {
                                 break;
                             }
                         }
-                        if (!found) {
+                        if (!placing) {
                             break;
                         }
                         groupData += 1;
@@ -777,12 +782,13 @@ void UpdateAllParticle(_pppPObject* pppObject, VBreathModel* vBreathModel, PBrea
             groupData += 1;
         }
 
+        groupData = groupTable;
         for (i = 0; i < (int)params->m_groupCount; i++) {
-            if (groupTable->active != 0) {
-                PSVECScale(&groupTable->direction, &stepVelocity, groupTable->speed);
-                PSVECAdd(&stepVelocity, &groupTable->position, &groupTable->position);
+            if (groupData->active != 0) {
+                PSVECScale(&groupData->direction, &stepVelocity, groupData->speed);
+                PSVECAdd(&stepVelocity, &groupData->position, &groupData->position);
             }
-            groupTable += 1;
+            groupData += 1;
         }
     }
 }
