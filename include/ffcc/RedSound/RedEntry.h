@@ -1,10 +1,69 @@
 #ifndef _FFCC_REDSOUND_REDENTRY_H
 #define _FFCC_REDSOUND_REDENTRY_H
 
-struct RedHistoryBANK;
-struct RedMusicHEAD;
-struct RedSeSepHEAD;
-struct RedWaveHeadWD;
+struct RedHistoryBANK
+{
+	int m_id;
+	int m_historyNo;
+	int m_data;
+	int m_size;
+};
+
+struct RedMusicHEAD
+{
+	char m_signature[4];
+	short m_musicNo;
+	short m_waveNo;
+	char m_trackCount;
+	unsigned char m_unk09;
+	short m_reverbDepth;
+	unsigned short m_flags;
+	unsigned short m_unk0e;
+	int m_size;
+	unsigned int m_playFlags;
+	int m_unk18;
+	int m_unk1c;
+};
+
+struct RedSeSepHEAD
+{
+	char m_signature[8];
+	int m_seNo;
+	unsigned int m_sizeAndFlags;
+	unsigned char m_unk10;
+	unsigned char m_waveNoLo;
+	unsigned char m_waveNoHi;
+	unsigned char m_unk13;
+};
+
+struct RedSeINFO
+{
+	unsigned char m_flagsAndCount;
+	unsigned char m_waveNoLo;
+	unsigned char m_waveNoHi;
+	unsigned char m_eraseTrack;
+	unsigned char m_attrMask;
+	unsigned char m_sequence[1];
+};
+
+struct RedSeBlockHEAD
+{
+	unsigned char m_unk00[0x0A];
+	short m_seCount;
+	int m_size;
+	int m_entries[1];
+};
+
+struct RedWaveHeadWD
+{
+	char m_signature[2];
+	short m_waveNo;
+	int m_waveSize;
+	int m_tableCount;
+	int m_toneCount;
+	int m_aramAddress;
+	int m_loadSize;
+};
 
 class CRedEntry
 {

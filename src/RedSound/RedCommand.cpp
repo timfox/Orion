@@ -66,7 +66,7 @@ void _EraseAttribute(int eraseTrack, int attrMask)
 
 			c_RedEntry.SeSepHistoryManager(0, track[0x3d]);
 			if ((u32)track[6] != 0) {
-				c_RedEntry.WaveHistoryManager(0, *(short*)(track[6] + 2));
+				c_RedEntry.WaveHistoryManager(0, reinterpret_cast<RedWaveHeadWD*>(track[6])->m_waveNo);
 			}
 		}
 		track += 0x55;
@@ -135,7 +135,7 @@ int _EraseTime(int eraseTrack)
 			*(unsigned int*)((unsigned char*)p_VoiceData + trackNo * 0xc0 + 0x8c) = 0;
 
 			if ((u32)track[6] != 0) {
-				c_RedEntry.WaveHistoryManager(0, *(short*)(track[6] + 2));
+				c_RedEntry.WaveHistoryManager(0, reinterpret_cast<RedWaveHeadWD*>(track[6])->m_waveNo);
 			}
 			erasedCount++;
 		}
@@ -232,7 +232,7 @@ int SeStopID(int seId)
 			*(unsigned int*)((unsigned char*)p_VoiceData + trackNo * 0xc0 + 0x8c) = 0;
 
 			if ((u32)track[6] != 0) {
-				c_RedEntry.WaveHistoryManager(0, *(short*)(track[6] + 2));
+				c_RedEntry.WaveHistoryManager(0, reinterpret_cast<RedWaveHeadWD*>(track[6])->m_waveNo);
 			}
 			c_RedEntry.SeSepHistoryManager(0, track[0x3d]);
 		}
@@ -280,7 +280,7 @@ int SeStopMG(int bank, int sep, int group, int kind)
 				*(unsigned int*)((unsigned char*)p_VoiceData + trackNo * 0xc0 + 0x8c) = 0;
 
 				if ((u32)track[6] != 0) {
-					c_RedEntry.WaveHistoryManager(0, *(short*)(track[6] + 2));
+					c_RedEntry.WaveHistoryManager(0, reinterpret_cast<RedWaveHeadWD*>(track[6])->m_waveNo);
 				}
 				c_RedEntry.SeSepHistoryManager(0, track[0x3d]);
 			}
@@ -316,10 +316,10 @@ int _SePlayStart(RedSeINFO* info, int seId, int sepId, int pan, int volume)
 	int isMulti;
 
 	*(unsigned int*)((char*)p_SoundControlBuffer + 0x1244) = 0;
-	deltaTime = (unsigned int)((unsigned char*)info)[2] * 0x100 + (unsigned int)((unsigned char*)info)[1];
+	deltaTime = (unsigned int)info->m_waveNoHi * 0x100 + (unsigned int)info->m_waveNoLo;
 	waveBase = c_RedEntry.SearchWaveBase(deltaTime);
 	if (waveBase != 0) {
-		c_RedEntry.WaveHistoryManager(1, *(short*)(waveBase + 2));
+		c_RedEntry.WaveHistoryManager(1, reinterpret_cast<RedWaveHeadWD*>(waveBase)->m_waveNo);
 	} else {
 		if (m_ReportPrint != 0) {
 			OSReport(sRedCommandWaveNotEntryFmt, sRedCommandLogPrefix, sRedCommandLogWarnColor,
@@ -328,15 +328,15 @@ int _SePlayStart(RedSeINFO* info, int seId, int sepId, int pan, int volume)
 		}
 	}
 
-	flag = ((unsigned char*)info)[0];
+	flag = info->m_flagsAndCount;
 	if ((flag & 0x80) != 0) {
 		isMulti = 1;
 	} else {
 		isMulti = 0;
 	}
-	seq = (unsigned char*)info + 5;
-	attrMask = ((unsigned char*)info)[4];
-	count = ((unsigned char*)info)[0] & 0x7f;
+	seq = info->m_sequence;
+	attrMask = info->m_attrMask;
+	count = info->m_flagsAndCount & 0x7f;
 	current = seq + count * 2;
 	do {
 		remaining = count;
@@ -350,7 +350,7 @@ int _SePlayStart(RedSeINFO* info, int seId, int sepId, int pan, int volume)
 			} while ((int)remaining < (int)count);
 		}
 
-		track = SearchSeEmptyTrack((int)remaining, ((unsigned char*)info)[3], attrMask);
+		track = SearchSeEmptyTrack((int)remaining, info->m_eraseTrack, attrMask);
 		attrMask = 0;
 		if (track == 0) {
 			break;
@@ -379,8 +379,8 @@ int _SePlayStart(RedSeINFO* info, int seId, int sepId, int pan, int volume)
 			track[0x43] = state;
 
 			if (*(char*)*track != '\0') {
-				*(unsigned char*)((char*)track + 0x14f) = ((unsigned char*)info)[3];
-				*(unsigned char*)(track + 0x54) = ((unsigned char*)info)[4];
+				*(unsigned char*)((char*)track + 0x14f) = info->m_eraseTrack;
+				*(unsigned char*)(track + 0x54) = info->m_attrMask;
 				track[0x13] = volume << 0xc;
 				track[0x15] = 0;
 				track[0x16] = 0;
@@ -468,21 +468,21 @@ int SeBlockPlay(int seId, int bank, int no, int pan, int volume)
 	no = no & 0x1FF;
 
 	if (p_SeBlockData[bank] != 0) {
-		int bankData = (int)p_SeBlockData[bank];
+		RedSeBlockHEAD* bankData = reinterpret_cast<RedSeBlockHEAD*>(p_SeBlockData[bank]);
 		int seNo = no;
 
 		no += bank << 9;
 		no |= 0x80000000;
-		if (seNo < *(short*)(bankData + 10)) {
-			int dataBase = bankData + 0x10;
+		if (seNo < bankData->m_seCount) {
+			int dataBase = reinterpret_cast<int>(bankData->m_entries);
 
 			if (*(int*)(dataBase + seNo * 4) != -1) {
 				RedSeINFO* seInfo =
-				    (RedSeINFO*)(dataBase + *(short*)(bankData + 10) * 4 +
+				    (RedSeINFO*)(dataBase + bankData->m_seCount * 4 +
 				                 (*(unsigned int*)(dataBase + seNo * 4) & 0x7FFFFFFF));
 
 				if ((*(unsigned int*)(dataBase + seNo * 4) & 0x80000000) != 0) {
-					*(unsigned char*)seInfo |= 0x80;
+					seInfo->m_flagsAndCount |= 0x80;
 				}
 				if (_SePlayStart(seInfo, seId, no, pan, volume) != 0) {
 					return seNo;
@@ -507,16 +507,16 @@ int SeSepPlay(int seId, int sepId, int pan, int volume)
 {
 	int* sepBank;
 	int sepBase;
-	unsigned char* sepInfo;
+	RedSeINFO* sepInfo;
 
 	sepBank = c_RedEntry.SearchSeSepBank(sepId);
 	if (sepBank != 0) {
 		sepBase = sepBank[2];
-		sepInfo = (unsigned char*)(sepBase + 0x10);
+		sepInfo = reinterpret_cast<RedSeINFO*>(sepBase + 0x10);
 		if ((*(unsigned int*)(sepBase + 0xc) & 0x80000000) != 0) {
-			*sepInfo |= 0x80;
+			sepInfo->m_flagsAndCount |= 0x80;
 		}
-		if (_SePlayStart((RedSeINFO*)sepInfo, seId, sepId, pan, volume) != 0) {
+		if (_SePlayStart(sepInfo, seId, sepId, pan, volume) != 0) {
 			c_RedEntry.SeSepHistoryManager(1, sepId);
 			return sepId;
 		}
@@ -684,7 +684,7 @@ void SePause(int seId, int pause)
  */
 void _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int musicId, int volume, int mode)
 {
-	int waveBase = c_RedEntry.SearchWaveBase((int)*(short*)((char*)musicHead + 6));
+	int waveBase = c_RedEntry.SearchWaveBase(musicHead->m_waveNo);
 	if (waveBase == 0) {
 		return;
 	}
@@ -710,7 +710,7 @@ void _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int music
 		m_CrossTime = 0;
 	}
 
-	int trackBase = RedNew(*(char*)((char*)musicHead + 8) * 0x154);
+	int trackBase = RedNew(musicHead->m_trackCount * 0x154);
 	if (trackBase == 0) {
 		if (m_ReportPrint != 0) {
 			OSReport(sRedCommandMusicTrackCreateErrorFmt,
@@ -718,7 +718,7 @@ void _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int music
 			fflush(__files + 1);
 			OSReport(sRedCommandMusicNeedMemoryFmt,
 			         sRedCommandLogPrefix, sRedCommandLogErrorColor,
-			         (int)*(short*)((char*)musicHead + 4), *(char*)((char*)musicHead + 8) * 0x154, sRedCommandLogReset);
+			         (int)musicHead->m_musicNo, musicHead->m_trackCount * 0x154, sRedCommandLogReset);
 			fflush(__files + 1);
 		}
 		c_RedEntry.DisplayMMemoryInfo();
@@ -732,18 +732,18 @@ void _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int music
 		SetReverb(0, t_ReverbModeData[reverbKind].kind, t_ReverbModeData[reverbKind].params);
 	}
 
-	*(int*)p_ReverbDepth = (int)*(short*)((char*)musicHead + 10);
+	*(int*)p_ReverbDepth = (int)musicHead->m_reverbDepth;
 	if (*(int*)p_ReverbDepth != 0) {
 		*(int*)p_ReverbDepth = (*(int*)p_ReverbDepth + 1) << 8;
 		*(int*)p_ReverbDepth = (*(int*)p_ReverbDepth - 1) << 0xc;
 	}
 	((int*)p_ReverbDepth)[1] = 0;
 	((int*)p_ReverbDepth)[2] = 0;
-	music[0x11f] = (int)*(short*)((char*)musicHead + 6);
+	music[0x11f] = musicHead->m_waveNo;
 
 	unsigned char* current = (unsigned char*)musicHead + 0x20;
 	int* track = (int*)*music;
-	int count = *(char*)((char*)musicHead + 8);
+	int count = musicHead->m_trackCount;
 	char trackNo = 0;
 	while (count != 0) {
 		unsigned int blockSize = ((unsigned int)current[3] << 24) | ((unsigned int)current[2] << 16) |
@@ -783,7 +783,7 @@ void _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int music
 		*(short*)((char*)track + 0xb2) = 0;
 		*(short*)((char*)track + 0x92) = 0;
 		track[7] = 0;
-		track[0x41] = ((*(unsigned int*)((char*)musicHead + 0x14) & 0x40000) == 0) ? 0x200000 : 0;
+		track[0x41] = ((musicHead->m_playFlags & 0x40000) == 0) ? 0x200000 : 0;
 		*(short*)((char*)track + 0x13a) = 0;
 		*(short*)(track + 0x4e) = 0;
 		track[0x3c] = 0;
@@ -807,9 +807,9 @@ void _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int music
 	*(unsigned char*)((char*)music + 0x490) = 0;
 	music[0x120] = 0;
 	music[2] = (int)(t_KeySignatureData + 0xb);
-	*(unsigned char*)((char*)music + 0x491) = *(unsigned char*)((char*)musicHead + 8);
-	*(short*)((char*)music + 0x48e) = (short)*(char*)((char*)musicHead + 8);
-	*(unsigned char*)((char*)music + 0x492) = (unsigned char)(*(unsigned short*)((char*)musicHead + 0xc) & 0x7f);
+	*(unsigned char*)((char*)music + 0x491) = musicHead->m_trackCount;
+	*(short*)((char*)music + 0x48e) = (short)musicHead->m_trackCount;
+	*(unsigned char*)((char*)music + 0x492) = (unsigned char)(musicHead->m_flags & 0x7f);
 	*(short*)(music + 0x123) = 1;
 	music[0x112] = 0x1000;
 	music[5] = 10000;
@@ -823,7 +823,7 @@ void _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int music
 	music[9] = 0;
 	music[0x122] = 0;
 	music[0x11b] &= 0x10;
-	if ((*(unsigned int*)((char*)musicHead + 0x14) & 0x40000) != 0) {
+	if ((musicHead->m_playFlags & 0x40000) != 0) {
 		music[0x11b] |= 0x40000;
 	}
 
@@ -914,12 +914,13 @@ int MusicStop(int seId)
  */
 int MusicPlay(int musicId, int volume, int mode)
 {
+	RedMusicHEAD* musicHead;
 	int* musicBank = c_RedEntry.SearchMusicBank(musicId);
 
 	if (musicBank != 0) {
-		RedMusicHEAD* musicHead = (RedMusicHEAD*)musicBank[2];
+		musicHead = (RedMusicHEAD*)musicBank[2];
 		RedWaveHeadWD* waveHead =
-		    (RedWaveHeadWD*)c_RedEntry.SearchWaveBase(*(short*)((char*)musicHead + 6));
+		    (RedWaveHeadWD*)c_RedEntry.SearchWaveBase(musicHead->m_waveNo);
 
 		if (waveHead == 0) {
 			return -1;
