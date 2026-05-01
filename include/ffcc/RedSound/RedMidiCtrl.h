@@ -1,15 +1,18 @@
 #ifndef _FFCC_REDSOUND_REDMIDICTRL_H
 #define _FFCC_REDSOUND_REDMIDICTRL_H
 
-struct RedKeyOnDATA;
+#include "ffcc/RedSound/RedExecute.h"
+
 struct RedSoundCONTROL;
 
 struct RedTrackDATA {
 	unsigned char* m_command;
-	unsigned char m_pad04[0x18 - 0x04];
+	unsigned char m_pad04[0x08 - 0x04];
+	unsigned char* m_loopCommand[4];
 	int m_waveBankData;
 	int m_waveData;
-	unsigned char m_pad20[0x28 - 0x20];
+	signed char* m_keySignatureData;
+	RedNoteDATA m_note;
 	int m_volume;
 	int m_volumeAdd;
 	int m_volumeDelta;
@@ -19,7 +22,16 @@ struct RedTrackDATA {
 	int m_pan;
 	int m_panAdd;
 	int m_panDelta;
-	unsigned char m_pad4C[0x74 - 0x4C];
+	int m_mixVolume;
+	int m_mixVolumeAdd;
+	int m_mixVolumeDelta;
+	int m_mixVolumeMode;
+	int m_pitch;
+	int m_pitchAdd;
+	int m_pitchDelta;
+	int m_reverbDepth;
+	int m_reverbDepthAdd;
+	int m_reverbDepthDelta;
 	int m_vibrateFunc;
 	int m_vibrateRate;
 	int m_vibrateRateAdd;
@@ -57,31 +69,99 @@ struct RedTrackDATA {
 	unsigned char m_adsrDL;
 	unsigned char m_adsrSL;
 	unsigned char m_adsrRL;
-	unsigned char m_padE0[0xFC - 0xE0];
+	int m_fuzzyPitchDepth;
+	int m_fuzzyVolumeDepth;
+	int m_fuzzyPanDepth;
+	int m_fuzzyDeltaTimeDepth;
+	int m_fuzzyAdsrDepth;
+	int m_seSepId;
+	int m_seId;
 	int m_voiceSwitch;
 	unsigned char m_pad100[0x104 - 0x100];
 	unsigned int m_flags;
-	unsigned char m_pad108[0x110 - 0x108];
+	int m_deltaTime;
+	int m_playTime;
 	int m_sweepDelta;
 	int m_sweepAdd;
 	int m_portamentTime;
 	int m_waveBase;
 	int m_portamentPitch;
 	int m_waveNo;
-	unsigned char m_pad128[0x138 - 0x128];
+	short m_loopCount[4];
+	short m_loopStep[4];
 	short m_step;
 	short m_step2;
-	unsigned char m_pad13C[0x13E - 0x13C];
+	short m_loopDepth;
 	short m_pitchBend;
 	short m_pitchBendRaw;
 	short m_keyTranspose;
-	unsigned char m_pad144[0x148 - 0x144];
+	short m_loopStepCurrent;
+	short m_seTickCounter;
 	signed char m_fineTune;
 	unsigned char m_pad149[0x14B - 0x149];
 	signed char m_pitchBendRange;
 	unsigned char m_pad14C[0x14D - 0x14C];
 	unsigned char m_waveBankNo;
-	unsigned char m_pad14E[0x154 - 0x14E];
+	signed char m_trackNo;
+	unsigned char m_eraseTrack;
+	unsigned char m_attrMask;
+	unsigned char m_pad151[0x154 - 0x151];
+};
+
+struct RedKeyOnSlot {
+	RedTrackDATA* m_track;
+	RedNoteDATA m_note;
+};
+
+struct RedKeyOnDATA {
+	RedKeyOnSlot m_fixed[0x40];
+	RedKeyOnSlot m_priority[0x40];
+	RedKeyOnSlot m_normal[0x40];
+};
+
+struct RedSoundCONTROL {
+	RedTrackDATA* m_tracks;
+	unsigned char m_pad04[0x08 - 0x04];
+	signed char* m_keySignatureData;
+	int m_measure;
+	int m_tick;
+	int m_ticksPerMeasure;
+	unsigned short m_timeNumerator;
+	unsigned short m_timeDenominator;
+	int m_volume;
+	int m_volumeAdd;
+	int m_volumeDelta;
+	unsigned char* m_savedCommand[0x40];
+	int m_savedDelta[0x40];
+	unsigned int m_savedFlags[0x40];
+	int m_savedNote[0x40];
+	int m_savedTempo;
+	int m_savedTempoAdd;
+	int m_savedTempoDelta;
+	int m_savedActiveTrackCount;
+	int m_savedMeasure;
+	int m_savedTick;
+	int m_savedTicksPerMeasure;
+	int m_savedTimeSignature;
+	int m_tempo;
+	int m_tempoAdd;
+	int m_tempoDelta;
+	int m_masterVolume;
+	int m_masterVolumeAdd;
+	int m_masterVolumeDelta;
+	unsigned char m_pad460[0x46C - 0x460];
+	unsigned int m_flags;
+	int m_musicId;
+	int m_skipFrames;
+	unsigned int m_elapsedTime;
+	int m_waveNo;
+	int m_keySignature;
+	int m_loopBase;
+	unsigned int m_updateFlags;
+	short m_tickCounter;
+	short m_activeTrackCount;
+	unsigned char m_channelAlloc;
+	unsigned char m_trackCount;
 };
 
 typedef void (*RedMidiControlFunc)(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);

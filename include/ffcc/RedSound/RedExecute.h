@@ -6,11 +6,80 @@
 class AXFX_BUFFERUPDATE;
 struct RedReverbDATA;
 struct RedTrackDATA;
-struct RedVoiceDATA;
-struct RedWaveDATA;
-struct RedNoteDATA;
 struct RedSoundCONTROL;
 struct RedKeyOnDATA;
+
+struct RedNoteDATA {
+	signed char m_key;
+	signed char m_velocity;
+	unsigned char m_allocFlags;
+	unsigned char m_pad03;
+};
+
+struct RedWaveDATA {
+	unsigned int m_flags;
+	int m_sampleStart;
+	int m_loopStart;
+	int m_loopEnd;
+	unsigned char m_pad10[0x14 - 0x10];
+	int m_pitch;
+	signed char m_splitKey;
+	unsigned char m_splitVelocity;
+	unsigned char m_volume;
+	unsigned char m_pan;
+	signed char m_reverbMix;
+	unsigned char m_pad1D[0x22 - 0x1D];
+	unsigned char m_adpcmData[0x4A - 0x22];
+	unsigned char m_adpcmLoop[0x50 - 0x4A];
+	unsigned char m_adsr[0x5C - 0x50];
+	unsigned char m_pad5C[0x60 - 0x5C];
+};
+
+struct RedVoiceDATA {
+	RedTrackDATA* m_track;
+	RedWaveDATA* m_waveData;
+	int* m_trackVolume;
+	int* m_trackExpression;
+	int* m_trackPan;
+	void* m_axVoice;
+	signed char m_key;
+	signed char m_velocity;
+	unsigned char m_stateFlags;
+	unsigned char m_notePad;
+	int m_pitchModPhase;
+	int m_pitchModFrames;
+	int m_pitchModFrame;
+	short m_pitchModDelay;
+	unsigned char m_pad2A[0x2C - 0x2A];
+	int m_volumeModPhase;
+	int m_volumeModFrames;
+	int m_volumeModFrame;
+	short m_volumeModDelay;
+	unsigned char m_pad3A[0x3C - 0x3A];
+	int m_randomPitch;
+	int m_randomVolume;
+	int m_randomPan;
+	unsigned char m_pad48[0x50 - 0x48];
+	unsigned short m_adsrTime[4];
+	unsigned char m_adsrLevel[4];
+	int m_adsrStage;
+	int m_adsrStepFrames;
+	int m_adsrStepAdd;
+	unsigned short m_axMix[0x12];
+	int m_active;
+	unsigned int m_flags;
+	unsigned int m_voiceSwitch;
+	int m_pitch;
+	int m_targetPitch;
+	int m_basePitch;
+	unsigned char m_padA4[0xA8 - 0xA4];
+	int m_voiceIndex;
+	int m_adsrCurrentLevel;
+	int m_envelopeLevel;
+	unsigned char m_padB4[0xB8 - 0xB4];
+	unsigned int m_updateFlags;
+	unsigned char m_padBC[0xC0 - 0xBC];
+};
 
 u8 GetRandomData();
 int PitchCompute(int, int, int, int);

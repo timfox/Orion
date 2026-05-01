@@ -4,6 +4,7 @@
 #include "ffcc/RedSound/RedStream.h"
 #include "ffcc/RedSound/RedCommand.h"
 #include "ffcc/RedSound/RedExecute.h"
+#include "ffcc/RedSound/RedMidiCtrl.h"
 #include "ffcc/RedSound/RedGlobals.h"
 #include "PowerPC_EABI_Support/Msl/MSL_C/MSL_Common/file_io.h"
 #include "PowerPC_EABI_Support/Msl/MSL_C/MSL_Common/string.h"
@@ -175,10 +176,10 @@ void _SetSoundMode(int* command)
  */
 void _SetReverbDepth(int* command)
 {
+    int fadeDepth;
     int reverbBank;
     int reverbDepth;
     int fadeStep;
-    int fadeDepth;
     int* seInfo;
 
     reverbBank = command[0] & 1;
@@ -201,7 +202,8 @@ void _SetReverbDepth(int* command)
         seInfo = *(int**)((char*)p_SoundControlBuffer + 0xdbc);
         do {
             if ((u32)*seInfo != 0) {
-                fadeDepth = reverbDepth - (seInfo[0x1a] & 0xfffff000U);
+                fadeDepth = seInfo[0x1a] & 0xfffff000U;
+                fadeDepth = reverbDepth - fadeDepth;
                 seInfo[0x1b] = fadeDepth / fadeStep;
                 seInfo[0x1c] = fadeStep;
             }
@@ -807,7 +809,7 @@ int _MainThread(void*)
             iVar3 = m_RedMasterTime;
             uVar4 = (unsigned int)(m_RedMasterTime - m_MainThreadTime);
             if (*(short*)(iVar1 + 0x48e) != 0) {
-                *(unsigned int*)(iVar1 + 0x478) = *(unsigned int*)(iVar1 + 0x478) + uVar4;
+                ((RedSoundCONTROL*)iVar1)->m_elapsedTime = ((RedSoundCONTROL*)iVar1)->m_elapsedTime + uVar4;
             }
             m_MainThreadTime = iVar3;
             if (4 < uVar4) {
@@ -1282,7 +1284,7 @@ void CRedDriver::Init()
         iVar4 = iVar5 * 0x154;
         cVar1 = (char)iVar5;
         iVar5 = iVar5 + 1;
-        *(char*)(iVar6 + iVar4 + 0x14e) = (char)(cVar1 + ' ');
+        ((RedTrackDATA*)(iVar6 + iVar4))->m_trackNo = (char)(cVar1 + ' ');
     } while (iVar5 < 0x20);
     p_EditorTrack = (void*)RedNew(0x154);
     memset(p_EditorTrack, 0, 0x154);
@@ -1422,20 +1424,19 @@ int CRedDriver::GetSoundMode()
 int CRedDriver::SetMusicData(void* musicData)
 {
     int result;
-    char localHeader[0x20];
-    char* header;
+    RedMusicHEAD localHeader;
+    RedMusicHEAD* const header = (RedMusicHEAD*)musicData;
     void* copiedHeader;
     int headerSize;
 
     result = -1;
-    header = (char*)musicData;
-    if (((header[0] == 'B') && (header[1] == 'G')) && (header[2] == 'M')) {
-        memcpy(localHeader, header, sizeof(localHeader));
-        headerSize = *(int*)(localHeader + 0x10);
+    if (((header->m_signature[0] == 'B') && (header->m_signature[1] == 'G')) && (header->m_signature[2] == 'M')) {
+        memcpy(&localHeader, header, sizeof(localHeader));
+        headerSize = localHeader.m_size;
         copiedHeader = (void*)RedNew(headerSize);
         if (copiedHeader != 0) {
             memcpy(copiedHeader, header, headerSize);
-            result = *(short*)(localHeader + 4);
+            result = localHeader.m_musicNo;
             _EntryExecCommand(_SetMusicData, (int)copiedHeader, 0, 0, 0, 0, 0, 0);
         }
     } else if (m_ReportPrint != 0) {
@@ -1695,11 +1696,11 @@ int CRedDriver::ReentrySeSepData(int id)
  */
 int CRedDriver::SePlayState(int seID)
 {
+    int* commandNow;
     unsigned int uVar1;
-    int result;
     int* seInfo;
     int** seInfoBase;
-    int* commandNow;
+    int result;
     int* command;
 
     uVar1 = OSDisableInterrupts();
@@ -1707,7 +1708,7 @@ int CRedDriver::SePlayState(int seID)
     seInfoBase = (int**)((int)p_SoundControlBuffer + 0xdbc);
     seInfo = *seInfoBase;
     do {
-        if (((u32)*seInfo != 0) && ((seID == -1 || (seInfo[0x3e] == seID)))) {
+        if (((u32)*seInfo != 0) && ((seID == -1 || (((RedTrackDATA*)seInfo)->m_seId == seID)))) {
             result = (int)seInfo;
             break;
         }
@@ -1879,7 +1880,7 @@ int CRedDriver::GetSeVolume(int seID, int mode)
 
     seInfo = *(unsigned int**)((int)p_SoundControlBuffer + 0xdbc);
     while (1) {
-        if ((*seInfo != 0) && ((seID == -1) || (seID == (int)seInfo[0x3e]))) {
+        if ((*seInfo != 0) && ((seID == -1) || (seID == ((RedTrackDATA*)seInfo)->m_seId))) {
             if (*seInfo != 0) {
                 if (mode == 1) {
                     return seInfo[0x15];
@@ -1911,7 +1912,7 @@ int CRedDriver::ReportSeLoop(int seID)
     seInfo = *(unsigned int**)((int)p_SoundControlBuffer + 0xdbc);
     while (1) {
         if ((*seInfo != 0) &&
-            (((seID == -1) || (seID == (int)seInfo[0x3e])) && ((seInfo[0x40] & 1U) != 0))) {
+            (((seID == -1) || (seID == ((RedTrackDATA*)seInfo)->m_seId)) && ((seInfo[0x40] & 1U) != 0))) {
             return 1;
         }
         seInfo += 0x55;

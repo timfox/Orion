@@ -183,7 +183,7 @@ void KeyOnReserve(RedKeyOnDATA* keyOnData, RedTrackDATA* track)
     unsigned int* slot;
 
     if ((((signed char*)track)[0x26] & 5) != 0) {
-        slot = (unsigned int*)((int)keyOnData + ((signed char*)track)[0x14e] * 8);
+        slot = (unsigned int*)((int)keyOnData + track->m_trackNo * 8);
         if ((*slot == 0) || (*slot == (unsigned int)track)) {
             *slot = (unsigned int)track;
             slot[1] = ((unsigned int*)track)[9];
@@ -509,7 +509,7 @@ void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrack
     unsigned int* seTrack;
     unsigned int* controlData;
 
-    ((int*)track)[0x41] = 0;
+    track->m_flags = 0;
     KeyOffSet(control, keyOnData, track);
 
     seTrack = p_VoiceData;
@@ -520,10 +520,10 @@ void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrack
         seTrack += 0x30;
     } while (seTrack < p_VoiceData + 0xc00);
 
-    *((int*)track) = 0;
+    track->m_command = 0;
     if ((int*)control < (int*)((int)p_SoundControlBuffer + 0xdbc)) {
-        *(short*)((int)control + 0x48e) = *(short*)((int)control + 0x48e) - 1;
-        if ((*(short*)((int)control + 0x48e) == 0) &&
+        control->m_activeTrackCount--;
+        if ((control->m_activeTrackCount == 0) &&
             ((m_MusicPhraseStop == 1) || ((((int*)control)[0x11b] & 1) == 0))) {
             controlData = (unsigned int*)control;
             seTrack = p_VoiceData;
@@ -541,16 +541,16 @@ void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrack
             c_RedEntry.MusicHistoryManager(0, controlData[0x11c]);
             c_RedEntry.WaveHistoryManager(0, controlData[0x11f]);
             controlData[0x11c] = 0xffffffff;
-            controlData[0x122] = 0;
+            control->m_updateFlags = 0;
             RedDelete((int)controlData[0]);
             controlData[0] = 0;
         }
     } else {
-        if ((u32)((int*)track)[6] != 0) {
-            c_RedEntry.WaveHistoryManager(0, *(short*)(((int*)track)[6] + 2));
+        if ((u32)track->m_waveBankData != 0) {
+            c_RedEntry.WaveHistoryManager(0, reinterpret_cast<RedWaveHeadWD*>(track->m_waveBankData)->m_waveNo);
         }
-        c_RedEntry.SeSepHistoryManager(0, ((int*)track)[0x3d]);
-        ((int*)track)[0x3e] = 0;
+        c_RedEntry.SeSepHistoryManager(0, track->m_seSepId);
+        track->m_seId = 0;
     }
 }
 
@@ -566,13 +566,13 @@ void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrack
 void __MidiCtrl_Sleep(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA*)
 {
     if ((m_MusicPhraseStop == 1) && ((void*)control == p_SoundControlBuffer)) {
-        int* track = (int*)*(int*)control;
+        RedTrackDATA* track = control->m_tracks;
         do {
-            if ((u32)*track != 0) {
-                __MidiCtrl_Stop(control, keyOnData, (RedTrackDATA*)track);
+            if ((u32)track->m_command != 0) {
+                __MidiCtrl_Stop(control, keyOnData, track);
             }
-            track += 0x55;
-        } while (track < (int*)(*(int*)control + (unsigned int)*(unsigned char*)((char*)control + 0x491) * 0x154));
+            track++;
+        } while (track < control->m_tracks + control->m_trackCount);
     }
 }
 
@@ -589,15 +589,15 @@ void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData
 {
     int* controlData = (int*)control;
     int* trackData = (int*)track;
-    int loopBase = controlData[0x121];
-    int deltaAdjust = 1 - trackData[0x42];
+    int loopBase = control->m_loopBase;
+    int deltaAdjust = 1 - track->m_deltaTime;
     int slot = 0;
     int* scan;
 
-    controlData[0x11b] |= 1;
-    for (scan = (int*)controlData[0]; scan < trackData; scan += 0x55) {
+    control->m_flags |= 1;
+    for (scan = (int*)control->m_tracks; scan < trackData; scan += 0x55) {
         controlData[slot + 10] = *scan;
-        controlData[slot + 0x4a] = scan[0x42] + deltaAdjust;
+        controlData[slot + 0x4a] = ((RedTrackDATA*)scan)->m_deltaTime + deltaAdjust;
         controlData[slot + 0x8a] = scan[0x41];
         controlData[slot + 0xca] = scan[9];
         slot++;
@@ -610,14 +610,14 @@ void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData
         int delta = DeltaTimeSumup((unsigned char**)command);
 
         controlData[slot + 10] = command[0];
-        controlData[slot + 0x4a] = scan[0x42] + delta + deltaAdjust;
+        controlData[slot + 0x4a] = ((RedTrackDATA*)scan)->m_deltaTime + delta + deltaAdjust;
         controlData[slot + 0x8a] = scan[0x41];
         controlData[slot + 0xca] = scan[9];
 
-        if (nextTrack < (int*)(controlData[0] + (unsigned int)*(unsigned char*)((char*)control + 0x491) * 0x154)) {
-            for (; nextTrack < (int*)(controlData[0] + (unsigned int)*(unsigned char*)((char*)control + 0x491) * 0x154);
+        if (((RedTrackDATA*)nextTrack - control->m_tracks) < control->m_trackCount) {
+            for (; nextTrack < (int*)(control->m_tracks + control->m_trackCount);
                  nextTrack += 0x55) {
-                int currentDelta = deltaAdjust + (nextTrack[0x42] - loopBase);
+                int currentDelta = deltaAdjust + (((RedTrackDATA*)nextTrack)->m_deltaTime - loopBase);
 
                 while ((currentDelta < 1) && ((u32)*nextTrack != 0)) {
                     unsigned char* cmd = (unsigned char*)*nextTrack;
@@ -627,7 +627,7 @@ void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData
                     if ((u32)*nextTrack != 0) {
                         int step = DeltaTimeSumup((unsigned char**)nextTrack);
                         currentDelta += step;
-                        nextTrack[0x42] += step;
+                        ((RedTrackDATA*)nextTrack)->m_deltaTime += step;
                     }
                 }
 
@@ -661,15 +661,15 @@ void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData
  */
 void __MidiCtrl_WholeLoopEnd(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA*)
 {
-    ((int*)control)[0x11b] |= 2;
+    control->m_flags |= 2;
     if ((m_MusicPhraseStop == 1) && ((void*)control == p_SoundControlBuffer)) {
-        int* track = (int*)((int*)control)[0];
+        RedTrackDATA* track = control->m_tracks;
         do {
-            if ((u32)*track != 0) {
-                __MidiCtrl_Stop(control, keyOnData, (RedTrackDATA*)track);
+            if ((u32)track->m_command != 0) {
+                __MidiCtrl_Stop(control, keyOnData, track);
             }
-            track += 0x55;
-        } while (track < (int*)(((int*)control)[0] + (unsigned int)*(unsigned char*)((char*)control + 0x491) * 0x154));
+            track++;
+        } while (track < control->m_tracks + control->m_trackCount);
     }
 }
 
@@ -684,12 +684,11 @@ void __MidiCtrl_WholeLoopEnd(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, 
  */
 void __MidiCtrl_LoopStart(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
-    ++*(short*)((char*)track + 0x13C);
-    *(short*)((char*)track + 0x13C) &= 3;
-    *(int*)((char*)track + *(short*)((char*)track + 0x13C) * 4 + 8) = *(int*)track;
-    *(short*)((char*)track + *(short*)((char*)track + 0x13C) * 2 + 0x130) =
-        *(short*)((char*)track + 0x144);
-    *(short*)((char*)track + *(short*)((char*)track + 0x13C) * 2 + 0x128) = 0;
+    ++track->m_loopDepth;
+    track->m_loopDepth &= 3;
+    track->m_loopCommand[track->m_loopDepth] = track->m_command;
+    track->m_loopStep[track->m_loopDepth] = track->m_loopStepCurrent;
+    track->m_loopCount[track->m_loopDepth] = 0;
 }
 
 /*
@@ -704,21 +703,19 @@ void __MidiCtrl_LoopStart(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 void __MidiCtrl_LoopEnd(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
     int loopCount;
-    int counterOffset;
 
-    loopCount = *(*(u8**)track)++;
+    loopCount = *track->m_command++;
     if (loopCount == 0) {
         loopCount = 0x100;
     }
 
-    counterOffset = *(short*)((char*)track + 0x13c) * 2 + 0x128;
-    *(short*)((char*)track + counterOffset) = *(short*)((char*)track + counterOffset) + 1;
-    if (*(short*)((char*)track + *(short*)((char*)track + 0x13c) * 2 + 0x128) != loopCount) {
-        *(u8**)track = *(u8**)((char*)track + *(short*)((char*)track + 0x13c) * 4 + 8);
-        *(short*)((char*)track + 0x144) = *(short*)((char*)track + *(short*)((char*)track + 0x13c) * 2 + 0x130);
+    track->m_loopCount[track->m_loopDepth]++;
+    if (track->m_loopCount[track->m_loopDepth] != loopCount) {
+        track->m_command = track->m_loopCommand[track->m_loopDepth];
+        track->m_loopStepCurrent = track->m_loopStep[track->m_loopDepth];
     } else {
-        *(short*)((char*)track + 0x13c) = *(short*)((char*)track + 0x13c) - 1;
-        *(short*)((char*)track + 0x13c) &= 3;
+        track->m_loopDepth--;
+        track->m_loopDepth &= 3;
     }
 }
 
@@ -733,9 +730,8 @@ void __MidiCtrl_LoopEnd(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
  */
 void __MidiCtrl_LoopRepeat(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
-    *(int*)track = *(int*)((char*)track + (*(short*)((char*)track + 0x13c) * 4) + 8);
-    *(short*)((char*)track + 0x144) =
-        *(short*)((char*)track + *(short*)((char*)track + 0x13c) * 2 + 0x130);
+    track->m_command = track->m_loopCommand[track->m_loopDepth];
+    track->m_loopStepCurrent = track->m_loopStep[track->m_loopDepth];
 }
 
 /*
@@ -749,9 +745,9 @@ void __MidiCtrl_LoopRepeat(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
  */
 void __MidiCtrl_TempoDirect(RedSoundCONTROL* control, RedKeyOnDATA*, RedTrackDATA* track)
 {
-    *(u32*)((u8*)control + 0x448) = ((u32)*(*(u8**)track)++) << 0xc;
-    *(u32*)((u8*)control + 0x44C) = 0;
-    *(u32*)((u8*)control + 0x450) = 0;
+    control->m_tempo = ((u32)*track->m_command++) << 0xc;
+    control->m_tempoAdd = 0;
+    control->m_tempoDelta = 0;
 }
 
 /*
@@ -767,11 +763,11 @@ void __MidiCtrl_TempoChange(RedSoundCONTROL* control, RedKeyOnDATA*, RedTrackDAT
 {
     unsigned int delta;
 
-    delta = (*(u8*)*(int*)track != 0) ? *(u8*)*(int*)track : 0x100;
+    delta = (*track->m_command != 0) ? *track->m_command : 0x100;
 
-    ((int*)control)[0x113] = DataAddCompute((int*)control + 0x112, *(unsigned char*)(*(int*)track + 1), (int*)&delta);
-    ((int*)control)[0x114] = delta;
-    *(int*)track += 2;
+    control->m_tempoAdd = DataAddCompute(&control->m_tempo, track->m_command[1], (int*)&delta);
+    control->m_tempoDelta = delta;
+    track->m_command += 2;
 }
 
 /*
@@ -785,9 +781,9 @@ void __MidiCtrl_TempoChange(RedSoundCONTROL* control, RedKeyOnDATA*, RedTrackDAT
  */
 void __MidiCtrl_ReverbDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
-    int* reverbDepth = (int*)track + 0x1a;
+    int* reverbDepth = &track->m_reverbDepth;
 
-    *reverbDepth = *(*(s8**)track)++;
+    *reverbDepth = *(s8*)track->m_command++;
 
     if (*reverbDepth != 0) {
         *reverbDepth += 1;
@@ -813,21 +809,21 @@ void __MidiCtrl_ReverbDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
 void __MidiCtrl_ReverbDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
     unsigned int stepCount;
-    int* reverbDepth = (int*)track + 0x1a;
+    int* reverbDepth = &track->m_reverbDepth;
     int targetDepth;
 
-    stepCount = (*(u8*)*(int*)track != 0) ? *(u8*)*(int*)track : 0x100;
+    stepCount = (*track->m_command != 0) ? *track->m_command : 0x100;
 
-    targetDepth = *(*(s8**)track)++;
+    targetDepth = (s8)*track->m_command++;
     if (targetDepth != 0) {
         targetDepth += 1;
         targetDepth <<= 8;
         targetDepth -= 1;
     }
 
-    reverbDepth[1] = DataAddCompute(reverbDepth, (s8)targetDepth, (int*)&stepCount);
-    reverbDepth[2] = stepCount;
-    *(u8**)track += 2;
+    track->m_reverbDepthAdd = DataAddCompute(reverbDepth, (s8)targetDepth, (int*)&stepCount);
+    track->m_reverbDepthDelta = stepCount;
+    track->m_command += 2;
 }
 
 /*
@@ -870,7 +866,7 @@ void __MidiCtrl_KeySignature(RedSoundCONTROL* control, RedKeyOnDATA*, RedTrackDA
     if (m_MusicKeySignature != 0) {
         value = ((unsigned int*)control)[0];
         do {
-            *(unsigned int*)(value + 0x20) = ((unsigned int*)control)[2];
+            ((RedTrackDATA*)value)->m_keySignatureData = control->m_keySignatureData;
             value += 0x154;
         } while (value < ((unsigned int*)control)[0] + (unsigned int)*(unsigned char*)((int)control + 0x491) * 0x154);
     }
@@ -887,7 +883,7 @@ void __MidiCtrl_KeySignature(RedSoundCONTROL* control, RedKeyOnDATA*, RedTrackDA
  */
 void __MidiCtrl_PhraseSignature(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
-    int command = *(*(u8**)track)++;
+    int command = *track->m_command++;
 }
 
 /*
@@ -915,8 +911,8 @@ void __MidiCtrl_KeyOnSame(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedTrackDAT
  */
 void __MidiCtrl_KeyOnNoteVelocity(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedTrackDATA* track)
 {
-    *reinterpret_cast<char*>(reinterpret_cast<int>(track) + 0x24) = *(*reinterpret_cast<unsigned char**>(track))++;
-    *reinterpret_cast<char*>(reinterpret_cast<int>(track) + 0x25) = *(*reinterpret_cast<unsigned char**>(track))++;
+    track->m_note.m_key = *track->m_command++;
+    track->m_note.m_velocity = *track->m_command++;
 
     KeyOnReserve(keyOnData, track);
 }
@@ -932,7 +928,7 @@ void __MidiCtrl_KeyOnNoteVelocity(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, Red
  */
 void __MidiCtrl_KeyOnNote(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedTrackDATA* track)
 {
-    *reinterpret_cast<char*>(reinterpret_cast<int>(track) + 0x24) = *(*reinterpret_cast<unsigned char**>(track))++;
+    track->m_note.m_key = *track->m_command++;
 
     KeyOnReserve(keyOnData, track);
 }
@@ -948,7 +944,7 @@ void __MidiCtrl_KeyOnNote(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedTrackDAT
  */
 void __MidiCtrl_KeyOnVelocity(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedTrackDATA* track)
 {
-    *reinterpret_cast<char*>(reinterpret_cast<int>(track) + 0x25) = *(*reinterpret_cast<unsigned char**>(track))++;
+    track->m_note.m_velocity = *track->m_command++;
 
     KeyOnReserve(keyOnData, track);
 }
@@ -978,8 +974,8 @@ void __MidiCtrl_KeyOffSame(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, Re
  */
 void __MidiCtrl_KeyOffNoteVelocity(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA* track)
 {
-    *reinterpret_cast<char*>(reinterpret_cast<int>(track) + 0x24) = *(*reinterpret_cast<unsigned char**>(track))++;
-    *reinterpret_cast<int*>(track) += 1;
+    track->m_note.m_key = *track->m_command++;
+    track->m_command++;
 
     KeyOffSet(control, keyOnData, track);
 }
@@ -995,7 +991,7 @@ void __MidiCtrl_KeyOffNoteVelocity(RedSoundCONTROL* control, RedKeyOnDATA* keyOn
  */
 void __MidiCtrl_KeyOffNote(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA* track)
 {
-    *reinterpret_cast<char*>(reinterpret_cast<int>(track) + 0x24) = *(*reinterpret_cast<unsigned char**>(track))++;
+    track->m_note.m_key = *track->m_command++;
 
     KeyOffSet(control, keyOnData, track);
 }
@@ -1011,7 +1007,7 @@ void __MidiCtrl_KeyOffNote(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, Re
  */
 void __MidiCtrl_KeyOffVelocity(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA* track)
 {
-    *reinterpret_cast<int*>(track) += 1;
+    track->m_command++;
 
     KeyOffSet(control, keyOnData, track);
 }
@@ -1056,7 +1052,7 @@ void __MidiCtrl_WaveWithBank(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* trac
 {
 	int waveBank;
 	int bankNo;
-	int waveNo;
+	unsigned int waveNo;
 	int waveBankData;
 	int waveTable;
 
@@ -1597,7 +1593,7 @@ void __MidiCtrl_SustainPedal(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* trac
 {
     unsigned int* voice;
 
-    if (*(u8*)((int*)track)[0] != 0) {
+    if (*track->m_command != 0) {
         track->m_voiceSwitch |= 4;
         voice = p_VoiceData;
         do {
@@ -1617,7 +1613,7 @@ void __MidiCtrl_SustainPedal(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* trac
         } while (voice < p_VoiceData + 0xc00);
     }
 
-    ((int*)track)[0] += 1;
+    track->m_command += 1;
     SetVoiceSwitch(track, track->m_voiceSwitch);
 }
 
@@ -1632,7 +1628,7 @@ void __MidiCtrl_SustainPedal(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* trac
  */
 void __MidiCtrl_ChannelAlloc(RedSoundCONTROL* control, RedKeyOnDATA*, RedTrackDATA* track)
 {
-    *((unsigned char*)control + 0x490) = (int)*(*(unsigned char**)track)++;
+    control->m_channelAlloc = (int)*track->m_command++;
 }
 
 /*
@@ -1648,11 +1644,11 @@ void __MidiCtrl_ChannelPriority(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* t
 {
     int command;
 
-    command = *(*(u8**)track)++;
+    command = *track->m_command++;
     if (command != 0) {
-        *(u8*)((char*)track + 0x26) |= 8;
+        track->m_note.m_allocFlags |= 8;
     } else {
-        *(u8*)((char*)track + 0x26) &= ~8;
+        track->m_note.m_allocFlags &= ~8;
     }
 }
 
@@ -1669,11 +1665,11 @@ void __MidiCtrl_ChannelFix(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
     int command;
 
-    command = *(*(u8**)track)++;
+    command = *track->m_command++;
     if (command != 0) {
-        *(u8*)((char*)track + 0x26) |= 4;
+        track->m_note.m_allocFlags |= 4;
     } else {
-        *(u8*)((char*)track + 0x26) &= ~4;
+        track->m_note.m_allocFlags &= ~4;
     }
 }
 
@@ -1693,19 +1689,19 @@ void __MidiCtrl_VibrateOn(RedSoundCONTROL* control, RedKeyOnDATA* keyOn, RedTrac
     int output;
     unsigned int* entry;
 
-    ((int*)track)[0x20] = (unsigned int)(*(unsigned char*)((int*)track)[0]) << 0xc;
-    if (*(u8*)(((int*)track)[0] + 1) != 0) {
-        depth = (unsigned int)(*(unsigned char*)(((int*)track)[0] + 1));
+    ((int*)track)[0x20] = (unsigned int)track->m_command[0] << 0xc;
+    if (track->m_command[1] != 0) {
+        depth = (unsigned int)track->m_command[1];
     } else {
         depth = 0x100;
     }
 
     divisor = depth;
     ((int*)track)[0x1e] = 0x100000 / divisor;
-    ((int*)track)[0x1d] = (int)SwingEntryFunction[*(unsigned char*)(((int*)track)[0] + 2) & 0xf];
+    ((int*)track)[0x1d] = (int)SwingEntryFunction[track->m_command[2] & 0xf];
     *(short*)((int)track + 0x8e) = 0;
     *(short*)((int)track + 0x8c) = 0;
-    ((int*)track)[0] = ((int*)track)[0] + 3;
+    track->m_command += 3;
 
     entry = p_VoiceData;
     do {
@@ -1770,9 +1766,9 @@ void __MidiCtrl_VibrateDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA
 	if (delta[0] == 0) {
 		delta[0] += 1;
 	}
-	((int*)track)[0x21] = DataAddCompute((int*)track + 0x20, *(u8*)((int*)track)[0], delta);
+	((int*)track)[0x21] = DataAddCompute((int*)track + 0x20, *track->m_command, delta);
 	*(short*)((int)track + 0x8e) = (short)delta[0];
-	((int*)track)[0] += 1;
+	track->m_command += 1;
 }
 
 /*
@@ -1819,8 +1815,8 @@ void __MidiCtrl_VibrateRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
         trackDelta[0] += 1;
     }
 
-    if (*(u8*)((int*)track)[0] != 0) {
-        divisor = *(u8*)((int*)track)[0];
+    if (*track->m_command != 0) {
+        divisor = *track->m_command;
     } else {
         divisor = 0x100;
     }
@@ -1829,7 +1825,7 @@ void __MidiCtrl_VibrateRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
     rate = 0x100 / rate;
     ((int*)track)[0x1f] = DataAddCompute((int*)track + 0x1e, rate, trackDelta);
     *(short*)((int*)track + 0x23) = (short)trackDelta[0];
-    ((int*)track)[0] += 1;
+    track->m_command += 1;
 }
 
 /*
@@ -1880,18 +1876,18 @@ void __MidiCtrl_TremoloOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 	int output;
 	unsigned int* voice;
 
-	((int*)track)[0x28] = (unsigned int)(*(unsigned char*)((int*)track)[0]) << 0xc;
-	if (*(u8*)(((int*)track)[0] + 1) != 0) {
-		rateDivisor = (unsigned int)(*(unsigned char*)(((int*)track)[0] + 1));
+	((int*)track)[0x28] = (unsigned int)track->m_command[0] << 0xc;
+	if (track->m_command[1] != 0) {
+		rateDivisor = (unsigned int)track->m_command[1];
 	} else {
 		rateDivisor = 0x100;
 	}
 	divisor = rateDivisor;
 	((int*)track)[0x26] = 0x100000 / divisor;
-	((int*)track)[0x25] = (int)SwingEntryFunction[*(unsigned char*)(((int*)track)[0] + 2) & 0xf];
+	((int*)track)[0x25] = (int)SwingEntryFunction[track->m_command[2] & 0xf];
 	*(short*)((int)track + 0xae) = 0;
 	*(short*)((int)track + 0xac) = 0;
-	((int*)track)[0] += 3;
+	track->m_command += 3;
 
 	voice = p_VoiceData;
 	do {
@@ -1960,9 +1956,9 @@ void __MidiCtrl_TremoloDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA
 	if (delta[0] == 0) {
 		delta[0] += 1;
 	}
-	((int*)track)[0x29] = DataAddCompute((int*)track + 0x28, *(u8*)((int*)track)[0], delta);
+	((int*)track)[0x29] = DataAddCompute((int*)track + 0x28, *track->m_command, delta);
 	*(short*)((int)track + 0xae) = (short)delta[0];
-	((int*)track)[0] += 1;
+	track->m_command += 1;
 }
 
 /*
@@ -2008,8 +2004,8 @@ void __MidiCtrl_TremoloRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
 	if (delta[0] == 0) {
 		delta[0] += 1;
 	}
-	if (*(u8*)((int*)track)[0] != 0) {
-		divisor = *(u8*)((int*)track)[0];
+	if (*track->m_command != 0) {
+		divisor = *track->m_command;
 	} else {
 		divisor = 0x100;
 	}
@@ -2017,7 +2013,7 @@ void __MidiCtrl_TremoloRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
 	rate = 0x100 / rate;
 	((int*)track)[0x27] = DataAddCompute((int*)track + 0x26, rate, delta);
 	*(short*)((int*)track + 0x2b) = (short)delta[0];
-	((int*)track)[0] += 1;
+	track->m_command += 1;
 }
 
 /*
@@ -2066,20 +2062,20 @@ void __MidiCtrl_ShakeOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 	int rate;
 	int divisor;
 
-	((int*)track)[0x30] = *(u8*)((int*)track)[0] << 0xc;
-	if (*(u8*)(((int*)track)[0] + 1) != 0) {
-		rate = *(u8*)(((int*)track)[0] + 1);
+	track->m_shakeDepth = *track->m_command << 0xc;
+	if (track->m_command[1] != 0) {
+		rate = track->m_command[1];
 	} else {
 		rate = 0x100;
 	}
 	divisor = rate;
-	((int*)track)[0x2e] = 0x100000 / divisor;
-	((int*)track)[0x2d] = (int)SwingEntryFunction[*(u8*)(((int*)track)[0] + 2) & 0xf];
-	*(u16*)((u8*)track + 0xd2) = 0;
-	*(u16*)((u8*)track + 0xd0) = 0;
-	((int*)track)[0x32] = 0;
-	((int*)track)[0x33] = 0;
-	((int*)track)[0] += 3;
+	track->m_shakeRate = 0x100000 / divisor;
+	track->m_shakeFunc = (int)SwingEntryFunction[track->m_command[2] & 0xf];
+	track->m_shakeDepthDelta = 0;
+	track->m_shakeRateDelta = 0;
+	track->m_shakeOutput = 0;
+	track->m_shakePan = 0;
+	track->m_command += 3;
 }
 
 /*
@@ -2124,9 +2120,9 @@ void __MidiCtrl_ShakeDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
 	if (delta[0] == 0) {
 		delta[0] += 1;
 	}
-	((int*)track)[0x31] = DataAddCompute((int*)track + 0x30, *(u8*)((int*)track)[0], delta);
+	((int*)track)[0x31] = DataAddCompute((int*)track + 0x30, *track->m_command, delta);
 	*(short*)((int)track + 0xd2) = (short)delta[0];
-	((int*)track)[0] += 1;
+	track->m_command += 1;
 }
 
 /*
@@ -2172,8 +2168,8 @@ void __MidiCtrl_ShakeRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* t
 	if (delta[0] == 0) {
 		delta[0] += 1;
 	}
-	if (*(u8*)((int*)track)[0] != 0) {
-		divisor = *(u8*)((int*)track)[0];
+	if (*track->m_command != 0) {
+		divisor = *track->m_command;
 	} else {
 		divisor = 0x100;
 	}
@@ -2181,7 +2177,7 @@ void __MidiCtrl_ShakeRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* t
 	rate = 0x100 / rate;
 	((int*)track)[0x2f] = DataAddCompute((int*)track + 0x2e, rate, delta);
 	*(short*)((int*)track + 0x34) = (short)delta[0];
-	((int*)track)[0] += 1;
+	track->m_command += 1;
 }
 
 /*
@@ -2304,14 +2300,13 @@ void _PitchBendCompute(RedTrackDATA* track, int bend)
  */
 void __MidiCtrl_PitchBend(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
-    int bend = (unsigned int)*(unsigned char*)(((int*)track)[0] + 1) * 0x80 +
-        ((unsigned int)*(unsigned char*)((int*)track)[0] - 0x2000);
+    int bend = (unsigned int)track->m_command[1] * 0x80 + ((unsigned int)track->m_command[0] - 0x2000);
 
     track->m_pitchBendRaw = bend;
     bend *= track->m_pitchBendRange;
     bend >>= 5;
     track->m_pitchBend = bend;
-    ((int*)track)[0] += 2;
+    track->m_command += 2;
     _PitchBendCompute(track, track->m_pitchBend);
 }
 
@@ -2421,7 +2416,7 @@ void __MidiCtrl_StepRelative(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* trac
     int value;
     short step;
 
-    value = (s8)*(*(u8**)track)++;
+    value = (s8)*track->m_command++;
     if (value != 0) {
         step = track->m_step + value;
     } else {
@@ -2451,7 +2446,7 @@ void __MidiCtrl_StepRelative2(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tra
     int value;
     short step;
 
-    value = *(*(unsigned char**)track)++;
+    value = *track->m_command++;
     track->m_step = 0;
 
     if (value != 0) {
@@ -2483,8 +2478,8 @@ void __MidiCtrl_FuzzyOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
     int value;
     int fuzzyValue;
 
-    mode = *(*(u8**)track)++;
-    value = *(*(u8**)track)++;
+    mode = *track->m_command++;
+    value = *track->m_command++;
     if (value != 0) {
         fuzzyValue = value + 1;
     } else {
@@ -2494,23 +2489,23 @@ void __MidiCtrl_FuzzyOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 
     switch (mode) {
     case 1:
-        ((int*)track)[0x39] = value;
+        track->m_fuzzyVolumeDepth = value;
         track->m_voiceSwitch |= 0x8000;
         return;
     case 2:
-        ((int*)track)[0x3a] = value;
+        track->m_fuzzyPanDepth = value;
         track->m_voiceSwitch |= 0x10000;
         return;
     case 3:
-        ((int*)track)[0x3b] = value;
+        track->m_fuzzyDeltaTimeDepth = value;
         track->m_voiceSwitch |= 0x20000;
         return;
     case 4:
-        ((int*)track)[0x3c] = value;
+        track->m_fuzzyAdsrDepth = value;
         track->m_voiceSwitch |= 0x40000;
         return;
     default:
-        ((int*)track)[0x38] = value;
+        track->m_fuzzyPitchDepth = value;
         track->m_voiceSwitch |= 0x4000;
         return;
     }
@@ -2529,7 +2524,7 @@ void __MidiCtrl_FuzzyOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track)
 {
     int mode;
 
-    mode = *(*(u8**)track)++;
+    mode = *track->m_command++;
 
     switch (mode) {
     case 1:
