@@ -16,6 +16,20 @@ struct RedReverbModeData {
 	int params[6];
 };
 
+struct RedControlRamp {
+	int m_value;
+	int m_step;
+	int m_count;
+};
+
+struct RedReverbDepth {
+	int m_depth;
+	int m_step;
+	int m_count;
+};
+
+struct RedSeBlockHEAD;
+
 extern RedMidiControlFunc p_MidiControl_Function[];
 extern u32 t_TonePitch[];
 extern int t_FinePitch[];
@@ -27,33 +41,33 @@ extern s16 t_PanningDataR[];
 extern RedReverbModeData t_ReverbModeData[];
 extern CRedEntry c_RedEntry;
 extern OSSemaphore m_MusicSkipSemaphore;
-extern void* volatile p_SeBlockData[];
-extern void* volatile p_ZeroData;
-extern void* volatile p_SoundControlBuffer;
-extern void* volatile p_SoundControl;
+extern RedSeBlockHEAD* volatile p_SeBlockData[];
+extern u8* volatile p_ZeroData;
+extern RedSoundCONTROL* volatile p_SoundControlBuffer;
+extern RedSoundCONTROL* volatile p_SoundControl;
 extern volatile int m_KeyOnEntry;
-extern void* volatile p_KeyOnData;
+extern RedKeyOnDATA* volatile p_KeyOnData;
 extern int m_SoundPlayMode;
 extern int m_SoundMasterControl;
 extern volatile int m_ReportPrint;
 extern int m_MusicFastSpeed;
 extern volatile int m_MusicSkipLine;
 extern int m_MusicKeySignature;
-extern void* volatile p_MusicReplayPoint;
-extern int* volatile p_MusicTempoControl;
-extern int* volatile p_MusicPitchControl;
+extern int* volatile p_MusicReplayPoint;
+extern RedControlRamp* volatile p_MusicTempoControl;
+extern RedControlRamp* volatile p_MusicPitchControl;
 extern int m_MusicPhraseStop;
 extern int m_CrossTime;
 extern volatile int m_MasterMusicVolume;
 extern volatile int m_MasterSEVolume;
 extern RedStreamDATA* volatile p_Stream;
 extern volatile int m_SeSkipStep;
-extern unsigned int* volatile p_VoiceData;
+extern RedVoiceDATA* volatile p_VoiceData;
 extern int p_EditorVoice[2];
-extern void* p_EditorTrack;
-extern void* volatile p_MusicSkipThreadStack;
+extern RedTrackDATA* p_EditorTrack;
+extern u8* volatile p_MusicSkipThreadStack;
 extern volatile int m_MusicSkipComplete;
-extern void* volatile p_ReverbDepth;
+extern RedReverbDepth* volatile p_ReverbDepth;
 extern int m_Mute[2];
 extern CRedMemory c_RedMemory;
 extern volatile u32 m_ChangeStatus;

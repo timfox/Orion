@@ -39,52 +39,78 @@ struct RedDriverSyncState {
     OSSemaphore m_musicSemaphore;
 };
 
+struct RedDmaRequest {
+    int m_id;
+    int m_direction;
+    int m_mainMemory;
+    int m_aramMemory;
+    int m_size;
+    void (*m_callback)(void*);
+    void* m_callbackData;
+};
+
+struct RedExecCommand {
+    void (*m_func)(int*);
+    int m_args[7];
+};
+
+struct RedMusicPlayCommand {
+    int m_musicId;
+    int m_volume;
+    int m_mode;
+    int m_pad;
+};
+
+struct RedTickHistory {
+    int m_ticks[100];
+};
+
 // RedDriver-owned linkage (sbss/sdata tracked symbols)
 static int m_RedMasterTime;
 static volatile int m_SequencialID;
 static volatile int m_ThreadControl;
 static volatile int m_ThreadExecute;
 static int m_SoundMode;
-static int* volatile p_Tick;
-void* volatile p_ZeroData;
-static void* volatile p_ExecCommand;
-static void* volatile p_ExecCommandNow;
-static void* volatile p_ExecCommandOld;
-static void* p_DmaControlNow[2];
-static void* p_DmaControlOld[2];
-void* volatile p_SoundControlBuffer;
-void* volatile p_SoundControl;
+static RedTickHistory* volatile p_Tick;
+u8* volatile p_ZeroData;
+static RedExecCommand* volatile p_ExecCommand;
+static RedExecCommand* volatile p_ExecCommandNow;
+static RedExecCommand* volatile p_ExecCommandOld;
+static RedDmaRequest* p_DmaControlNow[2];
+static RedDmaRequest* p_DmaControlOld[2];
+RedSoundCONTROL* volatile p_SoundControlBuffer;
+RedSoundCONTROL* volatile p_SoundControl;
 volatile int m_KeyOnEntry;
-void* volatile p_KeyOnData;
+RedKeyOnDATA* volatile p_KeyOnData;
 int m_SoundPlayMode;
 int m_SoundMasterControl;
 volatile int m_ReportPrint;
 int m_MusicFastSpeed;
 volatile int m_MusicSkipLine;
 int m_MusicKeySignature;
-void* volatile p_MusicReplayPoint;
-int* volatile p_MusicTempoControl;
-int* volatile p_MusicPitchControl;
+int* volatile p_MusicReplayPoint;
+RedControlRamp* volatile p_MusicTempoControl;
+RedControlRamp* volatile p_MusicPitchControl;
 int m_MusicPhraseStop;
-static int* volatile p_MusicNextPlay;
+static RedMusicPlayCommand* volatile p_MusicNextPlay;
 int m_CrossTime;
 volatile int m_MasterMusicVolume;
 volatile int m_MasterSEVolume;
 RedStreamDATA* volatile p_Stream;
 static int m_DMAMode;
 volatile int m_SeSkipStep;
-unsigned int* volatile p_VoiceData;
+RedVoiceDATA* volatile p_VoiceData;
 int p_EditorVoice[2];
-void* p_EditorTrack;
-static void* volatile p_MainThreadStack;
+RedTrackDATA* p_EditorTrack;
+static u8* volatile p_MainThreadStack;
 static int m_MainThreadTime;
-static void* volatile p_WaveSettingThreadStack;
+static u8* volatile p_WaveSettingThreadStack;
 static int m_WaveSettingStatus;
-static void* volatile p_DmaExecuteThreadStack;
+static u8* volatile p_DmaExecuteThreadStack;
 static volatile int m_DMAStatus;
-void* volatile p_MusicSkipThreadStack;
+u8* volatile p_MusicSkipThreadStack;
 volatile int m_MusicSkipComplete;
-void* volatile p_ReverbDepth;
+RedReverbDepth* volatile p_ReverbDepth;
 int m_Mute[2];
 static int m_DmaControl[0x700];
 static OSThread m_MainThread;
@@ -97,7 +123,7 @@ static OSSemaphore m_DmaExecuteSemaphore;
 static ARQRequest m_DMARequest;
 OSThread m_MusicSkipThread;
 OSSemaphore m_MusicSkipSemaphore;
-void* volatile p_SeBlockData[4];
+RedSeBlockHEAD* volatile p_SeBlockData[4];
 CRedMemory c_RedMemory;
 static volatile int m_DMAExecute;
 static volatile int m_DMAInThread;
@@ -108,19 +134,19 @@ static inline RedDriverSyncState& RedDriverSync()
     return *reinterpret_cast<RedDriverSyncState*>(m_DmaControl);
 }
 
-static inline int* RedDriverMainDmaQueue()
+static inline RedDmaRequest* RedDriverMainDmaQueue()
 {
-    return m_DmaControl;
+    return reinterpret_cast<RedDmaRequest*>(m_DmaControl);
 }
 
-static inline int* RedDriverStreamDmaQueue()
+static inline RedDmaRequest* RedDriverStreamDmaQueue()
 {
-    return m_DmaControl + 0x380;
+    return reinterpret_cast<RedDmaRequest*>(m_DmaControl + 0x380);
 }
 
-static inline int* RedDriverStreamDmaQueueEnd()
+static inline RedDmaRequest* RedDriverStreamDmaQueueEnd()
 {
-    return m_DmaControl + 0x700;
+    return reinterpret_cast<RedDmaRequest*>(m_DmaControl + 0x700);
 }
 
 static inline OSThread& RedDriverMainThread()
@@ -191,7 +217,7 @@ void _SetReverbDepth(int* command)
         reverbDepth -= 1;
         reverbDepth <<= 12;
     }
-    *(unsigned int*)((char*)p_ReverbDepth + reverbBank * 0xc) = reverbDepth;
+    p_ReverbDepth[reverbBank].m_depth = reverbDepth;
     if (reverbBank != 0) {
         fadeStep = fadeStep * 0x60;
         fadeStep = fadeStep / 0x3c;
@@ -230,10 +256,10 @@ void _SetMusicData(int* command)
 void _MusicStop(int* command)
 {
     MusicStop(*command);
-    if ((*command == -1) || (p_MusicNextPlay[0] == *command)) {
-        p_MusicNextPlay[0] = -1;
+    if ((*command == -1) || (p_MusicNextPlay->m_musicId == *command)) {
+        p_MusicNextPlay->m_musicId = -1;
     }
-    if (p_MusicNextPlay[0] < 0) {
+    if (p_MusicNextPlay->m_musicId < 0) {
         m_MusicPhraseStop = 0;
     }
 }
@@ -265,8 +291,8 @@ void _MusicPlaySequence(int* command)
                 MusicStop(*(int*)(srcBuffer + 0x904));
             }
             if (iVar1 == 0) {
-                iVar1 = *(int*)((int)p_MusicReplayPoint + *command * 4);
-                *(int*)((int)p_MusicReplayPoint + *command * 4) = 0;
+                iVar1 = p_MusicReplayPoint[*command];
+                p_MusicReplayPoint[*command] = 0;
             }
             if (iVar1 == 0) {
                 memcpy((void*)(srcBuffer + 0x494), (void*)srcBuffer, 0x494);
@@ -323,8 +349,8 @@ void _MusicCrossPlaySequence(int* command)
                 }
                 *(int*)((int)pvVar2 + 0x458) = -*(int*)((int)pvVar2 + 0x454) / command[2];
                 *(int*)((int)pvVar2 + 0x45c) = command[2];
-                iVar1 = *(int*)((char*)p_MusicReplayPoint + *command * 4);
-                *(int*)((char*)p_MusicReplayPoint + *command * 4) = 0;
+                iVar1 = p_MusicReplayPoint[*command];
+                p_MusicReplayPoint[*command] = 0;
                 if (iVar1 == 0) {
                     memcpy((void*)((int)pvVar2 + 0x494), pvVar2, 0x494);
                     *(int*)((int)pvVar2 + 0x470) = 0xffffffff;
@@ -351,9 +377,9 @@ void _MusicNextPlaySequence(int* command)
         return;
     }
     if (c_RedEntry.SearchMusicSequence(*command) >= 0) {
-        p_MusicNextPlay[0] = *command;
-        p_MusicNextPlay[1] = command[1];
-        p_MusicNextPlay[2] = command[2];
+        p_MusicNextPlay->m_musicId = *command;
+        p_MusicNextPlay->m_volume = command[1];
+        p_MusicNextPlay->m_mode = command[2];
     }
 }
 
@@ -372,11 +398,11 @@ void _MusicMasterVolume(int* command)
         m_MasterMusicVolume = m_MasterMusicVolume * 4;
         m_MasterMusicVolume = m_MasterMusicVolume - 1;
     }
-    puVar1 = p_VoiceData;
+    puVar1 = (unsigned int*)p_VoiceData;
     do {
         puVar1[0x2e] = puVar1[0x2e] | 2;
         puVar1 += 0x30;
-    } while (puVar1 < p_VoiceData + 0xc00);
+    } while (puVar1 < (unsigned int*)p_VoiceData + 0xc00);
 }
 
 /*
@@ -387,7 +413,7 @@ void _MusicMasterVolume(int* command)
 void _MusicVolume(int* command)
 {
     if (command[3] == 1) {
-        p_MusicNextPlay[0] = -1;
+        p_MusicNextPlay->m_musicId = -1;
         m_MusicPhraseStop = 0;
     }
     SetMusicVolume(command[0], command[1], command[2], command[3]);
@@ -423,7 +449,7 @@ void _SetSeBlockData(int* command)
         if ((*seBlockData = 'S') && (seBlockData[1] = 'e') && (seBlockData[2] = 'B') &&
             (seBlockData[3] = 'l') && (seBlockData[4] = 'o') && (seBlockData[5] = 'c') &&
             (seBlockData[6] = 'k')) {
-            p_SeBlockData[index] = seBlockData;
+            p_SeBlockData[index] = (RedSeBlockHEAD*)seBlockData;
         } else {
             RedDelete(seBlockData);
         }
@@ -536,11 +562,11 @@ void _SeMasterVolume(int* command)
         m_MasterSEVolume = m_MasterSEVolume * 4;
         m_MasterSEVolume = m_MasterSEVolume - 1;
     }
-    puVar1 = p_VoiceData;
+    puVar1 = (unsigned int*)p_VoiceData;
     do {
         puVar1[0x2e] = puVar1[0x2e] | 2;
         puVar1 += 0x30;
-    } while (puVar1 < p_VoiceData + 0xc00);
+    } while (puVar1 < (unsigned int*)p_VoiceData + 0xc00);
 }
 
 /*
@@ -652,25 +678,25 @@ int* _EntryExecCommand(void (*func)(int*), int arg1, int arg2, int arg3, int arg
                        int arg5, int arg6, int arg7)
 {
     unsigned int interruptLevel;
-    int* writePos;
+    RedExecCommand* writePos;
 
     interruptLevel = OSDisableInterrupts();
-    writePos = (int*)p_ExecCommandNow;
-    writePos[0] = (int)func;
-    writePos[1] = arg1;
-    writePos[2] = arg2;
-    writePos[3] = arg3;
-    writePos[4] = arg4;
-    writePos[5] = arg5;
-    writePos[6] = arg6;
-    writePos[7] = arg7;
-    writePos += 8;
-    if (writePos == (int*)p_ExecCommand + 0x800) {
-        writePos = (int*)p_ExecCommand;
+    writePos = p_ExecCommandNow;
+    writePos->m_func = func;
+    writePos->m_args[0] = arg1;
+    writePos->m_args[1] = arg2;
+    writePos->m_args[2] = arg3;
+    writePos->m_args[3] = arg4;
+    writePos->m_args[4] = arg5;
+    writePos->m_args[5] = arg6;
+    writePos->m_args[6] = arg7;
+    writePos++;
+    if (writePos == p_ExecCommand + 0x100) {
+        writePos = p_ExecCommand;
     }
     p_ExecCommandNow = writePos;
     OSRestoreInterrupts(interruptLevel);
-    return writePos;
+    return (int*)writePos;
 }
 
 /*
@@ -684,23 +710,23 @@ int* _EntryExecCommand(void (*func)(int*), int arg1, int arg2, int arg3, int arg
  */
 void _ExecuteCommand()
 {
-	volatile unsigned int* readPos;
-	volatile unsigned int* executePos;
+	volatile RedExecCommand* readPos;
+	volatile RedExecCommand* executePos;
 
-	executePos = (volatile unsigned int*)p_ExecCommandNow;
-	readPos = (volatile unsigned int*)p_ExecCommandOld;
+	executePos = p_ExecCommandNow;
+	readPos = p_ExecCommandOld;
 
 	while (executePos != readPos) {
-		if (*readPos != 0) {
-			((void (*)(int*))(*readPos))((int*)(readPos + 1));
+		if (readPos->m_func != 0) {
+			readPos->m_func((int*)readPos->m_args);
 		}
-		readPos += 8;
-		if (readPos == (volatile unsigned int*)p_ExecCommand + 0x800) {
-			readPos = (volatile unsigned int*)p_ExecCommand;
+		readPos++;
+		if (readPos == p_ExecCommand + 0x100) {
+			readPos = p_ExecCommand;
 		}
 	}
 
-	p_ExecCommandOld = (void*)readPos;
+	p_ExecCommandOld = (RedExecCommand*)readPos;
 }
 
 /*
@@ -818,17 +844,17 @@ int _MainThread(void*)
             MainControl(uVar4);
             StreamControl();
             _ExecuteCommand();
-            if ((-1 < p_MusicNextPlay[0]) && (*(int*)(iVar1 + 0x470) < 0)) {
-                _MusicPlaySequence(p_MusicNextPlay);
-                p_MusicNextPlay[0] = -1;
+            if ((-1 < p_MusicNextPlay->m_musicId) && (*(int*)(iVar1 + 0x470) < 0)) {
+                _MusicPlaySequence((int*)p_MusicNextPlay);
+                p_MusicNextPlay->m_musicId = -1;
                 m_MusicPhraseStop = 0;
             }
             do {
                 iVar3 = OSTryWaitSemaphore(&m_MainSemaphore);
             } while (0 < iVar3);
-            memmove((int*)p_Tick + 1, p_Tick, 0x18c);
+            memmove(p_Tick->m_ticks + 1, p_Tick->m_ticks, 0x18c);
             iVar3 = OSGetTick();
-            *(int*)p_Tick = iVar3 - iVar2;
+            p_Tick->m_ticks[0] = iVar3 - iVar2;
         }
     }
     m_ThreadExecute = m_ThreadExecute & ~1;
@@ -875,7 +901,7 @@ int _WaveSettingThread(void* threadArg)
  */
 void _DMACheckProcess()
 {
-    int* dmaInfo;
+    RedDmaRequest* dmaInfo;
 
     if (m_ReportPrint != 0) {
         OSReport(s_redDriverDmaCheckHeaderFmt, sRedDriverLogPrefix);
@@ -888,12 +914,13 @@ void _DMACheckProcess()
 
     dmaInfo = RedDriverMainDmaQueue();
     do {
-        if ((*dmaInfo != 0) && (m_ReportPrint != 0)) {
+        if ((dmaInfo->m_id != 0) && (m_ReportPrint != 0)) {
             OSReport(sRedDriverDmaEntryFmt, sRedDriverLogPrefix,
-                     dmaInfo[0], dmaInfo[2], dmaInfo[3], dmaInfo[4], dmaInfo[5]);
+                     dmaInfo->m_id, dmaInfo->m_mainMemory, dmaInfo->m_aramMemory,
+                     dmaInfo->m_size, dmaInfo->m_callback);
             fflush(__files + 1);
         }
-        dmaInfo += 7;
+        dmaInfo++;
     } while (dmaInfo < RedDriverStreamDmaQueueEnd());
 
     fflush(__files + 1);
@@ -925,63 +952,63 @@ void _DmaCallback(unsigned long)
 int RedDmaEntry(int param_1, int param_2, int param_3, int param_4, int param_5, void (*param_6)(void*), void* param_7)
 {
     unsigned int interrupt;
-    int* queueBase;
-    int** queuePtr;
+    RedDmaRequest* queueBase;
+    RedDmaRequest** queuePtr;
     unsigned int entryID;
     unsigned int size;
     unsigned int chunkSize;
-    int* queueEntry;
-    int* queueEnd;
-    int* nextEntry;
+    RedDmaRequest* queueEntry;
+    RedDmaRequest* queueEnd;
+    RedDmaRequest* nextEntry;
 
     interrupt = OSDisableInterrupts();
     if ((param_1 & 0xffff7fff) != 0) {
-        queuePtr = (int**)&p_DmaControlNow[0];
+        queuePtr = &p_DmaControlNow[0];
         queueBase = RedDriverMainDmaQueue();
     } else {
         queueBase = RedDriverStreamDmaQueue();
-        queuePtr = (int**)&p_DmaControlNow[1];
+        queuePtr = &p_DmaControlNow[1];
     }
     queueEntry = *queuePtr;
     entryID = GetMyEntryID();
     size = (unsigned int)(param_5 + 0x1f) & 0xffffffe0;
     if ((m_DMAMode != 0) || ((param_1 & 0x8000) != 0)) {
-        queueEnd = queueBase + 0x380;
+        queueEnd = queueBase + 0x80;
         do {
             chunkSize = size;
             if ((int)size > 0x40000) {
                 chunkSize = 0x40000;
             }
-            queueEntry[0] = entryID;
+            queueEntry->m_id = entryID;
             size -= chunkSize;
-            queueEntry[1] = param_2;
-            queueEntry[2] = param_3;
+            queueEntry->m_direction = param_2;
+            queueEntry->m_mainMemory = param_3;
             param_3 += chunkSize;
-            queueEntry[3] = param_4;
+            queueEntry->m_aramMemory = param_4;
             param_4 += chunkSize;
-            queueEntry[4] = chunkSize;
-            queueEntry[6] = (int)param_7;
+            queueEntry->m_size = chunkSize;
+            queueEntry->m_callbackData = param_7;
             if ((int)size < 1) {
-                queueEntry[5] = (int)param_6;
+                queueEntry->m_callback = param_6;
             } else {
-                queueEntry[5] = 0;
+                queueEntry->m_callback = 0;
             }
-            queueEntry += 7;
+            queueEntry++;
             if (queueEnd <= queueEntry) {
                 queueEntry = queueBase;
             }
         } while ((int)size > 0);
         *queuePtr = queueEntry;
     } else {
-        nextEntry = queueEntry + 7;
-        queueEnd = queueBase + 0x380;
-        queueEntry[0] = entryID;
-        queueEntry[1] = param_2;
-        queueEntry[2] = param_3;
-        queueEntry[3] = param_4;
-        queueEntry[4] = size;
-        queueEntry[5] = (int)param_6;
-        queueEntry[6] = (int)param_7;
+        nextEntry = queueEntry + 1;
+        queueEnd = queueBase + 0x80;
+        queueEntry->m_id = entryID;
+        queueEntry->m_direction = param_2;
+        queueEntry->m_mainMemory = param_3;
+        queueEntry->m_aramMemory = param_4;
+        queueEntry->m_size = size;
+        queueEntry->m_callback = param_6;
+        queueEntry->m_callbackData = param_7;
         if (queueEnd <= nextEntry) {
             nextEntry = queueBase;
         }
@@ -1005,18 +1032,18 @@ int RedDmaSearchID(int id)
 {
     unsigned int interruptLevel;
     int found;
-    int* queueEntry;
+    RedDmaRequest* queueEntry;
 
     found = 0;
     interruptLevel = OSDisableInterrupts();
     if (id != 0) {
         queueEntry = RedDriverMainDmaQueue();
         do {
-            if ((*queueEntry != 0) && ((id == 0) || (*queueEntry == id))) {
+            if ((queueEntry->m_id != 0) && ((id == 0) || (queueEntry->m_id == id))) {
                 found = 1;
                 break;
             }
-            queueEntry += 7;
+            queueEntry++;
         } while (queueEntry < RedDriverStreamDmaQueueEnd());
     }
     OSRestoreInterrupts(interruptLevel);
@@ -1037,45 +1064,45 @@ void _DmaExecute()
     unsigned int uVar1;
     int iVar2;
     int iVar3;
-    int* piVar4;
-    int** ppiVar5;
-    int* piVar6;
-    int* piVar7;
-    int* piVar8;
+    RedDmaRequest* piVar4;
+    RedDmaRequest** ppiVar5;
+    RedDmaRequest* piVar6;
+    RedDmaRequest* piVar7;
+    RedDmaRequest* piVar8;
 
     while ((p_DmaControlNow[0] != p_DmaControlOld[0]) || (p_DmaControlNow[1] != p_DmaControlOld[1])) {
         m_DMAInThread = 1;
         if (p_DmaControlNow[0] == p_DmaControlOld[0]) {
-            ppiVar5 = (int**)&p_DmaControlOld[1];
+            ppiVar5 = &p_DmaControlOld[1];
             piVar4 = RedDriverStreamDmaQueue();
         } else {
-            ppiVar5 = (int**)&p_DmaControlOld[0];
+            ppiVar5 = &p_DmaControlOld[0];
             piVar4 = RedDriverMainDmaQueue();
         }
         piVar7 = *ppiVar5;
         m_DMAInThread = 2;
         piVar6 = 0;
-        if (*piVar7 != 0) {
+        if (piVar7->m_id != 0) {
             m_DMAStatus = 1;
-            if (piVar7[1] == 0) {
-                DCFlushRange((void*)piVar7[2], (u32)piVar7[4]);
-                iVar3 = piVar7[2];
-                iVar2 = piVar7[3];
+            if (piVar7->m_direction == 0) {
+                DCFlushRange((void*)piVar7->m_mainMemory, (u32)piVar7->m_size);
+                iVar3 = piVar7->m_mainMemory;
+                iVar2 = piVar7->m_aramMemory;
             } else {
-                DCInvalidateRange((void*)piVar7[2], (u32)piVar7[4]);
-                iVar3 = piVar7[3];
-                iVar2 = piVar7[2];
+                DCInvalidateRange((void*)piVar7->m_mainMemory, (u32)piVar7->m_size);
+                iVar3 = piVar7->m_aramMemory;
+                iVar2 = piVar7->m_mainMemory;
             }
             m_DMAInThread = 3;
-            ARQSetChunkSize((u32)piVar7[4]);
-            ARQPostRequest(&m_DMARequest, 0x469, (u32)piVar7[1], 1, (u32)iVar3, (u32)iVar2,
-                           (u32)piVar7[4], _DmaCallback);
+            ARQSetChunkSize((u32)piVar7->m_size);
+            ARQPostRequest(&m_DMARequest, 0x469, (u32)piVar7->m_direction, 1, (u32)iVar3, (u32)iVar2,
+                           (u32)piVar7->m_size, _DmaCallback);
             m_DMAInThread = 4;
             piVar6 = piVar7;
         }
-        piVar8 = piVar7 + 7;
+        piVar8 = piVar7 + 1;
         m_DMAInThread = 5;
-        if (piVar4 + 0x380 <= piVar7 + 7) {
+        if (piVar4 + 0x80 <= piVar7 + 1) {
             piVar8 = piVar4;
         }
         *ppiVar5 = piVar8;
@@ -1085,16 +1112,16 @@ void _DmaExecute()
             m_DMAInThread = 7;
             if (m_DMAStatus == 0) {
                 m_DMAInThread = 8;
-                if ((u32)piVar6[5] != 0) {
+                if ((u32)piVar6->m_callback != 0) {
                     uVar1 = OSDisableInterrupts();
-                    ((void (*)(void*))piVar6[5])((void*)piVar6[6]);
+                    piVar6->m_callback(piVar6->m_callbackData);
                     OSRestoreInterrupts(uVar1);
                 }
                 m_DMAInThread = 9;
-                if (piVar6[1] == 1) {
-                    DCFlushRange((void*)piVar6[2], (u32)piVar6[4]);
+                if (piVar6->m_direction == 1) {
+                    DCFlushRange((void*)piVar6->m_mainMemory, (u32)piVar6->m_size);
                 }
-                *piVar6 = 0;
+                piVar6->m_id = 0;
                 break;
             }
             RedSleep(0);
@@ -1217,7 +1244,7 @@ void CRedDriver::Init()
     } else {
         AXSetMode(0);
     }
-    p_Tick = (int*)RedNew(400);
+    p_Tick = (RedTickHistory*)RedNew(400);
     memset(p_Tick, 0, 400);
     AXSetCompressor(0);
     m_MusicKeySignature = 0;
@@ -1234,19 +1261,19 @@ void CRedDriver::Init()
         p_SeBlockData[iVar6] = 0;
         iVar6 = iVar5;
     } while (iVar5 < 4);
-    p_ZeroData = (void*)RedNew(0x1000);
+    p_ZeroData = (u8*)RedNew(0x1000);
     memset(p_ZeroData, 0, 0x1000);
-    p_MusicReplayPoint = (void*)RedNew(0x400);
+    p_MusicReplayPoint = (int*)RedNew(0x400);
     memset(p_MusicReplayPoint, 0, 0x400);
-    p_MusicTempoControl = (int*)RedNew(0xc);
+    p_MusicTempoControl = (RedControlRamp*)RedNew(0xc);
     memset(p_MusicTempoControl, 0, 0xc);
-    p_MusicPitchControl = (int*)RedNew(0xc);
+    p_MusicPitchControl = (RedControlRamp*)RedNew(0xc);
     memset(p_MusicPitchControl, 0, 0xc);
-    p_ExecCommand = (void*)RedNew(0x2000);
+    p_ExecCommand = (RedExecCommand*)RedNew(0x2000);
     p_ExecCommandNow = p_ExecCommand;
     p_ExecCommandOld = p_ExecCommand;
     memset(p_ExecCommand, 0, 0x2000);
-    p_SoundControlBuffer = (void*)RedNew(0x1250);
+    p_SoundControlBuffer = (RedSoundCONTROL*)RedNew(0x1250);
     p_SoundControl = p_SoundControlBuffer;
     memset(p_SoundControlBuffer, 0, 0x1250);
     *(int*)((char*)p_SoundControl + 0xdd8) = 0x1ff000;
@@ -1260,9 +1287,9 @@ void CRedDriver::Init()
     *(int*)((char*)p_SoundControl + 0xd98) = -1;
     *(int*)((char*)p_SoundControl + 0x904) = -1;
     *(int*)((char*)p_SoundControl + 0x470) = -1;
-    p_KeyOnData = (void*)RedNew(0x600);
+    p_KeyOnData = (RedKeyOnDATA*)RedNew(0x600);
     memset(p_KeyOnData, 0, 0x600);
-    p_VoiceData = (unsigned int*)RedNew(0x3000);
+    p_VoiceData = (RedVoiceDATA*)RedNew(0x3000);
     memset(p_VoiceData, 0, 0x3000);
     iVar6 = 0;
     do {
@@ -1286,14 +1313,14 @@ void CRedDriver::Init()
         iVar5 = iVar5 + 1;
         ((RedTrackDATA*)(iVar6 + iVar4))->m_trackNo = (char)(cVar1 + ' ');
     } while (iVar5 < 0x20);
-    p_EditorTrack = (void*)RedNew(0x154);
+    p_EditorTrack = (RedTrackDATA*)RedNew(0x154);
     memset(p_EditorTrack, 0, 0x154);
-    p_ReverbDepth = (void*)RedNew(0x18);
+    p_ReverbDepth = (RedReverbDepth*)RedNew(0x18);
     memset(p_ReverbDepth, 0, 0x18);
     m_Mute[1] = 0;
     m_Mute[0] = 0;
-    p_MusicNextPlay = (int*)RedNew(0x10);
-    p_MusicNextPlay[0] = -1;
+    p_MusicNextPlay = (RedMusicPlayCommand*)RedNew(0x10);
+    p_MusicNextPlay->m_musicId = -1;
     m_MusicPhraseStop = 0;
     p_Stream = (RedStreamDATA*)RedNew(0x4c0);
     memset(p_Stream, 0, 0x4c0);
@@ -1308,24 +1335,24 @@ void CRedDriver::Init()
     AXFXSetHooks(ReverbAreaAlloc, ReverbAreaFree);
     InitReverb();
     OSInitSemaphore(&m_DmaExecuteSemaphore, 0);
-    p_DmaExecuteThreadStack = (void*)RedNew(0x1000);
-    OSCreateThread(&m_DmaExecuteThread, (void* (*)(void*))_DmaExecuteThread, 0, (char*)p_DmaExecuteThreadStack + 0x1000, 0x1000,
+    p_DmaExecuteThreadStack = (u8*)RedNew(0x1000);
+    OSCreateThread(&m_DmaExecuteThread, (void* (*)(void*))_DmaExecuteThread, 0, p_DmaExecuteThreadStack + 0x1000, 0x1000,
                    3, 1);
     OSResumeThread(&m_DmaExecuteThread);
     OSInitSemaphore(&m_WaveSettingSemaphore, 0);
-    p_WaveSettingThreadStack = (void*)RedNew(0x1000);
+    p_WaveSettingThreadStack = (u8*)RedNew(0x1000);
     OSCreateThread(&m_WaveSettingThread, (void* (*)(void*))_WaveSettingThread, &m_WaveSettingData,
-                   (char*)p_WaveSettingThreadStack + 0x1000, 0x1000, 4, 1);
+                   p_WaveSettingThreadStack + 0x1000, 0x1000, 4, 1);
     OSResumeThread(&m_WaveSettingThread);
     OSInitSemaphore(&m_MusicSkipSemaphore, 0);
-    p_MusicSkipThreadStack = (void*)RedNew(0x1000);
-    OSCreateThread(&m_MusicSkipThread, (void* (*)(void*))_MusicSkipThread, 0, (char*)p_MusicSkipThreadStack + 0x1000, 0x1000,
+    p_MusicSkipThreadStack = (u8*)RedNew(0x1000);
+    OSCreateThread(&m_MusicSkipThread, (void* (*)(void*))_MusicSkipThread, 0, p_MusicSkipThreadStack + 0x1000, 0x1000,
                    4, 1);
     OSResumeThread(&m_MusicSkipThread);
     OSInitSemaphore(&m_MainSemaphore, 0);
     m_MainThreadTime = 0;
-    p_MainThreadStack = (void*)RedNew(0x1000);
-    OSCreateThread(&RedDriverMainThread(), (void* (*)(void*))_MainThread, 0, (char*)p_MainThreadStack + 0x1000, 0x1000,
+    p_MainThreadStack = (u8*)RedNew(0x1000);
+    OSCreateThread(&RedDriverMainThread(), (void* (*)(void*))_MainThread, 0, p_MainThreadStack + 0x1000, 0x1000,
                    4, 1);
     OSResumeThread(&RedDriverMainThread());
 }
@@ -1368,12 +1395,12 @@ void CRedDriver::End()
 int CRedDriver::GetProgramTime()
 {
     int sum = 0;
-    int* p = p_Tick;
+    int* p = p_Tick->m_ticks;
 
     do {
         sum += *p;
         p++;
-    } while (p < p_Tick + 100);
+    } while (p < p_Tick->m_ticks + 100);
     return sum;
 }
 

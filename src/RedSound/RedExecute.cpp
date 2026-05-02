@@ -157,12 +157,17 @@ struct RedReverbDATA {
     int kind;
 };
 
+struct RedReverbSize {
+    u32 m_requested;
+    u32 m_aligned;
+};
+
 static volatile u8 m_RandomIndex;
 static RedReverbDATA* volatile p_ReverbData;
-static u32* p_ReverbSize;
+static RedReverbSize* p_ReverbSize;
 volatile u32 m_ChangeStatus;
 u32 m_TerminateNote[1] = { 0 };
-static int* volatile p_SkipKeyOn;
+static RedKeyOnDATA* volatile p_SkipKeyOn;
 static const float s_ReverbTimeScale = 1000.0f;
 static const float s_ReverbEffectScale = 100.0f;
 
@@ -247,8 +252,8 @@ void _ReverbNullCallback(AXFX_BUFFERUPDATE* update, void*)
  */
 void* ReverbAreaAlloc(unsigned long size)
 {
-    p_ReverbSize[0] += (u32)size;
-    p_ReverbSize[1] += ((u32)size + 0x1F) & ~0x1F;
+    p_ReverbSize->m_requested += (u32)size;
+    p_ReverbSize->m_aligned += ((u32)size + 0x1F) & ~0x1F;
     return (void*)RedNew((int)size);
 }
 
@@ -279,7 +284,7 @@ void InitReverb()
 {
     p_ReverbData = (RedReverbDATA*)RedNew(0x18);
     memset(p_ReverbData, 0, 0x18);
-    p_ReverbSize = (u32*)RedNew(4);
+    p_ReverbSize = (RedReverbSize*)RedNew(4);
 }
 
 /*
@@ -354,8 +359,8 @@ void _SetReverbData(RedReverbDATA* reverb, int* params)
     }
 
     if (result != 1) {
-        p_ReverbSize[0] = 0;
-        p_ReverbSize[1] = 0;
+        p_ReverbSize->m_requested = 0;
+        p_ReverbSize->m_aligned = 0;
     }
 }
 
@@ -417,8 +422,8 @@ int* SetReverb(int bank, int kind, int* params)
     RedReverbDATA* reverb;
     int result;
 
-    p_ReverbSize[0] = 0;
-    p_ReverbSize[1] = 0;
+    p_ReverbSize->m_requested = 0;
+    p_ReverbSize->m_aligned = 0;
 
     if (kind == 0) {
         _ClearReverb(bank);
@@ -520,8 +525,8 @@ int* SetReverb(int bank, int kind, int* params)
         }
     }
     else {
-        p_ReverbSize[0] = 0;
-        p_ReverbSize[1] = 0;
+        p_ReverbSize->m_requested = 0;
+        p_ReverbSize->m_aligned = 0;
     }
 
     return (int*)p_ReverbSize;
@@ -556,7 +561,7 @@ RedVoiceDATA* EntryVoiceSearch(RedTrackDATA* track)
         }
 
         bestEnvelope = 0x8000;
-        voiceEnd = (RedVoiceDATA*)(p_VoiceData + 0xC00);
+        voiceEnd = (RedVoiceDATA*)((unsigned int*)p_VoiceData + 0xC00);
         do {
             if ((voice->m_stateFlags & 3) == 0) {
                 if (voice->m_envelopeLevel < 1) {
@@ -612,7 +617,7 @@ void _VoiceEnvelopeCheck()
             voiceData->m_envelopeLevel = 0x8000;
         }
         voiceData++;
-    } while (voiceData < (RedVoiceDATA*)(p_VoiceData + 0xC00));
+    } while (voiceData < (RedVoiceDATA*)((unsigned int*)p_VoiceData + 0xC00));
 }
 
 /*
@@ -867,7 +872,7 @@ void _PitchExecute(RedVoiceDATA* voice)
                 voice->m_track->m_fineTune);
         } else {
             pitchDelta = PitchCompute(
-                voice->m_basePitch + *p_MusicPitchControl,
+                voice->m_basePitch + p_MusicPitchControl->m_value,
                 pitchDelta,
                 voice->m_waveData->m_pitch,
                 voice->m_track->m_fineTune);
@@ -1016,7 +1021,7 @@ void _VoiceDataAsign(RedTrackDATA* param_1, RedVoiceDATA* param_2, RedNoteDATA* 
 
     local_38[0] = trackS16[0xa1] + trackS16[0x9f];
     if ((((u8*)voiceData)[0x1a] & 3) == 0) {
-        iVar5 = voiceData[0x28] + *p_MusicPitchControl;
+        iVar5 = voiceData[0x28] + p_MusicPitchControl->m_value;
     } else {
         iVar5 = voiceData[0x28] + trackData[0x17];
     }
@@ -1153,9 +1158,9 @@ RedVoiceDATA* _VoiceDataSelect(RedTrackDATA* track, RedNoteDATA* note, int* voic
                 break;
             }
             voiceData += 0x30;
-        } while (voiceData < (int*)p_VoiceData + 0xC00);
+        } while (voiceData < (int*)((unsigned int*)p_VoiceData + 0xC00));
 
-        if (!(voiceData < (int*)p_VoiceData + 0xC00)) {
+        if (!(voiceData < (int*)((unsigned int*)p_VoiceData + 0xC00))) {
             voiceData = (int*)EntryVoiceSearch(track);
         }
     } else {
@@ -1198,7 +1203,7 @@ void SetVoiceAccess(RedTrackDATA* track, int mask)
             voiceData->m_flags |= mask;
         }
         voiceData++;
-    } while (voiceData < (RedVoiceDATA*)(p_VoiceData + 0xC00));
+    } while (voiceData < (RedVoiceDATA*)((unsigned int*)p_VoiceData + 0xC00));
 }
 
 /*
@@ -1218,7 +1223,7 @@ void SetVoiceSwitch(RedTrackDATA* track, int voiceSwitch)
             voiceData->m_voiceSwitch = voiceSwitch;
         }
         voiceData++;
-    } while (voiceData < (RedVoiceDATA*)(p_VoiceData + 0xC00));
+    } while (voiceData < (RedVoiceDATA*)((unsigned int*)p_VoiceData + 0xC00));
 }
 
 /*
@@ -1374,7 +1379,7 @@ void _VoiceDropedCallback(void* dropped)
             voiceData->m_axVoice = 0;
         }
         voiceData++;
-    } while (voiceData < (RedVoiceDATA*)(p_VoiceData + 0xc00));
+    } while (voiceData < (RedVoiceDATA*)((unsigned int*)p_VoiceData + 0xc00));
 }
 
 /*
@@ -1548,7 +1553,7 @@ void EnvelopeKeyExecute()
 
         voiceData[0x24] &= 0xFFFFFC24;
         voiceData += 0x30;
-        if ((int*)p_VoiceData + 0xC00 <= voiceData) {
+        if ((int*)((unsigned int*)p_VoiceData + 0xC00) <= voiceData) {
             return;
         }
     }
@@ -1564,7 +1569,7 @@ void _KeyOnControl()
     u32 local_24 = 0;
     u32 local_28 = 0;
     int* reserve = (int*)p_KeyOnData;
-    unsigned int* voiceData = p_VoiceData;
+    unsigned int* voiceData = (unsigned int*)p_VoiceData;
     int (*waveFunc)(int);
 
     _VoiceEnvelopeCheck();
@@ -1617,10 +1622,11 @@ void _KeyOnControl()
     }
 
     {
-        unsigned int* voice = p_VoiceData;
+        unsigned int* voice = (unsigned int*)p_VoiceData;
         do {
             if ((voice[0x23] != 0) && (*voice != 0) && ((((RedTrackDATA*)*voice)->m_voiceSwitch & 9) == 0)) {
-                if (((voice[0x2E] & 2) != 0) || (*(int*)(*voice + 0x94) != 0) || (*(int*)(*voice + 0xB4) != 0)) {
+                if ((((RedVoiceDATA*)voice)->m_updateFlags & 2) != 0 || (*(int*)(*voice + 0x94) != 0) ||
+                    (*(int*)(*voice + 0xB4) != 0)) {
                     int volume;
                     if ((*voice < *(u32*)p_SoundControlBuffer) ||
                         (*(u32*)p_SoundControlBuffer + (u32)*((u8*)p_SoundControlBuffer + 0x491) * 0x154 <= *voice)) {
@@ -1662,18 +1668,18 @@ void _KeyOnControl()
                     _VolumeExecute((RedVoiceDATA*)voice, volume);
                 }
 
-                if (((voice[0x2E] & 1) != 0) || (*(int*)(*voice + 0x74) != 0)) {
+                if ((((RedVoiceDATA*)voice)->m_updateFlags & 1) != 0 || (*(int*)(*voice + 0x74) != 0)) {
                     _PitchExecute((RedVoiceDATA*)voice);
                 }
-                voice[0x2E] = 0;
+                ((RedVoiceDATA*)voice)->m_updateFlags = 0;
             }
             voice += 0x30;
-        } while (voice < p_VoiceData + 0xC00);
+        } while (voice < (unsigned int*)p_VoiceData + 0xC00);
     }
 
     {
         u32 bit = 1;
-        unsigned int* voice = p_VoiceData;
+        unsigned int* voice = (unsigned int*)p_VoiceData;
         do {
             if ((local_28 & bit) != 0) {
                 local_28 &= ~bit;
@@ -1686,7 +1692,7 @@ void _KeyOnControl()
 
     {
         u32 bit = 1;
-        unsigned int* voice = p_VoiceData + 0x600;
+        unsigned int* voice = (unsigned int*)p_VoiceData + 0x600;
         do {
             if ((local_24 & bit) != 0) {
                 local_24 &= ~bit;
@@ -1727,39 +1733,39 @@ void _ExecuteExtraData()
 
             if (*sound != 0) {
                 musicBase = *sound;
-                voice = p_VoiceData;
+                voice = (unsigned int*)p_VoiceData;
                 do {
                     if ((musicBase <= *voice) && (*voice < musicBase + (u32)soundControl->m_trackCount * 0x154)) {
-                        voice[0x2E] |= 2;
+                        ((RedVoiceDATA*)voice)->m_updateFlags |= 2;
                     }
                     voice += 0x30;
-                } while (voice < p_VoiceData + 0xC00);
+                } while (voice < (unsigned int*)p_VoiceData + 0xC00);
             }
         }
         soundBase = (u32*)p_SoundControlBuffer;
         sound += 0x125;
     } while (sound < (u32*)p_SoundControlBuffer + 0x24A);
 
-    if (p_MusicTempoControl[2] != 0) {
-        p_MusicTempoControl[2]--;
-        p_MusicTempoControl[0] += p_MusicTempoControl[1];
+    if (p_MusicTempoControl->m_count != 0) {
+        p_MusicTempoControl->m_count--;
+        p_MusicTempoControl->m_value += p_MusicTempoControl->m_step;
     }
 
-    if (p_MusicPitchControl[2] != 0) {
-        p_MusicPitchControl[2]--;
-        p_MusicPitchControl[0] += p_MusicPitchControl[1];
-        voice = p_VoiceData;
+    if (p_MusicPitchControl->m_count != 0) {
+        p_MusicPitchControl->m_count--;
+        p_MusicPitchControl->m_value += p_MusicPitchControl->m_step;
+        voice = (unsigned int*)p_VoiceData;
         do {
             if ((((u8*)voice)[0x1A] & 3) == 0) {
                 voice[0x26] = PitchCompute(
-                    voice[0x28] + p_MusicPitchControl[0],
+                    voice[0x28] + p_MusicPitchControl->m_value,
                     (int)((RedTrackDATA*)*voice)->m_keyTranspose + (int)((RedTrackDATA*)*voice)->m_pitchBend,
                     *(int*)(voice[1] + 0x14),
                     ((RedTrackDATA*)*voice)->m_fineTune);
-                voice[0x2E] |= 1;
+                ((RedVoiceDATA*)voice)->m_updateFlags |= 1;
             }
             voice += 0x30;
-        } while (voice < p_VoiceData + 0xC00);
+        } while (voice < (unsigned int*)p_VoiceData + 0xC00);
     }
 
     do {
@@ -1770,14 +1776,14 @@ void _ExecuteExtraData()
             if ((soundControl->m_flags & 0x10000) == 0) {
                 track = (int*)soundControl->m_tracks;
                 do {
-                    voice = p_VoiceData;
+                    voice = (unsigned int*)p_VoiceData;
                     if (*track != 0) {
                         do {
                             if ((int*)*voice == track) {
-                                voice[0x2E] |= 2;
+                                ((RedVoiceDATA*)voice)->m_updateFlags |= 2;
                             }
                             voice += 0x30;
-                        } while (voice < p_VoiceData + 0xC00);
+                        } while (voice < (unsigned int*)p_VoiceData + 0xC00);
                     }
                     track += 0x55;
                 } while (track < (int*)((u32)soundControl->m_tracks + (u32)soundControl->m_trackCount * 0x154));
@@ -1859,13 +1865,13 @@ void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
             if (*voiceData == (int)track) {
                 voiceData[0x28] += addPitch;
                 if (voiceData[1] != 0) {
-                    voiceData[0x26] = PitchCompute(voiceData[0x28] + *p_MusicPitchControl,
+                    voiceData[0x26] = PitchCompute(voiceData[0x28] + p_MusicPitchControl->m_value,
                                                    (int)*(s16*)((u8*)track + 0x142) + (int)*(s16*)((u8*)track + 0x13E),
                                                    *(int*)((u8*)voiceData[1] + 0x14), (s8)((u8*)track)[0x148]);
                 }
             }
             voiceData += 0x30;
-        } while (voiceData < (int*)p_VoiceData + 0xC00);
+        } while (voiceData < (int*)((unsigned int*)p_VoiceData + 0xC00));
     }
 
     if ((u32)trackData[0x1D] != 0) {
@@ -1945,7 +1951,7 @@ void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
             voiceData[0x2E] |= flags;
         }
         voiceData += 0x30;
-    } while (voiceData < (int*)p_VoiceData + 0xC00);
+    } while (voiceData < (int*)((unsigned int*)p_VoiceData + 0xC00));
 }
 
 /*
@@ -1973,9 +1979,9 @@ void _MidiTrackExecute(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, int fr
                 KeyOffSet(control, keyOnData, (RedTrackDATA*)track);
             }
             while (((u32)*track != 0) && (((RedTrackDATA*)track)->m_deltaTime < 1)) {
-                unsigned char* cmd = (unsigned char*)*track;
+                unsigned char* cmd = ((RedTrackDATA*)track)->m_command;
                 int delta;
-                *track = (int)(cmd + 1);
+                ((RedTrackDATA*)track)->m_command = cmd + 1;
                 p_MidiControl_Function[*cmd](control, keyOnData, (RedTrackDATA*)track);
                 if ((u32)*track != 0) {
                     if (((RedTrackDATA*)track)->m_deltaTime < 1) {
@@ -1986,11 +1992,13 @@ void _MidiTrackExecute(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, int fr
                     }
 
                     if (delta != 0) {
-                        delta += *(s16*)(track + 0x4E);
+                        delta += ((RedTrackDATA*)track)->m_step;
                         if (delta < 1) {
                             delta = 1;
-                        } else if ((track[0x3F] & 0x20000) != 0) {
-                            delta += ((delta * track[0x3B] >> 8) * (int)GetRandomData()) >> 7;
+                        } else if ((((RedTrackDATA*)track)->m_voiceSwitch & 0x20000) != 0) {
+                            delta += ((delta * ((RedTrackDATA*)track)->m_fuzzyDeltaTimeDepth >> 8) *
+                                         (int)GetRandomData()) >>
+                                7;
                             if (delta < 1) {
                                 delta = 1;
                             }
@@ -2012,10 +2020,10 @@ void _MidiTrackExecute(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, int fr
                 int* voice = (int*)p_VoiceData;
                 do {
                     if ((int*)*voice == track) {
-                        voice[0x2E] = m_ChangeStatus;
+                        ((RedVoiceDATA*)voice)->m_updateFlags = m_ChangeStatus;
                     }
                     voice += 0x30;
-                } while (voice < (int*)p_VoiceData + 0xC00);
+                } while (voice < (int*)((unsigned int*)p_VoiceData + 0xC00));
             }
         }
         track += 0x55;
@@ -2176,7 +2184,7 @@ void _SkipMusicEntry()
     u8 temp[0xC];
 
     if (*(int*)((u8*)p_SoundControlBuffer + 0xD98) >= 0) {
-        src = p_SkipKeyOn;
+        src = (int*)p_SkipKeyOn;
         dst = (int*)p_KeyOnData;
         do {
             if ((*src != 0) && (*dst == 0)) {
@@ -2186,12 +2194,12 @@ void _SkipMusicEntry()
             }
             src += 2;
             dst += 2;
-        } while (src < p_SkipKeyOn + 0x80);
+        } while (src < (int*)p_SkipKeyOn + 0x80);
 
-        src = p_SkipKeyOn + 0x80;
+        src = (int*)p_SkipKeyOn + 0x80;
         for (dst = (int*)p_KeyOnData + 0x80; (dst < (int*)p_KeyOnData + 0x100) && (*dst != 0); dst += 2) {
         }
-        while ((dst < (int*)p_KeyOnData + 0x100) && (src < p_SkipKeyOn + 0x100)) {
+        while ((dst < (int*)p_KeyOnData + 0x100) && (src < (int*)p_SkipKeyOn + 0x100)) {
             if (*src != 0) {
                 *dst = *src;
                 dst[1] = src[1];
@@ -2201,10 +2209,10 @@ void _SkipMusicEntry()
             src += 2;
         }
 
-        src = p_SkipKeyOn + 0x100;
+        src = (int*)p_SkipKeyOn + 0x100;
         for (dst = (int*)p_KeyOnData + 0x100; (dst < (int*)p_KeyOnData + 0x180) && (*dst != 0); dst += 2) {
         }
-        while ((dst < (int*)p_KeyOnData + 0x180) && (src < p_SkipKeyOn + 0x180)) {
+        while ((dst < (int*)p_KeyOnData + 0x180) && (src < (int*)p_SkipKeyOn + 0x180)) {
             if (*src != 0) {
                 *dst = *src;
                 dst[1] = src[1];
@@ -2255,7 +2263,7 @@ void MusicSkipFunction()
     u32* puVar9;
 
     do {
-        p_SkipKeyOn = (int*)RedNew(0x600);
+        p_SkipKeyOn = (RedKeyOnDATA*)RedNew(0x600);
         if (p_SkipKeyOn == 0) {
             RedSleep(10000);
         }
@@ -2263,7 +2271,7 @@ void MusicSkipFunction()
 
     puVar9 = (u32*)((u8*)p_SoundControlBuffer + 0x928);
     memset(p_SkipKeyOn, 0, 0x600);
-    iVar5 = _MusicMidiNoteSkipExecute((RedSoundCONTROL*)puVar9, (RedKeyOnDATA*)p_SkipKeyOn, 1);
+    iVar5 = _MusicMidiNoteSkipExecute((RedSoundCONTROL*)puVar9, p_SkipKeyOn, 1);
     while ((iVar5 == 0) && ((*(u32*)((u8*)puVar9 + 0x46c) & 1) != 0)) {
         *(s16*)((u8*)puVar9 + 0x48e) = *(int*)((u8*)puVar9 + 0x434);
         memcpy((void*)((u8*)puVar9 + 0xc), (void*)((u8*)puVar9 + 0x438), 0x10);
@@ -2284,7 +2292,7 @@ void MusicSkipFunction()
             puVar8[9] = *(u32*)(iVar7 + iVar3 + 0x300);
             puVar8 += 0x55;
         } while (uVar6 != 0);
-        iVar5 = _MusicMidiNoteSkipExecute((RedSoundCONTROL*)puVar9, (RedKeyOnDATA*)p_SkipKeyOn, 1);
+        iVar5 = _MusicMidiNoteSkipExecute((RedSoundCONTROL*)puVar9, p_SkipKeyOn, 1);
     }
     m_MusicSkipComplete = 1;
 }
@@ -2485,7 +2493,7 @@ int _SeMidiNoteExecute(
 {
     int* track = (int*)trackData;
     do {
-        if (((u32)*track != 0) && ((track[0x3F] & 8) == 0)) {
+        if (((u32)*track != 0) && ((((RedTrackDATA*)track)->m_voiceSwitch & 8) == 0)) {
             ((RedTrackDATA*)track)->m_seTickCounter += (s16)(tickStep * -0x78);
             while (((RedTrackDATA*)track)->m_seTickCounter < 1) {
                 int step = frames;
@@ -2503,18 +2511,20 @@ int _SeMidiNoteExecute(
                 while (((u32)*track != 0) && (((RedTrackDATA*)track)->m_deltaTime < 1)) {
                     int delta;
                     unsigned char* cmd;
-                    *(s16*)(track + 0x51) += 1;
-                    cmd = (unsigned char*)*track;
-                    *track = (int)(cmd + 1);
+                    ((RedTrackDATA*)track)->m_loopStepCurrent += 1;
+                    cmd = ((RedTrackDATA*)track)->m_command;
+                    ((RedTrackDATA*)track)->m_command = cmd + 1;
                     p_MidiControl_Function[*cmd](control, keyOnData, (RedTrackDATA*)track);
                     if ((u32)*track != 0) {
                         delta = DeltaTimeSumup((unsigned char**)track);
                         if (delta != 0) {
-                            delta += *(s16*)(track + 0x4E);
+                            delta += ((RedTrackDATA*)track)->m_step;
                             if (delta < 1) {
                                 delta = 1;
-                            } else if ((track[0x3F] & 0x20000) != 0) {
-                                delta += ((delta * track[0x3B] >> 8) * (int)GetRandomData()) >> 7;
+                            } else if ((((RedTrackDATA*)track)->m_voiceSwitch & 0x20000) != 0) {
+                                delta += ((delta * ((RedTrackDATA*)track)->m_fuzzyDeltaTimeDepth >> 8) *
+                                             (int)GetRandomData()) >>
+                                    7;
                                 if (delta < 1) {
                                     delta = 1;
                                 }
@@ -2533,7 +2543,8 @@ int _SeMidiNoteExecute(
                 }
 
                 if (m_ChangeStatus != 0) {
-                    ((int*)((u8*)p_VoiceData + (s8)((u8*)track)[0x14E] * 0xC0))[0x2E] = m_ChangeStatus;
+                    ((RedVoiceDATA*)((u8*)p_VoiceData + ((RedTrackDATA*)track)->m_trackNo * 0xC0))->m_updateFlags =
+                        m_ChangeStatus;
                 }
             }
         }
@@ -2561,17 +2572,17 @@ void MainControl(int frames)
     m_KeyOnEntry = 0;
     memset(p_KeyOnData, 0, 0x600);
 
-    p_SoundControl = (void*)((u8*)p_SoundControlBuffer + 0xDBC);
+    p_SoundControl = (RedSoundCONTROL*)((u8*)p_SoundControlBuffer + 0xDBC);
     _SeMidiNoteExecute((RedSoundCONTROL*)p_SoundControl, (RedKeyOnDATA*)p_KeyOnData,
                        *(RedTrackDATA**)p_SoundControl, *(int*)((u8*)p_SoundControl + 0x474), frames);
     p_SoundControl = p_SoundControlBuffer;
 
     if (*(s16*)((u8*)p_SoundControl + 0x48E) != 0) {
         if ((((u32*)p_SoundControl)[0x11B] & 0x10) == 0) {
-            mul = ((u32)*p_MusicTempoControl >> 0xC) & 0xFFFF;
+            mul = ((u32)p_MusicTempoControl->m_value >> 0xC) & 0xFFFF;
             step = *(int*)((u8*)p_SoundControl + 0x448) >> 0xC;
             if (mul != 0) {
-                if (*p_MusicTempoControl < 0) {
+                if (p_MusicTempoControl->m_value < 0) {
                     step *= (int)mul;
                     step >>= 0x10;
                 } else {
@@ -2589,7 +2600,7 @@ void MainControl(int frames)
     }
 
     if (*(s16*)((u8*)p_SoundControlBuffer + 0x922) != 0) {
-        p_SoundControl = (void*)((u8*)p_SoundControlBuffer + 0x494);
+        p_SoundControl = (RedSoundCONTROL*)((u8*)p_SoundControlBuffer + 0x494);
         step = *(int*)((u8*)p_SoundControl + 0x448) >> 0xC;
         ((RedSoundCONTROL*)p_SoundControl)->m_tickCounter -= step * frames;
         while (((RedSoundCONTROL*)p_SoundControl)->m_tickCounter < 1) {

@@ -15,7 +15,7 @@ struct RedMusicHEAD
 	short m_musicNo;
 	short m_waveNo;
 	char m_trackCount;
-	unsigned char m_unk09;
+	char m_reverbKind;
 	short m_reverbDepth;
 	unsigned short m_flags;
 	unsigned short m_unk0e;
@@ -86,7 +86,7 @@ public:
 	void ClearWaveDataM(int, int, int, int);
 	void ClearWaveBank(int);
 	int GetWaveBank(int);
-	int SearchWaveBase(int);
+	RedWaveHeadWD* SearchWaveBase(int);
 	int ReentryWaveData(int);
 	void WaveHistoryManager(int, int);
 	void DisplayWaveInfo();
@@ -96,12 +96,12 @@ public:
 	void SeSepHistoryChoice(RedHistoryBANK*);
 	int SearchSeSepSequence(int);
 	int SeSepMemoryFree(RedHistoryBANK*);
-	unsigned int SeSepOldDelete();
+	RedHistoryBANK* SeSepOldDelete();
 	int SeSepHeadAdd(RedSeSepHEAD*);
 	int SetSeSepData(RedSeSepHEAD*);
 	int ClearSeSepData(int);
 	int ClearSeSepDataMG(int, int, int, int);
-	int* SearchSeSepBank(int);
+	RedHistoryBANK* SearchSeSepBank(int);
 	int ReentrySeSepData(int);
 	void SeSepHistoryManager(int, int);
 	void DisplaySePlayInfo();
@@ -112,8 +112,8 @@ public:
 	int SearchMusicSequence(int);
 	int MusicMemoryFree(RedHistoryBANK*);
 	int MusicOldClear();
-	unsigned int MusicOldChoice();
-	int* SearchMusicBank(int);
+	RedHistoryBANK* MusicOldChoice();
+	RedHistoryBANK* SearchMusicBank(int);
 	int ReentryMusicData(int);
 	void MusicHistoryManager(int, int);
 	int MusicHeadAdd(RedMusicHEAD*);
