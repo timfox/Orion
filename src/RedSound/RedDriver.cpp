@@ -26,9 +26,18 @@ struct RedWaveSettingState {
     int waveSize;
 };
 
+enum RedDriverDmaLayoutSize {
+    REDSOUND_DMA_QUEUE_WORD_COUNT = 0x380,
+    REDSOUND_DMA_CONTROL_WORD_COUNT = REDSOUND_DMA_QUEUE_WORD_COUNT * 2,
+    REDSOUND_DMA_QUEUE_ENTRY_COUNT = 0x80,
+    REDSOUND_DMA_TRANSFER_ALIGN = 0x20,
+    REDSOUND_DMA_TRANSFER_ALIGN_MASK = ~(REDSOUND_DMA_TRANSFER_ALIGN - 1),
+    REDSOUND_DMA_MAX_CHUNK_SIZE = 0x40000,
+};
+
 struct RedDriverSyncState {
-    int m_dmaQueue[0x380];
-    int m_streamDmaQueue[0x380];
+    int m_dmaQueue[REDSOUND_DMA_QUEUE_WORD_COUNT];
+    int m_streamDmaQueue[REDSOUND_DMA_QUEUE_WORD_COUNT];
     OSThread m_mainThread;
     OSSemaphore m_mainSemaphore;
     u8 m_pad2240[0x2240 - 0x1F18 - sizeof(OSSemaphore)];
@@ -74,6 +83,13 @@ enum RedDriverBufferSize {
     REDSOUND_EXEC_COMMAND_BUFFER_SIZE = sizeof(RedExecCommand) * REDSOUND_EXEC_COMMAND_COUNT,
     REDSOUND_EXEC_COMMAND_WORD_COUNT = REDSOUND_EXEC_COMMAND_BUFFER_SIZE / sizeof(int),
     REDSOUND_MUSIC_NEXT_PLAY_BUFFER_SIZE = sizeof(RedMusicPlayCommand),
+};
+
+enum RedDriverThreadFlag {
+    REDSOUND_THREAD_FLAG_MAIN = 1,
+    REDSOUND_THREAD_FLAG_DMA = 2,
+    REDSOUND_THREAD_FLAG_WAVE_SETTING = 4,
+    REDSOUND_THREAD_FLAG_MUSIC_SKIP = 8,
 };
 
 // RedDriver-owned linkage (sbss/sdata tracked symbols)
@@ -123,7 +139,7 @@ u8* volatile p_MusicSkipThreadStack;
 volatile int m_MusicSkipComplete;
 RedReverbDepth* volatile p_ReverbDepth;
 int m_Mute[2];
-static int m_DmaControl[0x700];
+static int m_DmaControl[REDSOUND_DMA_CONTROL_WORD_COUNT];
 static OSThread m_MainThread;
 static OSSemaphore m_MainSemaphore;
 static OSThread m_WaveSettingThread;
@@ -152,12 +168,12 @@ static inline RedDmaRequest* RedDriverMainDmaQueue()
 
 static inline RedDmaRequest* RedDriverStreamDmaQueue()
 {
-    return reinterpret_cast<RedDmaRequest*>(m_DmaControl + 0x380);
+    return reinterpret_cast<RedDmaRequest*>(m_DmaControl + REDSOUND_DMA_QUEUE_WORD_COUNT);
 }
 
 static inline RedDmaRequest* RedDriverStreamDmaQueueEnd()
 {
-    return reinterpret_cast<RedDmaRequest*>(m_DmaControl + 0x700);
+    return reinterpret_cast<RedDmaRequest*>(m_DmaControl + REDSOUND_DMA_CONTROL_WORD_COUNT);
 }
 
 static inline OSThread& RedDriverMainThread()
@@ -220,7 +236,7 @@ void _SetReverbDepth(int* command)
     int* seInfo;
 
     reverbBank = command[0] & 1;
-    reverbDepth = command[1] & 0x7f;
+    reverbDepth = command[1] & REDSOUND_COMMAND_VALUE_MASK;
     fadeStep = command[2];
     if (reverbDepth != 0) {
         reverbDepth += 1;
@@ -334,17 +350,20 @@ void _MusicCrossPlaySequence(int* command)
         command[2] = command[2] + 1;
     }
     pvVar2 = p_SoundControlBuffer;
-    if ((*command == *(int*)((int)pvVar2 + 0x470)) ||
-        (*command == *(int*)((int)pvVar2 + REDSOUND_CONTROL_SKIP_OFFSET + 0x470))) {
+    if ((*command == *(int*)((int)pvVar2 + REDSOUND_CONTROL_MUSIC_ID_OFFSET)) ||
+        (*command == *(int*)((int)pvVar2 + REDSOUND_CONTROL_SKIP_OFFSET + REDSOUND_CONTROL_MUSIC_ID_OFFSET))) {
         return;
     }
-    if (*command == *(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + 0x470)) {
-        *(int*)((int)pvVar2 + 0x458) = -*(int*)((int)pvVar2 + 0x454) / command[2];
-        *(int*)((int)pvVar2 + 0x45c) = command[2];
+    if (*command == *(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + REDSOUND_CONTROL_MUSIC_ID_OFFSET)) {
+        *(int*)((int)pvVar2 + REDSOUND_CONTROL_MASTER_VOLUME_ADD_OFFSET) =
+            -*(int*)((int)pvVar2 + REDSOUND_CONTROL_MASTER_VOLUME_OFFSET) / command[2];
+        *(int*)((int)pvVar2 + REDSOUND_CONTROL_MASTER_VOLUME_DELTA_OFFSET) = command[2];
         pvVar2 = p_SoundControlBuffer;
-        *(int*)((int)pvVar2 + 0x8ec) =
-             (0x1ff800 - *(int*)((int)pvVar2 + 0x8e8)) / command[2];
-        *(int*)((int)pvVar2 + 0x8f0) = command[2];
+        *(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + REDSOUND_CONTROL_MASTER_VOLUME_ADD_OFFSET) =
+             (REDSOUND_MASTER_VOLUME_FULL_FIXED_HALF -
+              *(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + REDSOUND_CONTROL_MASTER_VOLUME_OFFSET)) /
+             command[2];
+        *(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + REDSOUND_CONTROL_MASTER_VOLUME_DELTA_OFFSET) = command[2];
         pvVar2 = (void*)RedNew(REDSOUND_CONTROL_SIZE);
         memcpy(pvVar2, (void*)((int)p_SoundControlBuffer + REDSOUND_CONTROL_SECONDARY_OFFSET), REDSOUND_CONTROL_SIZE);
         memcpy((void*)((int)p_SoundControlBuffer + REDSOUND_CONTROL_SECONDARY_OFFSET), p_SoundControlBuffer,
@@ -355,17 +374,18 @@ void _MusicCrossPlaySequence(int* command)
         if (c_RedEntry.SearchMusicSequence(*command) >= 0) {
             m_CrossTime = command[2];
             iVar1 = 0;
-            if (*(int*)((int)pvVar2 + 0x470) != -1) {
-                if (*(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + 0x470) != -1) {
-                    MusicStop(*(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + 0x470));
+            if (*(int*)((int)pvVar2 + REDSOUND_CONTROL_MUSIC_ID_OFFSET) != -1) {
+                if (*(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + REDSOUND_CONTROL_MUSIC_ID_OFFSET) != -1) {
+                    MusicStop(*(int*)((int)pvVar2 + REDSOUND_CONTROL_SECONDARY_OFFSET + REDSOUND_CONTROL_MUSIC_ID_OFFSET));
                 }
-                *(int*)((int)pvVar2 + 0x458) = -*(int*)((int)pvVar2 + 0x454) / command[2];
-                *(int*)((int)pvVar2 + 0x45c) = command[2];
+                *(int*)((int)pvVar2 + REDSOUND_CONTROL_MASTER_VOLUME_ADD_OFFSET) =
+                    -*(int*)((int)pvVar2 + REDSOUND_CONTROL_MASTER_VOLUME_OFFSET) / command[2];
+                *(int*)((int)pvVar2 + REDSOUND_CONTROL_MASTER_VOLUME_DELTA_OFFSET) = command[2];
                 iVar1 = p_MusicReplayPoint[*command];
                 p_MusicReplayPoint[*command] = 0;
                 if (iVar1 == 0) {
                     memcpy((void*)((int)pvVar2 + REDSOUND_CONTROL_SIZE), pvVar2, REDSOUND_CONTROL_SIZE);
-                    *(int*)((int)pvVar2 + 0x470) = 0xffffffff;
+                    *(int*)((int)pvVar2 + REDSOUND_CONTROL_MUSIC_ID_OFFSET) = 0xffffffff;
                 }
             }
             MusicPlay(*command, command[1], iVar1);
@@ -404,15 +424,15 @@ void _MusicMasterVolume(int* command)
 {
     RedVoiceDATA* voice;
 
-    m_MasterMusicVolume = *command & 0x7f;
+    m_MasterMusicVolume = *command & REDSOUND_COMMAND_VALUE_MASK;
     if (m_MasterMusicVolume != 0) {
         m_MasterMusicVolume = m_MasterMusicVolume + 1;
-        m_MasterMusicVolume = m_MasterMusicVolume * 4;
+        m_MasterMusicVolume = m_MasterMusicVolume * REDSOUND_MASTER_VOLUME_SCALE;
         m_MasterMusicVolume = m_MasterMusicVolume - 1;
     }
     voice = p_VoiceData;
     do {
-        voice->m_updateFlags = voice->m_updateFlags | 2;
+        voice->m_updateFlags = voice->m_updateFlags | REDSOUND_VOICE_UPDATE_VOLUME;
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
@@ -568,15 +588,15 @@ void _SeMasterVolume(int* command)
 {
     RedVoiceDATA* voice;
 
-    m_MasterSEVolume = *command & 0x7f;
+    m_MasterSEVolume = *command & REDSOUND_COMMAND_VALUE_MASK;
     if (m_MasterSEVolume != 0) {
         m_MasterSEVolume = m_MasterSEVolume + 1;
-        m_MasterSEVolume = m_MasterSEVolume * 4;
+        m_MasterSEVolume = m_MasterSEVolume * REDSOUND_MASTER_VOLUME_SCALE;
         m_MasterSEVolume = m_MasterSEVolume - 1;
     }
     voice = p_VoiceData;
     do {
-        voice->m_updateFlags = voice->m_updateFlags | 2;
+        voice->m_updateFlags = voice->m_updateFlags | REDSOUND_VOICE_UPDATE_VOLUME;
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
@@ -838,7 +858,7 @@ int _MainThread(void*)
     int iVar3;
     unsigned int uVar4;
 
-    m_ThreadExecute = m_ThreadExecute | 1;
+    m_ThreadExecute = m_ThreadExecute | REDSOUND_THREAD_FLAG_MAIN;
     while (m_ThreadControl != 0) {
         OSWaitSemaphore(&m_MainSemaphore);
         if (m_ThreadControl != 0) {
@@ -869,7 +889,7 @@ int _MainThread(void*)
             p_Tick->m_ticks[0] = iVar3 - iVar2;
         }
     }
-    m_ThreadExecute = m_ThreadExecute & ~1;
+    m_ThreadExecute = m_ThreadExecute & ~REDSOUND_THREAD_FLAG_MAIN;
     return 0;
 }
 
@@ -884,7 +904,7 @@ int _MainThread(void*)
  */
 int _WaveSettingThread(void* threadArg)
 {
-    m_ThreadExecute = m_ThreadExecute | 4;
+    m_ThreadExecute = m_ThreadExecute | REDSOUND_THREAD_FLAG_WAVE_SETTING;
     m_WaveSettingStatus = 0;
     while (m_ThreadControl != 0) {
         OSWaitSemaphore(&m_WaveSettingSemaphore);
@@ -898,7 +918,7 @@ int _WaveSettingThread(void* threadArg)
             m_WaveSettingStatus = 0;
         }
     }
-    m_ThreadExecute = m_ThreadExecute & ~4;
+    m_ThreadExecute = m_ThreadExecute & ~REDSOUND_THREAD_FLAG_WAVE_SETTING;
     return 0;
 }
 
@@ -961,7 +981,8 @@ void _DmaCallback(unsigned long)
  * JP Address: TODO
  * JP Size: TODO
  */
-int RedDmaEntry(int param_1, int param_2, int param_3, int param_4, int param_5, void (*param_6)(void*), void* param_7)
+int RedDmaEntry(int flags, int direction, int mainMemory, int aramMemory, int sizeBytes, void (*callback)(void*),
+                void* callbackData)
 {
     unsigned int interrupt;
     RedDmaRequest* queueBase;
@@ -974,7 +995,7 @@ int RedDmaEntry(int param_1, int param_2, int param_3, int param_4, int param_5,
     RedDmaRequest* nextEntry;
 
     interrupt = OSDisableInterrupts();
-    if ((param_1 & 0xffff7fff) != 0) {
+    if ((flags & REDSOUND_DMA_FLAG_QUEUE_MASK) != 0) {
         queuePtr = &p_DmaControlNow[0];
         queueBase = RedDriverMainDmaQueue();
     } else {
@@ -983,25 +1004,25 @@ int RedDmaEntry(int param_1, int param_2, int param_3, int param_4, int param_5,
     }
     queueEntry = *queuePtr;
     entryID = GetMyEntryID();
-    size = (unsigned int)(param_5 + 0x1f) & ~0x1f;
-    if ((m_DMAMode != 0) || ((param_1 & 0x8000) != 0)) {
-        queueEnd = queueBase + 0x80;
+    size = (unsigned int)(sizeBytes + REDSOUND_DMA_TRANSFER_ALIGN - 1) & REDSOUND_DMA_TRANSFER_ALIGN_MASK;
+    if ((m_DMAMode != 0) || ((flags & REDSOUND_DMA_FLAG_CHUNKED_TRANSFER) != 0)) {
+        queueEnd = queueBase + REDSOUND_DMA_QUEUE_ENTRY_COUNT;
         do {
             chunkSize = size;
-            if ((int)size > 0x40000) {
-                chunkSize = 0x40000;
+            if ((int)size > REDSOUND_DMA_MAX_CHUNK_SIZE) {
+                chunkSize = REDSOUND_DMA_MAX_CHUNK_SIZE;
             }
             queueEntry->m_id = entryID;
             size -= chunkSize;
-            queueEntry->m_direction = param_2;
-            queueEntry->m_mainMemory = param_3;
-            param_3 += chunkSize;
-            queueEntry->m_aramMemory = param_4;
-            param_4 += chunkSize;
+            queueEntry->m_direction = direction;
+            queueEntry->m_mainMemory = mainMemory;
+            mainMemory += chunkSize;
+            queueEntry->m_aramMemory = aramMemory;
+            aramMemory += chunkSize;
             queueEntry->m_size = chunkSize;
-            queueEntry->m_callbackData = param_7;
+            queueEntry->m_callbackData = callbackData;
             if ((int)size < 1) {
-                queueEntry->m_callback = param_6;
+                queueEntry->m_callback = callback;
             } else {
                 queueEntry->m_callback = 0;
             }
@@ -1013,14 +1034,14 @@ int RedDmaEntry(int param_1, int param_2, int param_3, int param_4, int param_5,
         *queuePtr = queueEntry;
     } else {
         nextEntry = queueEntry + 1;
-        queueEnd = queueBase + 0x80;
+        queueEnd = queueBase + REDSOUND_DMA_QUEUE_ENTRY_COUNT;
         queueEntry->m_id = entryID;
-        queueEntry->m_direction = param_2;
-        queueEntry->m_mainMemory = param_3;
-        queueEntry->m_aramMemory = param_4;
+        queueEntry->m_direction = direction;
+        queueEntry->m_mainMemory = mainMemory;
+        queueEntry->m_aramMemory = aramMemory;
         queueEntry->m_size = size;
-        queueEntry->m_callback = param_6;
-        queueEntry->m_callbackData = param_7;
+        queueEntry->m_callback = callback;
+        queueEntry->m_callbackData = callbackData;
         if (queueEnd <= nextEntry) {
             nextEntry = queueBase;
         }
@@ -1114,7 +1135,7 @@ void _DmaExecute()
         }
         piVar8 = piVar7 + 1;
         m_DMAInThread = 5;
-        if (piVar4 + 0x80 <= piVar7 + 1) {
+        if (piVar4 + REDSOUND_DMA_QUEUE_ENTRY_COUNT <= piVar7 + 1) {
             piVar8 = piVar4;
         }
         *ppiVar5 = piVar8;
@@ -1153,7 +1174,7 @@ void _DmaExecute()
  */
 int _DmaExecuteThread(void*)
 {
-    m_ThreadExecute |= 2;
+    m_ThreadExecute |= REDSOUND_THREAD_FLAG_DMA;
     m_DMAExecute = 0;
     m_DMAInThread = 0;
     while (m_ThreadControl != 0) {
@@ -1164,7 +1185,7 @@ int _DmaExecuteThread(void*)
         }
         m_DMAExecute = 0;
     }
-    m_ThreadExecute &= ~2;
+    m_ThreadExecute &= ~REDSOUND_THREAD_FLAG_DMA;
     return 0;
 }
 
@@ -1179,7 +1200,7 @@ int _DmaExecuteThread(void*)
  */
 int _MusicSkipThread(void*)
 {
-    m_ThreadExecute |= 8;
+    m_ThreadExecute |= REDSOUND_THREAD_FLAG_MUSIC_SKIP;
     m_MusicSkipComplete = 0;
     while (m_ThreadControl != 0) {
         OSWaitSemaphore(&m_MusicSkipSemaphore);
@@ -1189,7 +1210,7 @@ int _MusicSkipThread(void*)
         while (OSTryWaitSemaphore(&m_MusicSkipSemaphore) > 0) {
         }
     }
-    m_ThreadExecute &= ~8;
+    m_ThreadExecute &= ~REDSOUND_THREAD_FLAG_MUSIC_SKIP;
     return 0;
 }
 
@@ -1265,8 +1286,8 @@ void CRedDriver::Init()
     m_MusicFastSpeed = 0;
     m_DMAStatus = 0;
     m_CrossTime = 0;
-    m_MasterSEVolume = 0x1ff;
-    m_MasterMusicVolume = 0x1ff;
+    m_MasterSEVolume = REDSOUND_MASTER_VOLUME_FULL;
+    m_MasterMusicVolume = REDSOUND_MASTER_VOLUME_FULL;
     iVar6 = 0;
     do {
         iVar5 = iVar6 + 1;
@@ -1288,14 +1309,14 @@ void CRedDriver::Init()
     p_SoundControlBuffer = (RedSoundCONTROL*)RedNew(REDSOUND_CONTROL_BUFFER_SIZE);
     p_SoundControl = p_SoundControlBuffer;
     memset(p_SoundControlBuffer, 0, REDSOUND_CONTROL_BUFFER_SIZE);
-    p_SoundControl[REDSOUND_CONTROL_SE].m_volume = 0x1ff000;
-    p_SoundControl[REDSOUND_CONTROL_MUSIC_SKIP].m_volume = 0x1ff000;
-    p_SoundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_volume = 0x1ff000;
-    p_SoundControl[REDSOUND_CONTROL_MUSIC_PRIMARY].m_volume = 0x1ff000;
-    p_SoundControl[REDSOUND_CONTROL_SE].m_masterVolume = 0x1ff000;
-    p_SoundControl[REDSOUND_CONTROL_MUSIC_SKIP].m_masterVolume = 0x1ff000;
-    p_SoundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_masterVolume = 0x1ff000;
-    p_SoundControl[REDSOUND_CONTROL_MUSIC_PRIMARY].m_masterVolume = 0x1ff000;
+    p_SoundControl[REDSOUND_CONTROL_SE].m_volume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
+    p_SoundControl[REDSOUND_CONTROL_MUSIC_SKIP].m_volume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
+    p_SoundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_volume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
+    p_SoundControl[REDSOUND_CONTROL_MUSIC_PRIMARY].m_volume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
+    p_SoundControl[REDSOUND_CONTROL_SE].m_masterVolume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
+    p_SoundControl[REDSOUND_CONTROL_MUSIC_SKIP].m_masterVolume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
+    p_SoundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_masterVolume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
+    p_SoundControl[REDSOUND_CONTROL_MUSIC_PRIMARY].m_masterVolume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
     p_SoundControl[REDSOUND_CONTROL_MUSIC_SKIP].m_musicId = -1;
     p_SoundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_musicId = -1;
     p_SoundControl[REDSOUND_CONTROL_MUSIC_PRIMARY].m_musicId = -1;
@@ -1818,7 +1839,8 @@ int CRedDriver::SePlay(int bank, int sep, int autoID, int unk, int volume, int p
 		if (sep >= 0) {
 			_EntryExecCommand(_SeSepPlaySequence, autoID, sep, unk, volume, pitch, 0, 0);
 		}
-	} else if ((bank >= 0) && (bank < 4) && (sep >= 0) && (sep < 0x200)) {
+	} else if ((bank >= 0) && (bank < REDSOUND_SE_BLOCK_BANK_COUNT) && (sep >= 0) &&
+	           (sep < REDSOUND_SE_BLOCK_SEQUENCE_COUNT)) {
 		_EntryExecCommand(_SeBlockPlay, autoID, bank, sep, unk, volume, pitch, 0);
 	}
     return autoID;
