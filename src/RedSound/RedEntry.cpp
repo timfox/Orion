@@ -351,29 +351,31 @@ int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
 		waveHead->m_loadSize = waveHead->m_waveSize;
 	}
 
-	if ((waveNo >= 100) && (waveNo < 300)) {
+	if ((waveNo >= REDSOUND_WAVE_LARGE_RANGE_BEGIN) && (waveNo < REDSOUND_WAVE_LARGE_RANGE_END)) {
 		if (waveHead->m_loadSize <= REDSOUND_WAVE_LARGE_LOAD_STEP) {
 			waveHead->m_loadSize = REDSOUND_WAVE_LARGE_LOAD_STEP;
 		} else if (waveHead->m_loadSize <= REDSOUND_WAVE_LARGE_REGION_SIZE) {
 			waveHead->m_loadSize = REDSOUND_WAVE_LARGE_REGION_SIZE;
 		}
-	} else if ((waveNo >= 10) && (waveNo < 70)) {
+	} else if ((waveNo >= REDSOUND_WAVE_STAGE_RANGE_BEGIN) && (waveNo < REDSOUND_WAVE_STAGE_RANGE_END)) {
 		waveHead->m_loadSize += REDSOUND_WAVE_STAGE_LOAD_BLOCK_ROUND;
 		int blocks = waveHead->m_loadSize / REDSOUND_WAVE_STAGE_LOAD_BLOCK_SIZE;
 		blocks += blocks >> 0x1F;
 		waveHead->m_loadSize = blocks * REDSOUND_WAVE_STAGE_LOAD_BLOCK_SIZE;
-	} else if (((waveNo >= 0x154) && (waveNo < 0x17a)) || ((waveNo >= 0x17f) && (waveNo < 0x182)) ||
-	           (waveNo == 0x183)) {
+	} else if (((waveNo >= REDSOUND_WAVE_FIXED_RANGE0_BEGIN) && (waveNo < REDSOUND_WAVE_FIXED_RANGE0_END)) ||
+	           ((waveNo >= REDSOUND_WAVE_FIXED_RANGE1_BEGIN) && (waveNo < REDSOUND_WAVE_FIXED_RANGE1_END)) ||
+	           (waveNo == REDSOUND_WAVE_FIXED_SINGLE)) {
 		waveHead->m_loadSize = REDSOUND_WAVE_FIXED_REGION_SIZE;
 	}
 
 	int minOffset;
 	int maxOffset;
-	if ((waveNo >= 100) && (waveNo < 300)) {
+	if ((waveNo >= REDSOUND_WAVE_LARGE_RANGE_BEGIN) && (waveNo < REDSOUND_WAVE_LARGE_RANGE_END)) {
 		minOffset = REDSOUND_WAVE_LARGE_REGION_OFFSET;
 		maxOffset = minOffset + REDSOUND_WAVE_LARGE_REGION_SIZE;
-	} else if (((waveNo >= 0x154) && (waveNo < 0x17a)) || ((waveNo >= 0x17f) && (waveNo < 0x182)) ||
-	           (waveNo == 0x183)) {
+	} else if (((waveNo >= REDSOUND_WAVE_FIXED_RANGE0_BEGIN) && (waveNo < REDSOUND_WAVE_FIXED_RANGE0_END)) ||
+	           ((waveNo >= REDSOUND_WAVE_FIXED_RANGE1_BEGIN) && (waveNo < REDSOUND_WAVE_FIXED_RANGE1_END)) ||
+	           (waveNo == REDSOUND_WAVE_FIXED_SINGLE)) {
 		minOffset = REDSOUND_WAVE_FIXED_REGION_OFFSET;
 		maxOffset = minOffset + REDSOUND_WAVE_FIXED_REGION_SIZE;
 	} else {
@@ -400,8 +402,10 @@ int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
 		int arAddress;
 		if ((historyBank < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + REDSOUND_WAVE_BANK_SIZE)) &&
 		    ((arAddress = RedNewA(waveHead->m_loadSize, minOffset, maxOffset)) != 0)) {
-			int copySize = ((waveHead->m_tableCount * 4) + 0x1F) & 0xFFFFFFE0;
-			copySize += waveHead->m_toneCount * 0x60 + 0x20;
+			int copySize = ((waveHead->m_tableCount * REDSOUND_WAVE_TABLE_ENTRY_SIZE) +
+			                (REDSOUND_WAVE_TABLE_ALIGN - 1)) &
+			               REDSOUND_WAVE_TABLE_ALIGN_MASK;
+			copySize += waveHead->m_toneCount * REDSOUND_WAVE_TONE_ENTRY_SIZE + REDSOUND_WAVE_HEADER_COPY_BASE_SIZE;
 			void* copied = (void*)RedNew(copySize);
 			if (copied != 0) {
 				historyBank->m_data = (int)copied;
@@ -482,9 +486,10 @@ int CRedEntry::SetWaveData(int waveBankNo, void* waveData, int waveDataSize)
 			}
 
 			int waveHeadSize =
-			    ((((waveHead->m_tableCount * 4) + 0x1F) & 0xFFFFFFE0) +
-			     waveHead->m_toneCount * 0x60) +
-			    0x20;
+			    ((((waveHead->m_tableCount * REDSOUND_WAVE_TABLE_ENTRY_SIZE) + (REDSOUND_WAVE_TABLE_ALIGN - 1)) &
+			      REDSOUND_WAVE_TABLE_ALIGN_MASK) +
+			     waveHead->m_toneCount * REDSOUND_WAVE_TONE_ENTRY_SIZE) +
+			    REDSOUND_WAVE_HEADER_COPY_BASE_SIZE;
 			waveSize = waveHead->m_waveSize;
 			waveDataSize -= waveHeadSize;
 			waveDataTop = (void*)((unsigned char*)waveData + waveHeadSize);
@@ -798,7 +803,8 @@ void CRedEntry::DisplayWaveInfo()
 				if (history < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + REDSOUND_WAVE_BANK_SIZE)) {
 					if (history < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + REDSOUND_WAVE_HISTORY_BANK_OFFSET)) {
 						unsigned int index = reinterpret_cast<unsigned int>(history) - (unsigned int)m_waveBankBase;
-						OSReport(s__s__2d___WAVE_4_4d___0x_8_8X___0_801e7a53, sRedEntryLogPrefix, (int)(index >> 4),
+						OSReport(s__s__2d___WAVE_4_4d___0x_8_8X___0_801e7a53, sRedEntryLogPrefix,
+						         (int)(index / REDSOUND_HISTORY_BANK_ENTRY_SIZE),
 						         (int)((RedWaveHeadWD*)history->m_data)->m_waveNo, ((RedWaveHeadWD*)history->m_data)->m_aramAddress, bank->m_size,
 						         freeSize, history->m_historyNo);
 						fflush(__files + 1);
@@ -823,7 +829,7 @@ void CRedEntry::DisplayWaveInfo()
 				aBufferAddress = bank->m_address + bank->m_size;
 			}
 			bank++;
-		} while (bank < aBankAddress + 0x400);
+		} while (bank < aBankAddress + REDSOUND_MEMORY_BANK_BLOCK_COUNT);
 
         int aBase = c_RedMemory.GetABufferAddress();
         int aSize = c_RedMemory.GetABufferSize();
@@ -1000,7 +1006,7 @@ RedHistoryBANK* CRedEntry::SeSepOldDelete()
  * Address:	TODO
  * Size:	TODO
  */
-int CRedEntry::SeSepHeadAdd(RedSeSepHEAD* seSepHead)
+RedSeSepHEAD* CRedEntry::SeSepHeadAdd(RedSeSepHEAD* seSepHead)
 {
 	RedHistoryBANK* bank = reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase);
 	int result = 0;
@@ -1024,7 +1030,7 @@ int CRedEntry::SeSepHeadAdd(RedSeSepHEAD* seSepHead)
 		bank->m_historyNo = 1;
 	}
 
-	return result;
+	return reinterpret_cast<RedSeSepHEAD*>(result);
 }
 
 /*
@@ -1032,7 +1038,7 @@ int CRedEntry::SeSepHeadAdd(RedSeSepHEAD* seSepHead)
  * Address:	TODO
  * Size:	TODO
  */
-int CRedEntry::SetSeSepData(RedSeSepHEAD* seSepHead)
+RedSeSepHEAD* CRedEntry::SetSeSepData(RedSeSepHEAD* seSepHead)
 {
 	int result;
 
@@ -1054,13 +1060,13 @@ int CRedEntry::SetSeSepData(RedSeSepHEAD* seSepHead)
 		                                                   result * 0x10));
 		result = *reinterpret_cast<int*>(*reinterpret_cast<int*>(reinterpret_cast<int>(this) + 4) + result * 0x10 + 8);
 	} else {
-		result = SeSepHeadAdd(seSepHead);
+		result = reinterpret_cast<int>(SeSepHeadAdd(seSepHead));
 		if (result == 0) {
 			RedDelete(seSepHead);
 		}
 	}
 
-	return result;
+	return reinterpret_cast<RedSeSepHEAD*>(result);
 }
 
 /*
@@ -1218,33 +1224,35 @@ void CRedEntry::DisplaySePlayInfo()
 				if ((track->m_seSepId & REDSOUND_SE_BLOCK_DATA_FLAG) != 0) {
 					unsigned int seDataNo = (unsigned int)track->m_seSepId;
 					int songNo = (int)(seDataNo & REDSOUND_SE_BLOCK_ENTRY_MASK) >> REDSOUND_SE_BLOCK_BANK_SHIFT;
-					int seqBase = ((int*)p_SeBlockData)[songNo] + 0x10;
-					int seqInfo = seqBase + *(short*)(((int*)p_SeBlockData)[songNo] + 10) * 4;
+					RedSeBlockHEAD* seBlock = p_SeBlockData[songNo];
+					int seqBase = reinterpret_cast<int>(seBlock->m_entries);
+					int seqInfo = seqBase + seBlock->m_seCount * sizeof(int);
 					seqInfo += (*(unsigned int*)(seqBase + (seDataNo & REDSOUND_SE_BLOCK_SEQUENCE_MASK) * 4) &
 					            REDSOUND_SE_BLOCK_ENTRY_MASK);
-					int waveNo = (reinterpret_cast<RedSeINFO*>(seqInfo)->m_waveNoHi << 8) +
+					int waveNo = reinterpret_cast<RedSeINFO*>(seqInfo)->m_waveNoHi * REDSOUND_SE_INFO_U16_HIGH_SCALE +
 					             reinterpret_cast<RedSeINFO*>(seqInfo)->m_waveNoLo;
 					int trackOffset = reinterpret_cast<int>(track) - reinterpret_cast<int>(*trackHead);
 					int trackIndex = trackOffset / REDSOUND_TRACK_SIZE + (trackOffset >> 0x1F);
 
 					OSReport(s__s__2d____3_3u__3_3u___WAVE_4_4u_801e7bb2, sRedEntryLogPrefix,
-					         (trackIndex - (trackIndex >> 0x1F)) + 0x20, songNo,
+					         (trackIndex - (trackIndex >> 0x1F)) + REDSOUND_SE_VOICE_BASE_INDEX, songNo,
 					         seDataNo & REDSOUND_SE_BLOCK_SEQUENCE_MASK, waveNo);
 					fflush(__files + 1);
 				} else {
 					RedHistoryBANK* seSepBank = SearchSeSepBank(track->m_seSepId);
 					int trackOffset = reinterpret_cast<int>(track) - reinterpret_cast<int>(*trackHead);
 					int trackIndex = trackOffset / REDSOUND_TRACK_SIZE + (trackOffset >> 0x1F);
-					int waveNo = (reinterpret_cast<RedSeSepHEAD*>(seSepBank->m_data)->m_waveNoHi << 8) +
+					int waveNo = reinterpret_cast<RedSeSepHEAD*>(seSepBank->m_data)->m_waveNoHi * REDSOUND_SE_INFO_U16_HIGH_SCALE +
 					             reinterpret_cast<RedSeSepHEAD*>(seSepBank->m_data)->m_waveNoLo;
 					OSReport(s__s__2d___se_6_6u_sep___WAVE_4_4u_801e7bdc, sRedEntryLogPrefix,
-					         (trackIndex - (trackIndex >> 0x1F)) + 0x20, track->m_seSepId, waveNo);
+					         (trackIndex - (trackIndex >> 0x1F)) + REDSOUND_SE_VOICE_BASE_INDEX, track->m_seSepId, waveNo);
 					fflush(__files + 1);
 				}
 			} else {
 				int trackOffset = reinterpret_cast<int>(track) - reinterpret_cast<int>(*trackHead);
 				int trackIndex = trackOffset / REDSOUND_TRACK_SIZE + (trackOffset >> 0x1F);
-				OSReport(s__s__2d_____801e7c01, sRedEntryLogPrefix, (trackIndex - (trackIndex >> 0x1F)) + 0x20);
+				OSReport(s__s__2d_____801e7c01, sRedEntryLogPrefix,
+				         (trackIndex - (trackIndex >> 0x1F)) + REDSOUND_SE_VOICE_BASE_INDEX);
 				fflush(__files + 1);
 			}
 			track += 1;
@@ -1490,7 +1498,7 @@ void CRedEntry::MusicHistoryManager(int mode, int musicNo)
  * Address:	TODO
  * Size:	TODO
  */
-int CRedEntry::MusicHeadAdd(RedMusicHEAD* musicHead)
+RedMusicHEAD* CRedEntry::MusicHeadAdd(RedMusicHEAD* musicHead)
 {
 	int result = 0;
 	RedHistoryBANK* bank = MusicOldChoice();
@@ -1508,7 +1516,7 @@ int CRedEntry::MusicHeadAdd(RedMusicHEAD* musicHead)
 		bank->m_historyNo = 1;
 	}
 
-	return result;
+	return reinterpret_cast<RedMusicHEAD*>(result);
 }
 
 /*
@@ -1516,7 +1524,7 @@ int CRedEntry::MusicHeadAdd(RedMusicHEAD* musicHead)
  * Address:	TODO
  * Size:	TODO
  */
-int CRedEntry::SetMusicData(RedMusicHEAD* musicHead)
+RedMusicHEAD* CRedEntry::SetMusicData(RedMusicHEAD* musicHead)
 {
 	int result;
 
@@ -1537,13 +1545,13 @@ int CRedEntry::SetMusicData(RedMusicHEAD* musicHead)
 		                                                    result * 0x10));
 		result = *reinterpret_cast<int*>(*reinterpret_cast<int*>(reinterpret_cast<int>(this) + 8) + result * 0x10 + 8);
 	} else {
-		result = MusicHeadAdd(musicHead);
+		result = reinterpret_cast<int>(MusicHeadAdd(musicHead));
 		if (result == 0) {
 			RedDelete(musicHead);
 		}
 	}
 
-	return result;
+	return reinterpret_cast<RedMusicHEAD*>(result);
 }
 
 /*
@@ -1566,7 +1574,7 @@ void CRedEntry::DisplayMMemoryInfo()
 	int freeSize;
 	RedMemoryBlock* memoryBank;
 	RedMemoryBlock* bankEntry;
-	unsigned int history;
+	RedHistoryBANK* history;
 	int* seBlockBase;
 
 	if (m_ReportPrint == 0) {
@@ -1599,17 +1607,17 @@ void CRedEntry::DisplayMMemoryInfo()
 				freeSize = bankEntry[1].m_address - (bankEntry->m_address + bankEntry->m_size);
 			}
 
-			history = (unsigned int)m_musicBankBase;
+			history = reinterpret_cast<RedHistoryBANK*>(m_musicBankBase);
 			do {
-				if ((*(int*)(history + 0xC) != 0) && (*(int*)(history + 8) == bankEntry->m_address)) {
+				if ((history->m_size != 0) && (history->m_data == bankEntry->m_address)) {
 					OSReport(s__s_MUSIC_3_3d___0x_8_8X___0x_8_8_801e7d24, sRedEntryLogPrefix,
 					         (int)*(short*)(bankEntry->m_address + 4), bankEntry->m_address, bankEntry->m_size, freeSize);
 					fflush(__files + 1);
 					matched = 1;
 					break;
 				}
-				history += 0x10;
-			} while (history < (unsigned int)m_musicBankBase + REDSOUND_MUSIC_BANK_SIZE);
+				history += 1;
+			} while (history < reinterpret_cast<RedHistoryBANK*>(m_musicBankBase + REDSOUND_MUSIC_BANK_SIZE));
 
 			if (matched == 0) {
 				i = 0;
@@ -1622,35 +1630,35 @@ void CRedEntry::DisplayMMemoryInfo()
 						break;
 					}
 					i++;
-				} while (i < 4);
+				} while (i < REDSOUND_SE_BLOCK_BANK_COUNT);
 			}
 
 			if (matched == 0) {
-				history = (unsigned int)m_waveBankBase;
+				history = reinterpret_cast<RedHistoryBANK*>(m_waveBankBase);
 				do {
-					if ((*(int*)(history + 0xC) != 0) && (*(int*)(history + 8) == bankEntry->m_address)) {
+					if ((history->m_size != 0) && (history->m_data == bankEntry->m_address)) {
 						OSReport(s__s_WAVE_4_4d___0x_8_8X___0x_8_8X_801e7d7c, sRedEntryLogPrefix,
 						         (int)*(short*)(bankEntry->m_address + 2), bankEntry->m_address, bankEntry->m_size, freeSize);
 						fflush(__files + 1);
 						matched = 1;
 						break;
 					}
-					history += 0x10;
-				} while (history < (unsigned int)m_waveBankBase + REDSOUND_WAVE_BANK_SIZE);
+					history += 1;
+				} while (history < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + REDSOUND_WAVE_BANK_SIZE));
 			}
 
 			if (matched == 0) {
-				history = (unsigned int)m_seSepBankBase;
+				history = reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase);
 				do {
-					if ((*(int*)(history + 0xC) != 0) && (*(int*)(history + 8) == bankEntry->m_address)) {
+					if ((history->m_size != 0) && (history->m_data == bankEntry->m_address)) {
 						OSReport(s__s_SE_6_6d___0x_8_8X___0x_8_8X___801e7da8, sRedEntryLogPrefix,
 						         *(int*)(bankEntry->m_address + 8), bankEntry->m_address, bankEntry->m_size, freeSize);
 						fflush(__files + 1);
 						matched = 1;
 						break;
 					}
-					history += 0x10;
-				} while (history < (unsigned int)m_seSepBankBase + REDSOUND_SESEP_BANK_SIZE);
+					history += 1;
+				} while (history < reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase + REDSOUND_SESEP_BANK_SIZE));
 			}
 
 			if (matched == 0) {

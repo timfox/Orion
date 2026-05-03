@@ -45,8 +45,8 @@ struct RedTrackDATA {
 	unsigned char m_pad88[0x8C - 0x88];
 	unsigned short m_vibrateRateDelta;
 	unsigned short m_vibrateDepthDelta;
-	unsigned short m_vibrateDelay;
-	unsigned short m_vibrateDelayDepth;
+	short m_vibrateDelay;
+	short m_vibrateDelayDepth;
 	int m_tremoloFunc;
 	int m_tremoloRate;
 	int m_tremoloRateAdd;
@@ -55,8 +55,8 @@ struct RedTrackDATA {
 	unsigned char m_padA8[0xAC - 0xA8];
 	unsigned short m_tremoloRateDelta;
 	unsigned short m_tremoloDepthDelta;
-	unsigned short m_tremoloDelay;
-	unsigned short m_tremoloDelayDepth;
+	short m_tremoloDelay;
+	short m_tremoloDelayDepth;
 	int m_shakeFunc;
 	int m_shakeRate;
 	int m_shakeRateAdd;
@@ -113,6 +113,12 @@ struct RedTrackDATA {
 	unsigned char m_pad151[0x154 - 0x151];
 };
 
+enum RedTrackAdsrLayout {
+	REDSOUND_TRACK_ADSR_DEFAULT_BYTE = 0xFF,
+	REDSOUND_TRACK_ADSR_DEFAULT_WORD = -1,
+	REDSOUND_TRACK_ADSR_SIZE = 0x0C,
+};
+
 enum RedTrackFlag {
 	REDSOUND_TRACK_FLAG_SLUR = 0x80000,
 	REDSOUND_TRACK_FLAG_SLUR_RELEASE = 0x100000,
@@ -143,8 +149,8 @@ struct RedSoundCONTROL {
 	int m_measure;
 	int m_tick;
 	int m_ticksPerMeasure;
-	unsigned short m_timeNumerator;
-	unsigned short m_timeDenominator;
+	short m_timeNumerator;
+	short m_timeDenominator;
 	int m_volume;
 	int m_volumeAdd;
 	int m_volumeDelta;
@@ -203,6 +209,11 @@ enum RedSoundControlWordOffset {
 	REDSOUND_CONTROL_SAVED_TICK_WORD_OFFSET = 0x10F,
 	REDSOUND_CONTROL_SAVED_TICKS_PER_MEASURE_WORD_OFFSET = 0x110,
 	REDSOUND_CONTROL_TEMPO_WORD_OFFSET = 0x112,
+};
+
+enum RedSoundControlSaveSize {
+	REDSOUND_CONTROL_SAVED_POSITION_SIZE = sizeof(int) * 4,
+	REDSOUND_CONTROL_SAVED_TEMPO_SIZE = sizeof(int) * 3,
 };
 
 typedef void (*RedMidiControlFunc)(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
