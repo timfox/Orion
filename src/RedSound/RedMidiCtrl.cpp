@@ -514,7 +514,7 @@ void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrack
     voice = p_VoiceData;
     do {
         if (voice->m_track == track) {
-            ((unsigned char*)voice)[0x1a] &= -6;
+            voice->m_stateFlags &= -6;
         }
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
@@ -526,9 +526,9 @@ void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrack
             ((m_MusicPhraseStop == 1) || ((control->m_flags & 1) == 0))) {
             voice = p_VoiceData;
             do {
-                if ((((unsigned int*)control)[0] <= (unsigned int)voice->m_track) &&
+                if (((unsigned int)voice->m_track >= (u32)control->m_tracks) &&
                     ((unsigned int)voice->m_track <
-                     ((unsigned int*)control)[0] + (unsigned int)control->m_trackCount * REDSOUND_TRACK_SIZE)) {
+                     (u32)control->m_tracks + (unsigned int)control->m_trackCount * REDSOUND_TRACK_SIZE)) {
                     ((unsigned int*)voice)[0x25] &= 0xfffffff3;
                     ((unsigned int*)voice)[0x24] &= 0xfffffffe;
                     ((unsigned int*)voice)[0x24] |= 2;
@@ -537,12 +537,12 @@ void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrack
                 voice++;
             } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 
-            c_RedEntry.MusicHistoryManager(0, ((unsigned int*)control)[0x11c]);
-            c_RedEntry.WaveHistoryManager(0, ((unsigned int*)control)[0x11f]);
-            ((unsigned int*)control)[0x11c] = 0xffffffff;
+            c_RedEntry.MusicHistoryManager(0, control->m_musicId);
+            c_RedEntry.WaveHistoryManager(0, control->m_waveNo);
+            control->m_musicId = 0xffffffff;
             control->m_updateFlags = 0;
-            RedDelete((int)((unsigned int*)control)[0]);
-            ((unsigned int*)control)[0] = 0;
+            RedDelete((int)control->m_tracks);
+            control->m_tracks = 0;
         }
     } else {
         if ((u32)track->m_waveBankData != 0) {
@@ -587,14 +587,13 @@ void __MidiCtrl_Sleep(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrac
 void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA* track)
 {
     int* controlData = (int*)control;
-    int* trackData = (int*)track;
     int loopBase = control->m_loopBase;
     int deltaAdjust = 1 - track->m_deltaTime;
     int slot = 0;
     int* scan;
 
     control->m_flags |= 1;
-    for (scan = (int*)control->m_tracks; scan < trackData; scan += REDSOUND_TRACK_SIZE / sizeof(*scan)) {
+    for (scan = (int*)control->m_tracks; scan < (int*)track; scan += REDSOUND_TRACK_SIZE / sizeof(*scan)) {
         controlData[slot + 10] = *scan;
         controlData[slot + 0x4a] = ((RedTrackDATA*)scan)->m_deltaTime + deltaAdjust;
         controlData[slot + 0x8a] = scan[0x41];

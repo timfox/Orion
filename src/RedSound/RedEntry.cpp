@@ -221,18 +221,18 @@ int CRedEntry::SearchUseWave(int waveNo)
 {
 	unsigned int interruptLevel = OSDisableInterrupts();
 	int found = 0;
-	int soundBase = (int)(p_SoundControlBuffer + REDSOUND_CONTROL_MUSIC_SECONDARY);
+	RedSoundCONTROL* control = p_SoundControlBuffer + REDSOUND_CONTROL_MUSIC_SECONDARY;
 
 	do {
-		if ((*(int*)(soundBase + 0x470) >= 0) && (*(int*)(soundBase + 0x47c) == waveNo)) {
+		if ((control->m_musicId >= 0) && (control->m_waveNo == waveNo)) {
 			found = 1;
-			MusicStop(*(int*)(soundBase + 0x470));
+			MusicStop(control->m_musicId);
 		}
-		soundBase -= REDSOUND_CONTROL_SIZE;
-	} while ((unsigned int)soundBase >= (unsigned int)p_SoundControlBuffer);
+		control--;
+	} while ((u32)control >= (u32)p_SoundControlBuffer);
 
-	soundBase = (int)(p_SoundControlBuffer + REDSOUND_CONTROL_SE);
-	RedTrackDATA* track = *(RedTrackDATA**)soundBase;
+	control = p_SoundControlBuffer + REDSOUND_CONTROL_SE;
+	RedTrackDATA* track = control->m_tracks;
 	do {
 		if (((u32)track->m_command != 0) && ((u32)track->m_waveBankData != 0) &&
 		    (reinterpret_cast<RedWaveHeadWD*>(track->m_waveBankData)->m_waveNo == waveNo)) {
@@ -240,7 +240,7 @@ int CRedEntry::SearchUseWave(int waveNo)
 			SeStopID(track->m_seId);
 		}
 		track += 1;
-	} while (track < reinterpret_cast<RedTrackDATA*>(*(int*)soundBase + REDSOUND_SE_TRACK_ARENA_SIZE));
+	} while (track < control->m_tracks + REDSOUND_SE_TRACK_COUNT);
 
 	OSRestoreInterrupts(interruptLevel);
 	return found;
@@ -303,15 +303,15 @@ int CRedEntry::WaveDelete(RedHistoryBANK* bank)
 int CRedEntry::WaveOldClear(int offset, int maxSize)
 {
 	RedHistoryBANK* selected = 0;
-	int aBase = c_RedMemory.GetABufferAddress();
+	int arAddress = c_RedMemory.GetABufferAddress();
 	int maxBankSize = 0;
-	offset += aBase;
-	maxSize += aBase;
+	offset += arAddress;
+	maxSize += arAddress;
 	RedHistoryBANK* history = reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + 0x100);
 
 	do {
 		if (history->m_historyNo > maxBankSize) {
-			int arAddress = reinterpret_cast<RedWaveHeadWD*>(history->m_data)->m_aramAddress;
+			arAddress = reinterpret_cast<RedWaveHeadWD*>(history->m_data)->m_aramAddress;
 			if ((arAddress >= offset) && (arAddress < maxSize)) {
 				maxBankSize = history->m_historyNo;
 				selected = history;
@@ -359,8 +359,8 @@ int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
 		}
 	} else if ((waveNo >= 10) && (waveNo < 70)) {
 		waveHead->m_loadSize += 0x27FFF;
-		int blocks = waveHead->m_loadSize / 0x28000 + (waveHead->m_loadSize >> 0x1F);
-		blocks = blocks - (blocks >> 0x1F);
+		int blocks = waveHead->m_loadSize / 0x28000;
+		blocks += blocks >> 0x1F;
 		waveHead->m_loadSize = blocks * 0x28000;
 	} else if (((waveNo >= 0x154) && (waveNo < 0x17a)) || ((waveNo >= 0x17f) && (waveNo < 0x182)) ||
 	           (waveNo == 0x183)) {
@@ -371,14 +371,14 @@ int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
 	int maxOffset;
 	if ((waveNo >= 100) && (waveNo < 300)) {
 		minOffset = 0x400000;
-		maxOffset = 0x800000;
+		maxOffset = minOffset + 0x400000;
 	} else if (((waveNo >= 0x154) && (waveNo < 0x17a)) || ((waveNo >= 0x17f) && (waveNo < 0x182)) ||
 	           (waveNo == 0x183)) {
 		minOffset = 0x300000;
-		maxOffset = 0x400000;
+		maxOffset = minOffset + 0x100000;
 	} else {
 		minOffset = 0;
-		maxOffset = 0x300000;
+		maxOffset = minOffset + 0x300000;
 	}
 
 	do {
@@ -400,8 +400,8 @@ int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
 		int arAddress;
 		if ((historyBank < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + 0x400U)) &&
 		    ((arAddress = RedNewA(waveHead->m_loadSize, minOffset, maxOffset)) != 0)) {
-			int copySize = waveHead->m_toneCount * 0x60 + 0x20;
-			copySize += ((waveHead->m_tableCount * 4) + 0x1F) & 0xFFFFFFE0;
+			int copySize = ((waveHead->m_tableCount * 4) + 0x1F) & 0xFFFFFFE0;
+			copySize += waveHead->m_toneCount * 0x60 + 0x20;
 			void* copied = (void*)RedNew(copySize);
 			if (copied != 0) {
 				historyBank->m_data = (int)copied;
@@ -438,7 +438,6 @@ int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
  */
 int CRedEntry::SetWaveData(int waveBankNo, void* waveData, int waveDataSize)
 {
-	int* entry = (int*)this;
 	int waveNo;
 	int waveAddress;
 	int waveSize;
@@ -446,7 +445,7 @@ int CRedEntry::SetWaveData(int waveBankNo, void* waveData, int waveDataSize)
 
 	if (waveDataSize == 0) {
 		if ((m_waveLoadNo >= 0) && ((waveNo = SearchWaveSequence(m_waveLoadNo)) >= 0)) {
-			WaveDelete((RedHistoryBANK*)(entry[0] + waveNo * 0x10));
+			WaveDelete(&reinterpret_cast<RedHistoryBANK*>(m_waveBankBase)[waveNo]);
 		}
 
 		m_waveLoadNo = -1;
@@ -458,23 +457,23 @@ int CRedEntry::SetWaveData(int waveBankNo, void* waveData, int waveDataSize)
 		RedWaveHeadWD* waveHead = (RedWaveHeadWD*)waveData;
 		waveNo = waveHead->m_waveNo;
 
-		if ((waveBankNo >= 0) && (waveNo != *(int*)(entry[0] + waveBankNo * 0x10))) {
-			WaveDelete((RedHistoryBANK*)(entry[0] + waveBankNo * 0x10));
+		if ((waveBankNo >= 0) && (waveNo != reinterpret_cast<RedHistoryBANK*>(m_waveBankBase)[waveBankNo].m_id)) {
+			WaveDelete(&reinterpret_cast<RedHistoryBANK*>(m_waveBankBase)[waveBankNo]);
 		}
 
 		int historyNo = SearchWaveSequence(waveNo);
 		if (historyNo >= 0) {
 			if ((waveBankNo >= 0) && (historyNo != waveBankNo)) {
-				*(int*)(entry[0] + waveBankNo * 0x10 + 0x0) = *(int*)(entry[0] + historyNo * 0x10 + 0x0);
-				*(int*)(entry[0] + waveBankNo * 0x10 + 0x4) = *(int*)(entry[0] + historyNo * 0x10 + 0x4);
-				*(int*)(entry[0] + waveBankNo * 0x10 + 0x8) = *(int*)(entry[0] + historyNo * 0x10 + 0x8);
-				*(int*)(entry[0] + waveBankNo * 0x10 + 0xC) = *(int*)(entry[0] + historyNo * 0x10 + 0xC);
+				*(int*)(m_waveBankBase + waveBankNo * 0x10 + 0x0) = *(int*)(m_waveBankBase + historyNo * 0x10 + 0x0);
+				*(int*)(m_waveBankBase + waveBankNo * 0x10 + 0x4) = *(int*)(m_waveBankBase + historyNo * 0x10 + 0x4);
+				*(int*)(m_waveBankBase + waveBankNo * 0x10 + 0x8) = *(int*)(m_waveBankBase + historyNo * 0x10 + 0x8);
+				*(int*)(m_waveBankBase + waveBankNo * 0x10 + 0xC) = *(int*)(m_waveBankBase + historyNo * 0x10 + 0xC);
 				historyNo = waveBankNo;
 			}
 
-			WaveHistoryChoice((RedHistoryBANK*)(entry[0] + historyNo * 0x10));
+			WaveHistoryChoice(&reinterpret_cast<RedHistoryBANK*>(m_waveBankBase)[historyNo]);
 		} else {
-			m_waveLoadNo = waveNo;
+			m_waveLoadNo = waveHead->m_waveNo;
 			waveAddress = WaveHeadAdd(waveBankNo, waveHead, waveNo);
 			if (waveAddress < 0) {
 				m_waveLoadSize = 0;
@@ -712,7 +711,6 @@ int CRedEntry::ReentryWaveData(int waveNo)
 void CRedEntry::WaveHistoryManager(int mode, int waveNo)
 {
 	int used;
-	int seq;
 	int* track;
 
 	if (mode == 0) {
@@ -726,7 +724,8 @@ void CRedEntry::WaveHistoryManager(int mode, int waveNo)
 			used |= 1;
 		}
 		if (used == 0) {
-			track = (int*)p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
+			int* trackHead = (int*)&p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
+			track = (int*)*trackHead;
 			do {
 				if (((*reinterpret_cast<unsigned int*>(track) != 0) && (*reinterpret_cast<unsigned int*>(track + 6) != 0)) &&
 				    (reinterpret_cast<RedWaveHeadWD*>(track[6])->m_waveNo == waveNo)) {
@@ -734,20 +733,20 @@ void CRedEntry::WaveHistoryManager(int mode, int waveNo)
 					break;
 				}
 				track += REDSOUND_TRACK_SIZE / sizeof(*track);
-			} while (track < (int*)((int)p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks + REDSOUND_SE_TRACK_ARENA_SIZE));
+			} while (track < (int*)(*trackHead + REDSOUND_SE_TRACK_ARENA_SIZE));
 		}
 		if (used == 0) {
-			seq = SearchWaveSequence(waveNo);
-			if ((seq >= 0x10) && (*(int*)(*(int*)this + seq * 0x10 + 4) == 0)) {
+			used = SearchWaveSequence(waveNo);
+			if ((used >= 0x10) && (*(int*)(*(int*)this + used * 0x10 + 4) == 0)) {
 				WaveHistoryAdd(0x14);
-				*(int*)(*(int*)this + seq * 0x10 + 4) = 0x14;
+				*(int*)(*(int*)this + used * 0x10 + 4) = 0x14;
 			}
 		}
 	} else {
-		seq = SearchWaveSequence(waveNo);
-		if ((seq >= 0x10) && (*(int*)(*(int*)this + seq * 0x10 + 4) != 0)) {
-			WaveHistoryDelete(*(int*)(*(int*)this + seq * 0x10 + 4));
-			*(int*)(*(int*)this + seq * 0x10 + 4) = 0;
+		used = SearchWaveSequence(waveNo);
+		if ((used >= 0x10) && (*(int*)(*(int*)this + used * 0x10 + 4) != 0)) {
+			WaveHistoryDelete(*(int*)(*(int*)this + used * 0x10 + 4));
+			*(int*)(*(int*)this + used * 0x10 + 4) = 0;
 		}
 	}
 }
@@ -763,8 +762,6 @@ void CRedEntry::WaveHistoryManager(int mode, int waveNo)
  */
 void CRedEntry::DisplayWaveInfo()
 {
-	int* entry = (int*)this;
-
 	if (m_ReportPrint != 0) {
 		OSReport(sRedEntryNewline);
 		fflush(__files + 1);
@@ -790,25 +787,25 @@ void CRedEntry::DisplayWaveInfo()
 					freeSize = bank[1].m_address - (bank->m_address + bank->m_size);
 				}
 
-				unsigned int history = (unsigned int)entry[0];
+				RedHistoryBANK* history = reinterpret_cast<RedHistoryBANK*>(m_waveBankBase);
 				do {
-					if ((*(int*)(history + 0xC) != 0) && (*(int*)(*(int*)(history + 8) + 0x10) == bank->m_address)) {
+					if ((history->m_size != 0) && (((RedWaveHeadWD*)history->m_data)->m_aramAddress == bank->m_address)) {
 						break;
 					}
-					history += 0x10;
-				} while (history < (unsigned int)entry[0] + 0x400);
+					history += 1;
+				} while (history < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + 0x400));
 
-				if (history < (unsigned int)entry[0] + 0x400) {
-					if (history < (unsigned int)entry[0] + 0x100) {
-						unsigned int index = history - (unsigned int)entry[0];
+				if (history < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + 0x400)) {
+					if (history < reinterpret_cast<RedHistoryBANK*>(m_waveBankBase + 0x100)) {
+						unsigned int index = reinterpret_cast<unsigned int>(history) - (unsigned int)m_waveBankBase;
 						OSReport(s__s__2d___WAVE_4_4d___0x_8_8X___0_801e7a53, sRedEntryLogPrefix, (int)(index >> 4),
-						         (int)*(short*)(*(int*)(history + 8) + 2), *(int*)(*(int*)(history + 8) + 0x10), bank->m_size,
-						         freeSize, *(int*)(history + 4));
+						         (int)((RedWaveHeadWD*)history->m_data)->m_waveNo, ((RedWaveHeadWD*)history->m_data)->m_aramAddress, bank->m_size,
+						         freeSize, history->m_historyNo);
 						fflush(__files + 1);
 					} else {
 						OSReport(s__s______WAVE_4_4d___0x_8_8X___0x_801e7a8f, sRedEntryLogPrefix,
-						         (int)*(short*)(*(int*)(history + 8) + 2), *(int*)(*(int*)(history + 8) + 0x10), bank->m_size,
-						         freeSize, *(int*)(history + 4));
+						         (int)((RedWaveHeadWD*)history->m_data)->m_waveNo, ((RedWaveHeadWD*)history->m_data)->m_aramAddress, bank->m_size,
+						         freeSize, history->m_historyNo);
 						fflush(__files + 1);
 					}
 					entryWave += 1;
@@ -1163,34 +1160,33 @@ int CRedEntry::ReentrySeSepData(int seNo)
  */
 void CRedEntry::SeSepHistoryManager(int mode, int seNo)
 {
-	int* track;
+	RedTrackDATA* track;
 	int sequenceNo;
 
 	if (mode == 0) {
 		sequenceNo = 0;
-		track = (int*)p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
+		track = p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
 
 		do {
-			if ((*reinterpret_cast<unsigned int*>(track) != 0) && (track[0x3D] == seNo)) {
+			if (((unsigned int)track->m_command != 0) && (track->m_seSepId == seNo)) {
 				sequenceNo |= 1;
 				break;
 			}
-			track += REDSOUND_TRACK_SIZE / sizeof(*track);
-		} while (track < (int*)((int)p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks + REDSOUND_SE_TRACK_ARENA_SIZE));
+			track += 1;
+		} while (track < p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks + REDSOUND_SE_TRACK_COUNT);
 
 		if (sequenceNo == 0) {
 			sequenceNo = SearchSeSepSequence(seNo);
-			if ((sequenceNo >= 0) &&
-			    (*reinterpret_cast<int*>(*reinterpret_cast<int*>((int)this + 4) + sequenceNo * 0x10 + 4) == 0)) {
+			if ((sequenceNo >= 0) && (reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase)[sequenceNo].m_historyNo == 0)) {
 				SeSepHistoryAdd();
-				*reinterpret_cast<int*>(*reinterpret_cast<int*>((int)this + 4) + sequenceNo * 0x10 + 4) = 1;
+				reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase)[sequenceNo].m_historyNo = 1;
 			}
 		}
 	} else {
 		sequenceNo = SearchSeSepSequence(seNo);
-		if (*reinterpret_cast<int*>(*reinterpret_cast<int*>((int)this + 4) + sequenceNo * 0x10 + 4) != 0) {
-			SeSepHistoryDelete(*reinterpret_cast<int*>(*reinterpret_cast<int*>((int)this + 4) + sequenceNo * 0x10 + 4));
-			*reinterpret_cast<int*>(*reinterpret_cast<int*>((int)this + 4) + sequenceNo * 0x10 + 4) = 0;
+		if (reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase)[sequenceNo].m_historyNo != 0) {
+			SeSepHistoryDelete(reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase)[sequenceNo].m_historyNo);
+			reinterpret_cast<RedHistoryBANK*>(m_seSepBankBase)[sequenceNo].m_historyNo = 0;
 		}
 	}
 }
@@ -1217,29 +1213,36 @@ void CRedEntry::DisplaySePlayInfo()
 		int* trackHead = (int*)&p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
 		int* track = (int*)*trackHead;
 		do {
-			int trackIndex = ((int)track - *trackHead) / REDSOUND_TRACK_SIZE + (((int)track - *trackHead) >> 0x1F);
-			trackIndex = (trackIndex - (trackIndex >> 0x1F)) + 0x20;
-			if (track[0] == 0) {
-				OSReport(s__s__2d_____801e7c01, sRedEntryLogPrefix, trackIndex);
-				fflush(__files + 1);
-			} else if ((track[0x3D] & 0x80000000) == 0) {
-				RedHistoryBANK* seSepBank = SearchSeSepBank(track[0x3D]);
-				OSReport(s__s__2d___se_6_6u_sep___WAVE_4_4u_801e7bdc, sRedEntryLogPrefix,
-				         trackIndex, track[0x3D],
-				         ((int)reinterpret_cast<RedSeSepHEAD*>(seSepBank->m_data)->m_waveNoHi << 8) |
-				             reinterpret_cast<RedSeSepHEAD*>(seSepBank->m_data)->m_waveNoLo);
-				fflush(__files + 1);
-			} else {
-				unsigned int seDataNo = (unsigned int)track[0x3D];
-				int songNo = (int)(seDataNo & 0x7FFFFFFF) >> 9;
-				int seqBase = ((int*)&p_SeBlockData)[songNo] + 0x10;
-				int seqInfo = seqBase + *(short*)(((int*)&p_SeBlockData)[songNo] + 10) * 4;
-				seqInfo += (*(unsigned int*)(seqBase + (seDataNo & 0x1FF) * 4) & 0x7FFFFFFF);
+			int trackCommand = track[0];
+			if (trackCommand != 0) {
+				if ((track[0x3D] & 0x80000000) != 0) {
+					unsigned int seDataNo = (unsigned int)track[0x3D];
+					int songNo = (int)(seDataNo & 0x7FFFFFFF) >> 9;
+					int seqBase = ((int*)p_SeBlockData)[songNo] + 0x10;
+					int seqInfo = seqBase + *(short*)(((int*)p_SeBlockData)[songNo] + 10) * 4;
+					seqInfo += (*(unsigned int*)(seqBase + (seDataNo & 0x1FF) * 4) & 0x7FFFFFFF);
+					int waveNo = (reinterpret_cast<RedSeINFO*>(seqInfo)->m_waveNoHi << 8) +
+					             reinterpret_cast<RedSeINFO*>(seqInfo)->m_waveNoLo;
+					int trackOffset = (int)track - *trackHead;
+					int trackIndex = trackOffset / REDSOUND_TRACK_SIZE + (trackOffset >> 0x1F);
 
-				OSReport(s__s__2d____3_3u__3_3u___WAVE_4_4u_801e7bb2, sRedEntryLogPrefix,
-				         trackIndex, songNo, seDataNo & 0x1FF,
-				         ((int)reinterpret_cast<RedSeINFO*>(seqInfo)->m_waveNoHi << 8) |
-				             reinterpret_cast<RedSeINFO*>(seqInfo)->m_waveNoLo);
+					OSReport(s__s__2d____3_3u__3_3u___WAVE_4_4u_801e7bb2, sRedEntryLogPrefix,
+					         (trackIndex - (trackIndex >> 0x1F)) + 0x20, songNo, seDataNo & 0x1FF, waveNo);
+					fflush(__files + 1);
+				} else {
+					RedHistoryBANK* seSepBank = SearchSeSepBank(track[0x3D]);
+					int trackOffset = (int)track - *trackHead;
+					int trackIndex = trackOffset / REDSOUND_TRACK_SIZE + (trackOffset >> 0x1F);
+					int waveNo = (reinterpret_cast<RedSeSepHEAD*>(seSepBank->m_data)->m_waveNoHi << 8) +
+					             reinterpret_cast<RedSeSepHEAD*>(seSepBank->m_data)->m_waveNoLo;
+					OSReport(s__s__2d___se_6_6u_sep___WAVE_4_4u_801e7bdc, sRedEntryLogPrefix,
+					         (trackIndex - (trackIndex >> 0x1F)) + 0x20, track[0x3D], waveNo);
+					fflush(__files + 1);
+				}
+			} else {
+				int trackOffset = (int)track - *trackHead;
+				int trackIndex = trackOffset / REDSOUND_TRACK_SIZE + (trackOffset >> 0x1F);
+				OSReport(s__s__2d_____801e7c01, sRedEntryLogPrefix, (trackIndex - (trackIndex >> 0x1F)) + 0x20);
 				fflush(__files + 1);
 			}
 			track += REDSOUND_TRACK_SIZE / sizeof(*track);
@@ -1563,7 +1566,6 @@ void CRedEntry::DisplayMMemoryInfo()
 	RedMemoryBlock* bankEntry;
 	unsigned int history;
 	int* seBlockBase;
-	int* entry = (int*)this;
 
 	if (m_ReportPrint == 0) {
 		return;
@@ -1595,7 +1597,7 @@ void CRedEntry::DisplayMMemoryInfo()
 				freeSize = bankEntry[1].m_address - (bankEntry->m_address + bankEntry->m_size);
 			}
 
-			history = (unsigned int)entry[2];
+			history = (unsigned int)m_musicBankBase;
 			do {
 				if ((*(int*)(history + 0xC) != 0) && (*(int*)(history + 8) == bankEntry->m_address)) {
 					OSReport(s__s_MUSIC_3_3d___0x_8_8X___0x_8_8_801e7d24, sRedEntryLogPrefix,
@@ -1605,7 +1607,7 @@ void CRedEntry::DisplayMMemoryInfo()
 					break;
 				}
 				history += 0x10;
-			} while (history < (unsigned int)entry[2] + 0x40);
+			} while (history < (unsigned int)m_musicBankBase + 0x40);
 
 			if (matched == 0) {
 				i = 0;
@@ -1622,7 +1624,7 @@ void CRedEntry::DisplayMMemoryInfo()
 			}
 
 			if (matched == 0) {
-				history = (unsigned int)entry[0];
+				history = (unsigned int)m_waveBankBase;
 				do {
 					if ((*(int*)(history + 0xC) != 0) && (*(int*)(history + 8) == bankEntry->m_address)) {
 						OSReport(s__s_WAVE_4_4d___0x_8_8X___0x_8_8X_801e7d7c, sRedEntryLogPrefix,
@@ -1632,11 +1634,11 @@ void CRedEntry::DisplayMMemoryInfo()
 						break;
 					}
 					history += 0x10;
-				} while (history < (unsigned int)entry[0] + 0x400);
+				} while (history < (unsigned int)m_waveBankBase + 0x400);
 			}
 
 			if (matched == 0) {
-				history = (unsigned int)entry[1];
+				history = (unsigned int)m_seSepBankBase;
 				do {
 					if ((*(int*)(history + 0xC) != 0) && (*(int*)(history + 8) == bankEntry->m_address)) {
 						OSReport(s__s_SE_6_6d___0x_8_8X___0x_8_8X___801e7da8, sRedEntryLogPrefix,
@@ -1646,7 +1648,7 @@ void CRedEntry::DisplayMMemoryInfo()
 						break;
 					}
 					history += 0x10;
-				} while (history < (unsigned int)entry[1] + 0x1000);
+				} while (history < (unsigned int)m_seSepBankBase + 0x1000);
 			}
 
 			if (matched == 0) {

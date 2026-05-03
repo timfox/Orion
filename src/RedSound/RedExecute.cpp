@@ -198,7 +198,7 @@ int PitchCompute(int param_1, int param_2, int param_3, int param_4)
     int noteBand;
 
     octaveAdjust = 0;
-    pitch = (param_1 >> 12) + param_2 + (param_3 >> 16);
+    pitch = param_2 + (param_3 >> 16) + (param_1 >> 12);
     while (pitch < 0) {
         pitch += 0xC00;
         octaveAdjust -= 1;
@@ -353,8 +353,8 @@ void _SetReverbData(RedReverbDATA* reverb, int* params)
     }
 
     if (result != 1) {
-        p_ReverbSize->m_requested = 0;
         p_ReverbSize->m_aligned = 0;
+        p_ReverbSize->m_requested = 0;
     }
 }
 
@@ -416,8 +416,8 @@ int* SetReverb(int bank, int kind, int* params)
     RedReverbDATA* reverb;
     int result;
 
-    p_ReverbSize->m_requested = 0;
     p_ReverbSize->m_aligned = 0;
+    p_ReverbSize->m_requested = 0;
 
     if (kind == 0) {
         _ClearReverb(bank);
@@ -519,8 +519,8 @@ int* SetReverb(int bank, int kind, int* params)
         }
     }
     else {
-        p_ReverbSize->m_requested = 0;
         p_ReverbSize->m_aligned = 0;
+        p_ReverbSize->m_requested = 0;
     }
 
     return (int*)p_ReverbSize;
@@ -2080,7 +2080,7 @@ void _MusicNoteExecute()
 {
     int i;
     u32 trackCount;
-    u32* sound;
+    u32* soundControl;
     u32* track;
     int status = _MusicMidiNoteExecute((RedSoundCONTROL*)p_SoundControl, (RedKeyOnDATA*)p_KeyOnData, 1);
 
@@ -2089,15 +2089,15 @@ void _MusicNoteExecute()
         memcpy((u8*)p_SoundControl + 0xC, (u8*)p_SoundControl + 0x438, 0x10);
         memcpy((u8*)p_SoundControl + 0x448, (u8*)p_SoundControl + 0x428, 0xC);
 
-        sound = (u32*)((u8*)p_SoundControl + 0x28);
-        track = (u32*)*(u32*)p_SoundControl;
+        soundControl = (u32*)p_SoundControl;
+        track = (u32*)*soundControl;
         trackCount = (u8)*((u8*)p_SoundControl + 0x491);
         i = 0;
         do {
-            track[0] = sound[i];
-            track[0x42] = sound[i + 0x40];
-            ((RedTrackDATA*)track)->m_flags = sound[i + 0x80];
-            track[9] = sound[i + 0xC0];
+            track[0] = soundControl[i + 0xA];
+            track[0x42] = soundControl[i + 0x4A];
+            ((RedTrackDATA*)track)->m_flags = soundControl[i + 0x8A];
+            track[9] = soundControl[i + 0xCA];
             track += REDSOUND_TRACK_SIZE / sizeof(*track);
             i++;
         } while (--trackCount != 0);
@@ -2260,7 +2260,7 @@ void MusicSkipFunction()
     u32 uVar6;
     int iVar7;
     u32* puVar8;
-    u32* puVar9;
+    RedSoundCONTROL* control;
 
     do {
         p_SkipKeyOn = (RedKeyOnDATA*)RedNew(REDSOUND_KEY_ON_BUFFER_SIZE);
@@ -2269,16 +2269,16 @@ void MusicSkipFunction()
         }
     } while (p_SkipKeyOn == 0);
 
-    puVar9 = (u32*)((u8*)p_SoundControlBuffer + REDSOUND_CONTROL_SKIP_OFFSET);
+    control = p_SoundControlBuffer + REDSOUND_CONTROL_MUSIC_SKIP;
     memset(p_SkipKeyOn, 0, REDSOUND_KEY_ON_BUFFER_SIZE);
-    iVar5 = _MusicMidiNoteSkipExecute((RedSoundCONTROL*)puVar9, p_SkipKeyOn, 1);
-    while ((iVar5 == 0) && ((*(u32*)((u8*)puVar9 + 0x46c) & 1) != 0)) {
-        *(s16*)((u8*)puVar9 + 0x48e) = *(int*)((u8*)puVar9 + 0x434);
-        memcpy((void*)((u8*)puVar9 + 0xc), (void*)((u8*)puVar9 + 0x438), 0x10);
-        memcpy((void*)((u8*)puVar9 + 0x448), (void*)((u8*)puVar9 + 0x428), 0xc);
-        puVar8 = (u32*)*puVar9;
-        iVar7 = (int)puVar9 + 0x28;
-        uVar6 = (u32)*(u8*)((u8*)puVar9 + 0x491);
+    iVar5 = _MusicMidiNoteSkipExecute(control, p_SkipKeyOn, 1);
+    while ((iVar5 == 0) && ((control->m_flags & 1) != 0)) {
+        control->m_activeTrackCount = control->m_savedActiveTrackCount;
+        memcpy(&control->m_measure, &control->m_savedMeasure, 0x10);
+        memcpy(&control->m_tempo, &control->m_savedTempo, 0xc);
+        puVar8 = (u32*)control->m_tracks;
+        iVar7 = (int)control + 0x28;
+        uVar6 = control->m_trackCount;
         iVar5 = 0;
         do {
             iVar1 = iVar5 * 4;
@@ -2292,7 +2292,7 @@ void MusicSkipFunction()
             puVar8[9] = *(u32*)(iVar7 + iVar3 + 0x300);
             puVar8 += REDSOUND_TRACK_SIZE / sizeof(*puVar8);
         } while (uVar6 != 0);
-        iVar5 = _MusicMidiNoteSkipExecute((RedSoundCONTROL*)puVar9, p_SkipKeyOn, 1);
+        iVar5 = _MusicMidiNoteSkipExecute(control, p_SkipKeyOn, 1);
     }
     m_MusicSkipComplete = 1;
 }

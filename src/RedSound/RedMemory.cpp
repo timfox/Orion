@@ -62,7 +62,7 @@ int RedNew(int size)
 	}
 
 	interrupts = OSDisableInterrupts();
-	size = (size + 0x1F) & 0xFFFFFFE0;
+	size = (size + 0x1F) & ~0x1F;
 	slot = m_MemoryBank;
 	address = m_DataBuffer;
 
@@ -77,7 +77,7 @@ int RedNew(int size)
 				break;
 			}
 
-			if ((address + size) <= (m_DataBuffer + m_DataBufferSize)) {
+			if ((u32)(address + size) <= (u32)(m_DataBuffer + m_DataBufferSize)) {
 				if (slot->m_size > 0) {
 					entryCount = ((int)(m_MemoryBank + 0x400) - (int)(slot + 1)) / 8;
 					if (entryCount > 0) {
@@ -190,7 +190,7 @@ int RedNewA(int size, int offset, int maxSize)
 		maxSize = m_ADataBufferSize;
 	}
 	maxSize -= offset;
-	size = (size + 0x1F) & 0xFFFFFFE0;
+	size = (size + 0x1F) & ~0x1F;
 	result = rangeStart;
 	maxGap = maxSize;
 	bestBlock = 0;
@@ -313,8 +313,8 @@ void CRedMemory::Init(int param1, int param2, int param3, int param4)
 	bankSize &= ~0x1F;
 
 	m_MemoryBank = (RedMemoryBlock*)param1;
-	m_DataBufferSize = param2 - bankSize * 2;
 	m_AMemoryBank = (RedMemoryBlock*)((int)m_MemoryBank + bankSize);
+	m_DataBufferSize = param2 - bankSize * 2;
 	m_DataBuffer = (int)m_AMemoryBank + bankSize;
 	memset(m_MemoryBank, 0, bankSize);
 	memset(m_AMemoryBank, 0, bankSize);

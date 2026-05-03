@@ -205,13 +205,12 @@ int _ArrangeStreamDataLoop(RedStreamDATA* stream, int bufferIndex, int byteCount
 			dmaID = RedDmaEntry(0x8001, 0, (int)(pbVar6 + 0x2000), stream->m_aramBuffer + (bufferIndex + 2) * 0x1000, 0x1000, 0, 0);
 			
 			if ((bufferIndex == 0) && (voiceData->m_axVoice != 0)) {
-				int zero = 0;
 				voiceData->m_axVoice->pb.adpcmLoop.loop_pred_scale = (unsigned short)*pbVar6;
-				voiceData->m_axVoice->pb.adpcmLoop.loop_yn1 = voiceData->m_axVoice->pb.adpcmLoop.loop_yn2 = zero;
-				voiceData->m_axVoice->sync = voiceData->m_axVoice->sync | 0x100000;
+				voiceData->m_axVoice->pb.adpcmLoop.loop_yn1 = voiceData->m_axVoice->pb.adpcmLoop.loop_yn2 = 0;
+				voiceData->m_axVoice->sync |= 0x100000;
 				voiceData[1].m_axVoice->pb.adpcmLoop.loop_pred_scale = (unsigned short)pbVar6[0x2000];
-				voiceData[1].m_axVoice->pb.adpcmLoop.loop_yn1 = voiceData[1].m_axVoice->pb.adpcmLoop.loop_yn2 = zero;
-				voiceData[1].m_axVoice->sync = voiceData[1].m_axVoice->sync | 0x100000;
+				voiceData[1].m_axVoice->pb.adpcmLoop.loop_yn1 = voiceData[1].m_axVoice->pb.adpcmLoop.loop_yn2 = 0;
+				voiceData[1].m_axVoice->sync |= 0x100000;
 			}
 			
 			bufferIndex = bufferIndex ^ 1;
@@ -237,10 +236,9 @@ int _ArrangeStreamDataLoop(RedStreamDATA* stream, int bufferIndex, int byteCount
 			dmaID = RedDmaEntry(0x8001, 0, (int)pbVar5, stream->m_aramBuffer + bufferIndex * 0x1000, 0x1000, 0, 0);
 			
 			if ((bufferIndex == 0) && (voiceData->m_axVoice != 0)) {
-				int zero = 0;
 				voiceData->m_axVoice->pb.adpcmLoop.loop_pred_scale = (unsigned short)*pbVar5;
-				voiceData->m_axVoice->pb.adpcmLoop.loop_yn1 = voiceData->m_axVoice->pb.adpcmLoop.loop_yn2 = zero;
-				voiceData->m_axVoice->sync = voiceData->m_axVoice->sync | 0x100000;
+				voiceData->m_axVoice->pb.adpcmLoop.loop_yn1 = voiceData->m_axVoice->pb.adpcmLoop.loop_yn2 = 0;
+				voiceData->m_axVoice->sync |= 0x100000;
 			}
 			
 			bufferIndex = bufferIndex ^ 1;
@@ -289,8 +287,8 @@ void StreamStop(int streamID)
  */
 int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volume)
 {
-	int amemSize;
-	int arOffset;
+	u32 amemSize;
+	u32 arOffset;
 	int pitch;
 	int iVar2;
 	int sampleOffset;
@@ -318,10 +316,9 @@ int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volu
 
 	if ((streamData->m_track != 0) && (streamData->m_buffer != 0) && (streamData->m_aramBuffer != 0)) {
 		sampleOffset = 0x1000;
-		*(short*)((int)streamHeader + 0x42) = (short)*(char*)((int)streamHeader + sampleOffset);
-		*(unsigned short*)((int)streamHeader + 0x46) = 0;
-		*(unsigned short*)((int)streamHeader + 0x44) = 0;
 		headerData = (u8*)streamHeader + 0x20;
+		*(short*)((int)streamHeader + 0x42) = (short)*(char*)((int)streamHeader + sampleOffset);
+		*(unsigned short*)((int)streamHeader + 0x44) = *(unsigned short*)((int)streamHeader + 0x46) = 0;
 		if (streamData->m_header.m_channelCount == 2) {
 			if (streamData->m_header.m_loopStart < 0) {
 				sampleOffset += 0x1000;
@@ -329,8 +326,7 @@ int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volu
 				sampleOffset += 8;
 			}
 			*(short*)(headerData + 0x50) = (short)*(char*)((int)streamHeader + sampleOffset);
-			*(unsigned short*)(headerData + 0x54) = 0;
-			*(unsigned short*)(headerData + 0x52) = 0;
+			*(unsigned short*)(headerData + 0x52) = *(unsigned short*)(headerData + 0x54) = 0;
 		}
 
 		streamData->m_streamId = streamID;
@@ -356,10 +352,10 @@ int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volu
 			if (streamData->m_header.m_flags != 0) {
 				voice->m_voiceSwitch |= 0x3000;
 			}
-			voice->m_track->m_seId = 1;
-			voice->m_adsrCurrentLevel = 0x8000;
+			voice->m_track->m_voiceSwitch = 1;
+			voice->m_envelopeLevel = 0x8000;
 			voice->m_waveData = &streamData->m_trackData[iVar2];
-			voice->m_pitch = pitch;
+			voice->m_targetPitch = pitch;
 			voice->m_track->m_reverbDepth = p_ReverbDepth[1].m_depth;
 			voice->m_track->m_reverbDepthDelta = 0;
 			if (streamData->m_header.m_channelCount == 2) {
@@ -378,13 +374,9 @@ int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volu
 			(streamData->m_track + iVar2)->m_waveBase = streamData->m_aramBuffer + iVar2 * 0x2000;
 			memset(&streamData->m_trackData[iVar2], 0, 0x60);
 			memcpy(streamData->m_trackData[iVar2].m_adpcmData, headerData + iVar2 * 0x2e, 0x2e);
-			voice->m_adsrLevel[2] = 0;
-			voice->m_adsrLevel[1] = 0;
-			voice->m_adsrLevel[0] = 0;
+			voice->m_adsrLevel[0] = voice->m_adsrLevel[1] = voice->m_adsrLevel[2] = 0;
 			voice->m_adsrLevel[3] = 0x7f;
-			voice->m_adsrTime[2] = 0;
-			voice->m_adsrTime[1] = 0;
-			voice->m_adsrTime[0] = 0;
+			voice->m_adsrTime[0] = voice->m_adsrTime[1] = voice->m_adsrTime[2] = 0;
 			voice->m_adsrTime[3] = 10;
 			streamData->m_trackData[iVar2].m_sampleStart = 0;
 			streamData->m_trackData[iVar2].m_loopEnd = 0x3fff;

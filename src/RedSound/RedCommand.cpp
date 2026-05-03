@@ -167,7 +167,7 @@ RedTrackDATA* SearchSeEmptyTrack(int trackCount, int eraseTrack, int attrMask)
 	}
 
 	do {
-		track = *trackBasePtr + 0x1f;
+		track = *trackBasePtr + REDSOUND_SE_TRACK_COUNT - 1;
 		scan = track;
 		remaining = trackCount;
 		do {
@@ -203,12 +203,12 @@ RedTrackDATA* SearchSeEmptyTrack(int trackCount, int eraseTrack, int attrMask)
  */
 int SeStopID(int seId)
 {
-	RedTrackDATA** trackBasePtr;
+	RedSoundCONTROL* soundControl;
 	RedTrackDATA* track;
 
-	trackBasePtr = &((RedSoundCONTROL*)p_SoundControlBuffer)[REDSOUND_CONTROL_SE].m_tracks;
-	((RedSoundCONTROL*)p_SoundControlBuffer)[REDSOUND_CONTROL_SE].m_updateFlags = 0;
-	track = *trackBasePtr;
+	soundControl = &((RedSoundCONTROL*)p_SoundControlBuffer)[REDSOUND_CONTROL_SE];
+	soundControl->m_updateFlags = 0;
+	track = soundControl->m_tracks;
 	do {
 		if (((u32)track->m_command != 0) && ((seId == -1) || (track->m_seId == seId))) {
 			int trackNo;
@@ -233,7 +233,7 @@ int SeStopID(int seId)
 			c_RedEntry.SeSepHistoryManager(0, track->m_seSepId);
 		}
 		track++;
-	} while (track < *trackBasePtr + REDSOUND_SE_TRACK_COUNT);
+	} while (track < soundControl->m_tracks + REDSOUND_SE_TRACK_COUNT);
 
 	return 0;
 }
@@ -249,12 +249,12 @@ int SeStopID(int seId)
  */
 int SeStopMG(int bank, int sep, int group, int kind)
 {
-	RedTrackDATA** trackBasePtr;
+	RedSoundCONTROL* soundControl;
 	RedTrackDATA* track;
 
-	trackBasePtr = &((RedSoundCONTROL*)p_SoundControlBuffer)[REDSOUND_CONTROL_SE].m_tracks;
-	((RedSoundCONTROL*)p_SoundControlBuffer)[REDSOUND_CONTROL_SE].m_updateFlags = 0;
-	track = *trackBasePtr;
+	soundControl = &((RedSoundCONTROL*)p_SoundControlBuffer)[REDSOUND_CONTROL_SE];
+	soundControl->m_updateFlags = 0;
+	track = soundControl->m_tracks;
 	do {
 		if (((u32)track->m_command != 0) && ((track->m_seSepId & 0x80000000U) == 0)) {
 			int id = track->m_seSepId / 1000;
@@ -282,7 +282,7 @@ int SeStopMG(int bank, int sep, int group, int kind)
 			}
 		}
 		track++;
-	} while (track < *trackBasePtr + REDSOUND_SE_TRACK_COUNT);
+	} while (track < soundControl->m_tracks + REDSOUND_SE_TRACK_COUNT);
 
 	return 0;
 }
@@ -470,14 +470,13 @@ int SeBlockPlay(int seId, int bank, int no, int pan, int volume)
 		no += bank << 9;
 		no |= 0x80000000;
 		if (seNo < bankData->m_seCount) {
-			int dataBase = reinterpret_cast<int>(bankData->m_entries);
+			int* entries = reinterpret_cast<int*>(bankData->m_entries);
 
-			if (*(int*)(dataBase + seNo * 4) != -1) {
+			if (entries[seNo] != -1) {
 				RedSeINFO* seInfo =
-				    (RedSeINFO*)(dataBase + bankData->m_seCount * 4 +
-				                 (*(unsigned int*)(dataBase + seNo * 4) & 0x7FFFFFFF));
+				    (RedSeINFO*)((int)(entries + bankData->m_seCount) + ((unsigned int)entries[seNo] & 0x7FFFFFFF));
 
-				if ((*(unsigned int*)(dataBase + seNo * 4) & 0x80000000) != 0) {
+				if (((unsigned int)entries[seNo] & 0x80000000) != 0) {
 					seInfo->m_flagsAndCount |= 0x80;
 				}
 				if (_SePlayStart(seInfo, seId, no, pan, volume) != 0) {
@@ -502,14 +501,14 @@ int SeBlockPlay(int seId, int bank, int no, int pan, int volume)
 int SeSepPlay(int seId, int sepId, int pan, int volume)
 {
 	RedHistoryBANK* sepBank;
-	int sepBase;
+	RedSeSepHEAD* sepHead;
 	RedSeINFO* sepInfo;
 
 	sepBank = c_RedEntry.SearchSeSepBank(sepId);
 	if (sepBank != 0) {
-		sepBase = sepBank->m_data;
-		sepInfo = reinterpret_cast<RedSeINFO*>(sepBase + 0x10);
-		if ((*(unsigned int*)(sepBase + 0xc) & 0x80000000) != 0) {
+		sepHead = reinterpret_cast<RedSeSepHEAD*>(sepBank->m_data);
+		sepInfo = reinterpret_cast<RedSeINFO*>((int)sepHead + 0x10);
+		if ((sepHead->m_sizeAndFlags & 0x80000000) != 0) {
 			sepInfo->m_flagsAndCount |= 0x80;
 		}
 		if (_SePlayStart(sepInfo, seId, sepId, pan, volume) != 0) {
