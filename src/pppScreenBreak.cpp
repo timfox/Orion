@@ -137,6 +137,13 @@ static inline Mtx44Ptr CameraScreenMatrix() { return reinterpret_cast<Mtx44Ptr>(
 static inline unsigned char* MaterialManRaw() { return reinterpret_cast<unsigned char*>(&MaterialMan); }
 static inline int GraphicScreenBreakBlurEnabled() { return Graphic.m_blurActive; }
 
+template <typename T>
+class CPtrArray
+{
+public:
+    T operator[](unsigned long);
+};
+
 extern "C" {
 int GetBackBufferRect2__8CGraphicFPvP9_GXTexObjiiiii12_GXTexFilter9_GXTexFmti(
     CGraphic*, void*, _GXTexObj*, int, int, int, int, int, int, int, int);
@@ -548,7 +555,8 @@ void InitPieceData(CChara::CModel* model, PScreenBreak* step, VScreenBreak* work
         inVec->y = dVar20;
         inVec->z = dVar21;
         PSVECNormalize(inVec, inVec);
-        PSVECCrossProduct(inVec, &DAT_801dd4bc, inVec + 2);
+        Vec basis = DAT_801dd4bc;
+        PSVECCrossProduct(inVec, &basis, inVec + 2);
 
         dVar17 = Math.RandF(*(float*)((u8*)step + 0x3C));
         PSVECScale(inVec, inVec, *(float*)((u8*)step + 0x38) + dVar17);
