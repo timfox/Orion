@@ -361,7 +361,7 @@ int CGMonObj::calcBranchFuncGolem(int)
 	}
 
 	unsigned short* script = reinterpret_cast<unsigned short*>(object->m_scriptHandle);
-	return static_cast<int>(script[0x1C / 2]) < static_cast<int>(script[0x1A / 2] >> 1);
+	return static_cast<unsigned int>(__cntlzw(static_cast<unsigned int>(script[0x1C / 2] >= (script[0x1A / 2] >> 1)))) >> 5;
 }
 
 /*
@@ -1671,8 +1671,13 @@ void CGMonObj::frameStatFuncTetsukyojin()
 int CGMonObj::calcBranchFuncTetsukyojin(int)
 {
 	const int branch = *reinterpret_cast<int*>(reinterpret_cast<unsigned char*>(this) + 0x6D0);
-	int positive = 1 <= branch;
-	return positive + (branch >> 31);
+	int positive;
+	if (branch >= 1) {
+		positive = 1;
+	} else {
+		positive = 0;
+	}
+	return positive;
 }
 
 /*
