@@ -1763,11 +1763,13 @@ int CSound::PlaySe3DLine(int soundId, int lineIndex, float nearDistance, float f
  */
 int CSound::PlaySe3D(int soundId, Vec* pos, float nearDistance, float farDistance, int fadeFrames)
 {
+    int volumeValue;
     CSe3D* se;
     int loopCount;
     int slot;
     int volume;
     int pan;
+    int panValue;
 
     if (soundId < 0) {
         Printf__7CSystemFPce(&System, s_soundMinusOneFmt);
@@ -1799,6 +1801,8 @@ int CSound::PlaySe3D(int soundId, Vec* pos, float nearDistance, float farDistanc
         se->m_volume = static_cast<u8>(volume);
         se->m_pan = static_cast<u8>(pan);
         se->m_group = -1;
+        volumeValue = volume;
+        panValue = pan;
 
         if (soundId < 0) {
             Printf__7CSystemFPce(&System, s_soundMinusOneFmt);
@@ -1806,15 +1810,15 @@ int CSound::PlaySe3D(int soundId, Vec* pos, float nearDistance, float farDistanc
         } else if (soundId < 4000) {
             int bank = soundId / 1000;
             slot = SePlay__9CRedSoundFiiiii(reinterpret_cast<CRedSound*>(soundObj + 8), bank, soundId % 1000,
-                                            pan, volume & ~((int)(-fadeFrames | fadeFrames) >> 0x1F), 0);
+                                            panValue, volumeValue & ~((int)(-fadeFrames | fadeFrames) >> 0x1F), 0);
             if (fadeFrames != 0) {
-                SeVolume__9CRedSoundFiii(reinterpret_cast<CRedSound*>(soundObj + 8), slot, volume, fadeFrames);
+                SeVolume__9CRedSoundFiii(reinterpret_cast<CRedSound*>(soundObj + 8), slot, volumeValue, fadeFrames);
             }
         } else {
-            slot = SePlay__9CRedSoundFiiiii(reinterpret_cast<CRedSound*>(soundObj + 8), -1, soundId, pan,
-                                            volume & ~((int)(-fadeFrames | fadeFrames) >> 0x1F), 0);
+            slot = SePlay__9CRedSoundFiiiii(reinterpret_cast<CRedSound*>(soundObj + 8), -1, soundId, panValue,
+                                            volumeValue & ~((int)(-fadeFrames | fadeFrames) >> 0x1F), 0);
             if (fadeFrames != 0) {
-                SeVolume__9CRedSoundFiii(reinterpret_cast<CRedSound*>(soundObj + 8), slot, volume, fadeFrames);
+                SeVolume__9CRedSoundFiii(reinterpret_cast<CRedSound*>(soundObj + 8), slot, volumeValue, fadeFrames);
             }
         }
 
@@ -1858,13 +1862,13 @@ void CSound::calcVolumePan(CSound::CSe3D* se3D, int& outVolume, int& outPan)
     if (se3D->m_lineIndex >= 0) {
         iVar4 = Calc__9CLine(
             (double)se3D->m_farDistance, &SoundData(this).m_lines[se3D->m_lineIndex], &nearestPoint, &nearestDistance,
-            (u32*)0, &nearestT, reinterpret_cast<const Vec*>(&CameraPcs._212_4_));
+            (u32*)0, &nearestT, reinterpret_cast<const Vec*>(&CameraPcs._236_4_));
         if (iVar4 != 0) {
             PSMTXMultVec(CameraPcs.m_cameraMatrix, &nearestPoint, &nearestPoint);
-            if (nearestDistance < se3D->m_nearDistance) {
+            fVar3 = se3D->m_nearDistance;
+            if (nearestDistance < fVar3) {
                 outVolume = 0x7F;
             } else {
-                fVar3 = se3D->m_nearDistance;
                 outVolume = 0x7F - (int)(FLOAT_80330ce8 * ((nearestDistance - fVar3) / (se3D->m_farDistance - fVar3)));
             }
 
@@ -1887,12 +1891,15 @@ void CSound::calcVolumePan(CSound::CSe3D* se3D, int& outVolume, int& outPan)
         outPan = 0x40;
     } else {
         fVar1 = kLineSegmentMaxT;
-        if ((s8)Game.m_gameWork.m_soundOptionFlag != 0) {
-            const short stageId = Game.m_gameWork.m_bossArtifactStageIndex;
-            if ((stageId == 0xE) || ((stageId < 0xE) && (stageId == 8))) {
+        if (Game.m_gameWork.m_soundOptionFlag != 0) {
+            switch (Game.m_gameWork.m_bossArtifactStageIndex) {
+            case 8:
+            case 0xE:
                 fVar1 = FLOAT_80330cf4;
-            } else {
+                break;
+            default:
                 fVar1 = FLOAT_80330cf8;
+                break;
             }
         }
 
@@ -1904,6 +1911,7 @@ void CSound::calcVolumePan(CSound::CSe3D* se3D, int& outVolume, int& outPan)
         if (fVar3 < fVar2) {
             float nearScaled = se3D->m_nearDistance * fVar1;
             nearScaled = se3D->m_nearDistance * nearScaled;
+            nearScaled = fVar1 * nearScaled;
             if (fVar3 < nearScaled) {
                 outVolume = 0x7F;
             } else {
