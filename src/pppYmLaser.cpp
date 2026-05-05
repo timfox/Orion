@@ -124,29 +124,29 @@ extern "C" void pppRenderYmLaser(pppYmLaser* laser, pppYmLaserUnkB* step, _pppCt
 	s32 i;
 	u8 alphaStep;
 	u8 alphaMax;
-	float halfWidth;
-	float length;
 	float negHalfWidth;
+	float length;
+	float halfWidth;
 	float u0;
 	float u1;
 	float uvStep;
-	pppFMATRIX modelMtx;
-	pppFMATRIX cameraMtx;
-	pppFMATRIX localMtx;
-	pppFMATRIX managerMtx;
+	pppFMATRIX mtxOut;
+	pppFMATRIX unitMtx;
 	Mtx shapeMtx;
 	Mtx rotateMtx;
 	Mtx debugMtx;
 	Mtx pointMtx;
 	Mtx sphereMtx;
-	pppFMATRIX unitMtx;
-	pppFMATRIX mtxOut;
+	pppFMATRIX managerMtx;
+	pppFMATRIX localMtx;
+	pppFMATRIX cameraMtx;
+	pppFMATRIX modelMtx;
 	Vec shapePos;
 	Vec debugSource;
 	Vec spherePos;
-	_GXColor color;
-	_GXColor trailColor;
 	_GXColor debugColor;
+	_GXColor trailColor;
+	_GXColor color;
 	int tex;
 
 	if (dataValIndex == 0xFFFF) {
@@ -608,4 +608,3 @@ extern "C" void pppConstructYmLaser(pppYmLaser* laser, _pppCtrlTable* ctrlTable)
 	work->m_shapeArg1 = 0;
 	work->m_shapeRotation = Math.RandF(randArg);
 }
-
