@@ -403,12 +403,14 @@ extern "C" void pppFrameLaser(struct pppLaser *pppLaser, struct pppLaserUnkB *pa
 extern "C" void pppRenderLaser(struct pppLaser *pppLaser, struct pppLaserUnkB *param_2, _pppCtrlTable *param_3)
 {
     LaserStep* step = (LaserStep*)param_2;
-    Vec* points;
+    int* serializedDataOffsets = param_3->m_serializedDataOffsets;
+    LaserWork* work = (LaserWork*)((u8*)pppLaser + 0x80 + serializedDataOffsets[2]);
+    int colorOffset = serializedDataOffsets[1];
+    LaserColorData* colorData = (LaserColorData*)((u8*)pppLaser + 0x80 + colorOffset);
     s32 dataValIndex = step->m_dataValIndex;
-    LaserWork* work = (LaserWork*)((u8*)pppLaser + 0x80 + param_3->m_serializedDataOffsets[2]);
-    LaserColorData* colorData = (LaserColorData*)((u8*)pppLaser + 0x80 + param_3->m_serializedDataOffsets[1]);
+    Vec* points;
     u32 count;
-    u32 i;
+    s32 i;
     u32 colorBase;
     u32 color0;
     u32 color1;
@@ -543,7 +545,7 @@ extern "C" void pppRenderLaser(struct pppLaser *pppLaser, struct pppLaserUnkB *p
         points = work->m_points;
 
         GXBegin(GX_TRIANGLES, GX_VTXFMT7, (u16)((step->m_payload[0x1e] - 1) * 3));
-        for (i = 0; (int)i < (int)(step->m_payload[0x1e] - 1); i++) {
+        for (i = 0; i < (int)(step->m_payload[0x1e] - 1); i++) {
             alpha0 = (u8)(alphaMax - (u8)(alphaStep * i));
             color0 = colorBase | alpha0;
             color1 = colorBase | (u8)(alphaMax - (u8)(alphaStep * (i + 1)));
@@ -631,7 +633,7 @@ extern "C" void pppRenderLaser(struct pppLaser *pppLaser, struct pppLaserUnkB *p
             debugColor.g = 0xFF;
             debugColor.b = 0xFF;
             debugColor.a = 0xFF;
-            for (i = 0; (int)i < (int)(u32)step->m_payload[0x1e]; i++) {
+            for (i = 0; i < (int)(u32)step->m_payload[0x1e]; i++) {
                 if ((work->m_points[i].x == kPppLaserZero) && (work->m_points[i].y == kPppLaserZero) && (work->m_points[i].z == kPppLaserZero)) {
                     continue;
                 }
