@@ -107,7 +107,7 @@ extern "C" void Printf__7CSystemFPce(CSystem* system, const char* format, ...);
 extern "C" const char s_m_node_pctd_m_meshtype_pctd_801D7268[];
 extern unsigned long s_insertShadowNo;
 
-static const char s_mapocttree_cpp[] = "mapocttree.cpp";
+extern "C" const char s_mapocttree_cpp_801D72EC[] = "mapocttree.cpp";
 
 namespace {
 static inline unsigned char* Ptr(void* ptr, unsigned int offset)
@@ -197,18 +197,20 @@ int COctTree::ReadOtmOctTree(CChunkFile& chunkFile)
 
     while (chunkFile.GetNextChunk(chunk)) {
         switch (chunk.m_id) {
+        case 'TYPE':
+            m_type = static_cast<unsigned char>(chunkFile.Get2());
+            break;
+
         case 'OBJN': {
             unsigned short objIndex = chunkFile.Get2();
-            signed char* mapObj;
 
             m_mapObject = GetMapObjByIndex(objIndex);
-            mapObj = reinterpret_cast<signed char*>(m_mapObject);
-            if (mapObj[0x1E] == 4) {
-                mapObj[0x15] = -1;
-                mapObj[0x14] = -1;
-                mapObj[0x22] = 0;
-            } else if (mapObj[0x1E] == 3) {
-                mapObj[0x22] = 0;
+            if (*reinterpret_cast<signed char*>(Ptr(m_mapObject, 0x1E)) == 4) {
+                *reinterpret_cast<unsigned char*>(Ptr(m_mapObject, 0x15)) = 0xFF;
+                *reinterpret_cast<unsigned char*>(Ptr(m_mapObject, 0x14)) = 0xFF;
+                *reinterpret_cast<signed char*>(Ptr(m_mapObject, 0x22)) = 0;
+            } else if (*reinterpret_cast<signed char*>(Ptr(m_mapObject, 0x1E)) == 3) {
+                *reinterpret_cast<signed char*>(Ptr(m_mapObject, 0x22)) = 0;
             }
             break;
         }
@@ -217,16 +219,17 @@ int COctTree::ReadOtmOctTree(CChunkFile& chunkFile)
             void* rootNode;
 
             m_nodeCount = chunkFile.Get2();
-            if ((*reinterpret_cast<signed char*>(Ptr(m_mapObject, 0x1E)) != 1) &&
-                (static_cast<unsigned int>(System.m_execParam) >= 3U)) {
-                Printf__7CSystemFPce(&System, s_m_node_pctd_m_meshtype_pctd_801D7268, m_nodeCount);
+            signed char mapObjType = *reinterpret_cast<signed char*>(Ptr(m_mapObject, 0x1E));
+            if ((mapObjType != 1) && (static_cast<unsigned int>(System.m_execParam) >= 3U)) {
+                Printf__7CSystemFPce(&System, s_m_node_pctd_m_meshtype_pctd_801D7268, m_nodeCount, mapObjType);
             }
 
+            unsigned short nodeCount = m_nodeCount;
             rootNode = __nwa__FUlPQ27CMemory6CStagePci(
-                m_nodeCount * 0x4C + 0x10, *reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_mapocttree_cpp),
+                nodeCount * 0x4C + 0x10, *reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_mapocttree_cpp_801D72EC),
                 0x59);
             m_nodePool = reinterpret_cast<COctNode*>(
-                __construct_new_array(rootNode, reinterpret_cast<void*>(__ct__8COctNodeFv), 0, 0x4C, m_nodeCount));
+                __construct_new_array(rootNode, reinterpret_cast<void*>(__ct__8COctNodeFv), 0, 0x4C, nodeCount));
             break;
         }
 
@@ -234,15 +237,11 @@ int COctTree::ReadOtmOctTree(CChunkFile& chunkFile)
             m_unk01 = chunkFile.Get1();
             break;
 
-        case 'TYPE':
-            m_type = static_cast<unsigned char>(chunkFile.Get2());
-            break;
-
         case 'TREE':
             chunkFile.PushChunk();
             while (chunkFile.GetNextChunk(chunk)) {
                 if (chunk.m_id == 'NODE') {
-                    COctNode* node = 0;
+                    COctNode* node;
 
                     chunkFile.PushChunk();
                     while (chunkFile.GetNextChunk(chunk)) {
@@ -267,21 +266,18 @@ int COctTree::ReadOtmOctTree(CChunkFile& chunkFile)
 
                         case 'CHLD':
                             int childCount = 0;
-                            COctNode** childNode = node->m_children;
 
                             for (int i = 0; i < 8; i++) {
-                                short childIndex = chunkFile.Get2();
+                                unsigned short childIndex = chunkFile.Get2();
 
-                                if (childIndex != -1) {
-                                    *childNode = m_nodePool + childIndex;
-                                    childNode++;
+                                if (static_cast<short>(childIndex) != -1) {
+                                    node->m_children[childCount] = m_nodePool + childIndex;
                                     childCount++;
                                 }
                             }
 
                             for (int i = childCount; i < 8; i++) {
-                                *childNode = 0;
-                                childNode++;
+                                node->m_children[i] = 0;
                             }
                             break;
                         }
