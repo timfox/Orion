@@ -15,11 +15,15 @@ struct RedMemoryBlock {
 
 enum RedMemoryLayoutSize {
 	REDSOUND_MEMORY_BANK_BLOCK_COUNT = 0x400,
+	REDSOUND_MEMORY_NEXT_BLOCK_INDEX = 1,
 	REDSOUND_MEMORY_BANK_LAST_INDEX = REDSOUND_MEMORY_BANK_BLOCK_COUNT - 1,
 	REDSOUND_MEMORY_BANK_ALIGN = 0x20,
 	REDSOUND_MEMORY_BANK_ALIGN_MASK = REDSOUND_MEMORY_BANK_ALIGN - 1,
 	REDSOUND_MEMORY_BLOCK_SIZE = sizeof(RedMemoryBlock),
+	REDSOUND_MEMORY_BLOCK_INDEX_SHIFT = 3,
 	REDSOUND_MEMORY_BANK_SIZE = sizeof(RedMemoryBlock) * REDSOUND_MEMORY_BANK_BLOCK_COUNT,
+	REDSOUND_MEMORY_BANK_TABLE_COUNT = 2,
+	REDSOUND_MEMORY_ALLOC_FAILED = -1,
 };
 
 class CRedMemory
@@ -28,7 +32,7 @@ public:
 	CRedMemory();
 	~CRedMemory();
 
-	void Init(int, int, int, int);
+	void Init(int mainBuffer, int mainBufferSize, int auxBuffer, int auxBufferSize);
 	int GetMainBufferAddress();
 	int GetMainBufferSize();
 	RedMemoryBlock* GetMainBankAddress();

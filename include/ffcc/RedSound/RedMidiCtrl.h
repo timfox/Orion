@@ -4,18 +4,22 @@
 #include "ffcc/RedSound/RedExecute.h"
 
 struct RedSoundCONTROL;
+struct RedWaveHeadWD;
 
 enum RedMidiLayoutSize {
 	REDSOUND_KEY_ON_SLOT_COUNT = 0x40,
 	REDSOUND_MUSIC_TRACK_SAVE_COUNT = 0x40,
+	REDSOUND_TRACK_LOOP_STACK_COUNT = 4,
 };
+
+typedef int (*RedSwingFunc)(int);
 
 struct RedTrackDATA {
 	unsigned char* m_command;
 	unsigned char m_pad04[0x08 - 0x04];
-	unsigned char* m_loopCommand[4];
-	int m_waveBankData;
-	int m_waveData;
+	unsigned char* m_loopCommand[REDSOUND_TRACK_LOOP_STACK_COUNT];
+	RedWaveHeadWD* m_waveBankData;
+	RedWaveDATA* m_waveData;
 	signed char* m_keySignatureData;
 	RedNoteDATA m_note;
 	int m_volume;
@@ -37,35 +41,35 @@ struct RedTrackDATA {
 	int m_reverbDepth;
 	int m_reverbDepthAdd;
 	int m_reverbDepthDelta;
-	int m_vibrateFunc;
+	RedSwingFunc m_vibrateFunc;
 	int m_vibrateRate;
 	int m_vibrateRateAdd;
 	int m_vibrateDepth;
 	int m_vibrateDepthAdd;
 	unsigned char m_pad88[0x8C - 0x88];
-	unsigned short m_vibrateRateDelta;
-	unsigned short m_vibrateDepthDelta;
+	short m_vibrateRateDelta;
+	short m_vibrateDepthDelta;
 	short m_vibrateDelay;
 	short m_vibrateDelayDepth;
-	int m_tremoloFunc;
+	RedSwingFunc m_tremoloFunc;
 	int m_tremoloRate;
 	int m_tremoloRateAdd;
 	int m_tremoloDepth;
 	int m_tremoloDepthAdd;
 	unsigned char m_padA8[0xAC - 0xA8];
-	unsigned short m_tremoloRateDelta;
-	unsigned short m_tremoloDepthDelta;
+	short m_tremoloRateDelta;
+	short m_tremoloDepthDelta;
 	short m_tremoloDelay;
 	short m_tremoloDelayDepth;
-	int m_shakeFunc;
+	RedSwingFunc m_shakeFunc;
 	int m_shakeRate;
 	int m_shakeRateAdd;
 	int m_shakeDepth;
 	int m_shakeDepthAdd;
 	int m_shakeOutput;
 	int m_shakePan;
-	unsigned short m_shakeRateDelta;
-	unsigned short m_shakeDepthDelta;
+	short m_shakeRateDelta;
+	short m_shakeDepthDelta;
 	unsigned short m_adsrAR;
 	unsigned short m_adsrDR;
 	unsigned short m_adsrSR;
@@ -92,8 +96,8 @@ struct RedTrackDATA {
 	int m_waveBase;
 	int m_portamentPitch;
 	int m_waveNo;
-	short m_loopCount[4];
-	short m_loopStep[4];
+	short m_loopCount[REDSOUND_TRACK_LOOP_STACK_COUNT];
+	short m_loopStep[REDSOUND_TRACK_LOOP_STACK_COUNT];
 	short m_step;
 	short m_step2;
 	short m_loopDepth;
@@ -117,6 +121,98 @@ enum RedTrackAdsrLayout {
 	REDSOUND_TRACK_ADSR_DEFAULT_BYTE = 0xFF,
 	REDSOUND_TRACK_ADSR_DEFAULT_WORD = -1,
 	REDSOUND_TRACK_ADSR_SIZE = 0x0C,
+	REDSOUND_TRACK_ADSR_TIME_ATTACK_HALFWORD = 0x6A,
+	REDSOUND_TRACK_ADSR_TIME_DECAY_HALFWORD = REDSOUND_TRACK_ADSR_TIME_ATTACK_HALFWORD + 1,
+	REDSOUND_TRACK_ADSR_TIME_SUSTAIN_HALFWORD = REDSOUND_TRACK_ADSR_TIME_ATTACK_HALFWORD + 2,
+	REDSOUND_TRACK_ADSR_TIME_RELEASE_HALFWORD = REDSOUND_TRACK_ADSR_TIME_ATTACK_HALFWORD + 3,
+	REDSOUND_TRACK_ADSR_LEVEL_ATTACK_OFFSET = 0xDC,
+	REDSOUND_TRACK_ADSR_LEVEL_DECAY_OFFSET = REDSOUND_TRACK_ADSR_LEVEL_ATTACK_OFFSET + 1,
+	REDSOUND_TRACK_ADSR_LEVEL_SUSTAIN_OFFSET = REDSOUND_TRACK_ADSR_LEVEL_ATTACK_OFFSET + 2,
+	REDSOUND_TRACK_ADSR_LEVEL_RELEASE_OFFSET = REDSOUND_TRACK_ADSR_LEVEL_ATTACK_OFFSET + 3,
+};
+
+enum RedTrackLayoutWord {
+	REDSOUND_TRACK_VOLUME_WORD_OFFSET = 0x0A,
+	REDSOUND_TRACK_VOLUME_ADD_WORD_OFFSET = 0x0B,
+	REDSOUND_TRACK_VOLUME_DELTA_WORD_OFFSET = 0x0C,
+	REDSOUND_TRACK_EXPRESSION_WORD_OFFSET = 0x0D,
+	REDSOUND_TRACK_EXPRESSION_ADD_WORD_OFFSET = 0x0E,
+	REDSOUND_TRACK_EXPRESSION_DELTA_WORD_OFFSET = 0x0F,
+	REDSOUND_TRACK_PAN_WORD_OFFSET = 0x10,
+	REDSOUND_TRACK_PAN_ADD_WORD_OFFSET = 0x11,
+	REDSOUND_TRACK_PAN_DELTA_WORD_OFFSET = 0x12,
+	REDSOUND_TRACK_MIX_VOLUME_WORD_OFFSET = 0x13,
+	REDSOUND_TRACK_MIX_VOLUME_ADD_WORD_OFFSET = 0x14,
+	REDSOUND_TRACK_MIX_VOLUME_DELTA_WORD_OFFSET = 0x15,
+	REDSOUND_TRACK_MIX_VOLUME_MODE_WORD_OFFSET = 0x16,
+	REDSOUND_TRACK_PITCH_WORD_OFFSET = 0x17,
+	REDSOUND_TRACK_PITCH_ADD_WORD_OFFSET = 0x18,
+	REDSOUND_TRACK_PITCH_DELTA_WORD_OFFSET = 0x19,
+	REDSOUND_TRACK_REVERB_DEPTH_WORD_OFFSET = 0x1A,
+	REDSOUND_TRACK_REVERB_DEPTH_ADD_WORD_OFFSET = 0x1B,
+	REDSOUND_TRACK_REVERB_DEPTH_DELTA_WORD_OFFSET = 0x1C,
+	REDSOUND_TRACK_VIBRATE_FUNC_WORD_OFFSET = 0x1D,
+	REDSOUND_TRACK_VIBRATE_RATE_WORD_OFFSET = 0x1E,
+	REDSOUND_TRACK_VIBRATE_RATE_ADD_WORD_OFFSET = 0x1F,
+	REDSOUND_TRACK_VIBRATE_DEPTH_WORD_OFFSET = 0x20,
+	REDSOUND_TRACK_VIBRATE_DEPTH_ADD_WORD_OFFSET = 0x21,
+	REDSOUND_TRACK_VIBRATE_RATE_DELTA_HALFWORD = 0x46,
+	REDSOUND_TRACK_VIBRATE_DEPTH_DELTA_HALFWORD = 0x47,
+	REDSOUND_TRACK_VIBRATE_DELAY_HALFWORD = 0x48,
+	REDSOUND_TRACK_VIBRATE_DELAY_DEPTH_HALFWORD = 0x49,
+	REDSOUND_TRACK_TREMOLO_FUNC_WORD_OFFSET = 0x25,
+	REDSOUND_TRACK_TREMOLO_RATE_WORD_OFFSET = 0x26,
+	REDSOUND_TRACK_TREMOLO_RATE_ADD_WORD_OFFSET = 0x27,
+	REDSOUND_TRACK_TREMOLO_DEPTH_WORD_OFFSET = 0x28,
+	REDSOUND_TRACK_TREMOLO_DEPTH_ADD_WORD_OFFSET = 0x29,
+	REDSOUND_TRACK_TREMOLO_RATE_DELTA_HALFWORD = 0x56,
+	REDSOUND_TRACK_TREMOLO_DEPTH_DELTA_HALFWORD = 0x57,
+	REDSOUND_TRACK_TREMOLO_DELAY_HALFWORD = 0x58,
+	REDSOUND_TRACK_TREMOLO_DELAY_DEPTH_HALFWORD = 0x59,
+	REDSOUND_TRACK_SHAKE_FUNC_WORD_OFFSET = 0x2D,
+	REDSOUND_TRACK_SHAKE_RATE_WORD_OFFSET = 0x2E,
+	REDSOUND_TRACK_SHAKE_RATE_ADD_WORD_OFFSET = 0x2F,
+	REDSOUND_TRACK_SHAKE_DEPTH_WORD_OFFSET = 0x30,
+	REDSOUND_TRACK_SHAKE_DEPTH_ADD_WORD_OFFSET = 0x31,
+	REDSOUND_TRACK_SHAKE_OUTPUT_WORD_OFFSET = 0x32,
+	REDSOUND_TRACK_SHAKE_PAN_WORD_OFFSET = 0x33,
+	REDSOUND_TRACK_SHAKE_RATE_DELTA_HALFWORD = 0x68,
+	REDSOUND_TRACK_SHAKE_DEPTH_DELTA_HALFWORD = 0x69,
+	REDSOUND_TRACK_FUZZY_PITCH_DEPTH_WORD_OFFSET = 0x38,
+	REDSOUND_TRACK_FUZZY_VOLUME_DEPTH_WORD_OFFSET = 0x39,
+	REDSOUND_TRACK_FUZZY_PAN_DEPTH_WORD_OFFSET = 0x3A,
+	REDSOUND_TRACK_FUZZY_ADSR_DEPTH_WORD_OFFSET = 0x3C,
+	REDSOUND_TRACK_FLAGS_WORD_OFFSET = 0x41,
+	REDSOUND_TRACK_SWEEP_DELTA_WORD_OFFSET = 0x44,
+	REDSOUND_TRACK_PORTAMENT_TIME_WORD_OFFSET = 0x46,
+	REDSOUND_TRACK_PORTAMENT_PITCH_WORD_OFFSET = 0x48,
+};
+
+enum RedTrackLayoutHalfword {
+	REDSOUND_TRACK_PITCH_BEND_HALFWORD = 0x9F,
+	REDSOUND_TRACK_KEY_TRANSPOSE_HALFWORD = 0xA1,
+};
+
+enum RedTrackLayoutByte {
+	REDSOUND_TRACK_FINE_TUNE_BYTE = 0x148,
+};
+
+enum RedTrackWordLayout {
+	REDSOUND_TRACK_WAVE_DATA_WORD_OFFSET = 7,
+	REDSOUND_TRACK_NOTE_KEY_OFFSET = 0x24,
+	REDSOUND_TRACK_NOTE_ALLOC_FLAGS_OFFSET = 0x26,
+	REDSOUND_TRACK_VOLUME_OFFSET = 0x28,
+	REDSOUND_TRACK_EXPRESSION_OFFSET = 0x34,
+	REDSOUND_TRACK_PAN_OFFSET = 0x40,
+	REDSOUND_TRACK_NOTE_WORD_OFFSET = 9,
+	REDSOUND_TRACK_VOICE_SWITCH_WORD_OFFSET = 0x3F,
+	REDSOUND_TRACK_LOOP_REPORT_WORD_OFFSET = 0x40,
+	REDSOUND_TRACK_LOOP_REPORT_ACTIVE = 1,
+};
+
+enum RedKeySignatureLayout {
+	REDSOUND_KEY_SIGNATURE_INDEX_MASK = 0x1F,
+	REDSOUND_KEY_SIGNATURE_DEFAULT_OFFSET = 0x0B,
 };
 
 enum RedTrackFlag {
@@ -140,6 +236,12 @@ enum RedKeyOnWordOffset {
 	REDSOUND_KEY_ON_PRIORITY_WORD_OFFSET = 0x80,
 	REDSOUND_KEY_ON_NORMAL_WORD_OFFSET = 0x100,
 	REDSOUND_KEY_ON_TOTAL_WORD_COUNT = 0x180,
+};
+
+enum RedKeyOnByteOffset {
+	REDSOUND_KEY_ON_PRIORITY_BYTE_OFFSET = REDSOUND_KEY_ON_PRIORITY_WORD_OFFSET * sizeof(int),
+	REDSOUND_KEY_ON_NORMAL_BYTE_OFFSET = REDSOUND_KEY_ON_NORMAL_WORD_OFFSET * sizeof(int),
+	REDSOUND_KEY_ON_END_BYTE_OFFSET = REDSOUND_KEY_ON_TOTAL_WORD_COUNT * sizeof(int),
 };
 
 struct RedSoundCONTROL {
@@ -211,133 +313,26 @@ enum RedSoundControlWordOffset {
 	REDSOUND_CONTROL_TEMPO_WORD_OFFSET = 0x112,
 };
 
+enum RedSoundControlBufferOffset {
+	REDSOUND_CONTROL_WORD_COUNT = 0x125,
+	REDSOUND_CONTROL_SECONDARY_TRACKS_WORD_OFFSET = 0x125,
+	REDSOUND_CONTROL_SECONDARY_FLAGS_WORD_OFFSET = 0x240,
+	REDSOUND_CONTROL_SECONDARY_ACTIVE_TRACK_COUNT_OFFSET = 0x922,
+	REDSOUND_CONTROL_SECONDARY_TRACK_COUNT_OFFSET = 0x925,
+	REDSOUND_CONTROL_SECONDARY_END_WORD_OFFSET = 0x24A,
+	REDSOUND_CONTROL_MUSIC_END_WORD_OFFSET = 0x36F,
+};
+
 enum RedSoundControlSaveSize {
 	REDSOUND_CONTROL_SAVED_POSITION_SIZE = sizeof(int) * 4,
 	REDSOUND_CONTROL_SAVED_TEMPO_SIZE = sizeof(int) * 3,
 };
 
 typedef void (*RedMidiControlFunc)(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-typedef int (*RedSwingFunc)(int);
-
 int DataAddCompute(int*, int, int*);
 void KeyOnReserveClear(RedKeyOnDATA*, RedTrackDATA*);
 void KeyOnReserve(RedKeyOnDATA*, RedTrackDATA*);
 void KeyOffSet(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-int SineSwing(int);
-int TriangleSwing(int);
-int SawSwing(int);
-int DutySwing(int);
-int RandomSwing(int);
-int SineSwingR(int);
-int TriangleSwingR(int);
-int DutySwingR(int);
-int SawSwingR(int);
-int RandomSwingR(int);
-
-void __MidiCtrl_NoSupport(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_Pass(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_Stop(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_Sleep(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_WholeLoopStart(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_WholeLoopEnd(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_LoopStart(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_LoopEnd(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_LoopRepeat(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TempoDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TempoChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ReverbDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ReverbDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TimeSignature(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeySignature(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_PhraseSignature(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_KeyOnSame(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyOnNoteVelocity(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyOnNote(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyOnVelocity(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_KeyOffSame(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyOffNoteVelocity(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyOffNote(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyOffVelocity(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_Wave(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_WaveWithBank(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_VolumeDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VolumeChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ExpressionDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ExpressionChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_PanDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_PanChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_PortamentOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_PortamentOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_SlurOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_SlurOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_Sweep(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TenutoOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TenutoOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_ADSR_Default(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_AL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_AR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_DL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_DR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_SL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_SR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_RL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ADSR_RR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_SustainPedal(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ChannelAlloc(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ChannelPriority(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ChannelFix(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_VibrateOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VibrateOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VibrateDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VibrateDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VibrateRateDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VibrateRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VibrateType(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_VibrateDelay(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_TremoloOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TremoloOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TremoloDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TremoloDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TremoloRateDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TremoloRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TremoloType(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_TremoloDelay(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_ShakeOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ShakeOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ShakeDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ShakeDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ShakeRateDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ShakeRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ShakeType(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_FineTuneAbsolute(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_FineTuneRelative(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyTransposeAbsolute(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_KeyTransposeRelative(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void _PitchBendCompute(RedTrackDATA*, int);
-void __MidiCtrl_PitchBend(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_PitchBendRange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_ReverbOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ReverbOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_ReverbMix(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_StepRelative(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_StepRelative2(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-
-void __MidiCtrl_FuzzyOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-void __MidiCtrl_FuzzyOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
 
 extern RedMidiControlFunc p_MidiControl_Function[];
 extern RedSwingFunc SwingEntryFunction[];

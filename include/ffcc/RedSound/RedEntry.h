@@ -10,15 +10,35 @@ struct RedHistoryBANK
 };
 
 enum RedEntryBankLayoutSize {
+	REDSOUND_HISTORY_BANK_EMPTY_ID = -1,
 	REDSOUND_HISTORY_BANK_ENTRY_SIZE = sizeof(RedHistoryBANK),
 	REDSOUND_WAVE_BANK_ENTRY_COUNT = 0x40,
 	REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT = 0x10,
+	REDSOUND_WAVE_PRIMARY_BANK_MASK = REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT - 1,
+	REDSOUND_WAVE_RELEASE_HISTORY_NO = REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT + 4,
 	REDSOUND_SESEP_BANK_ENTRY_COUNT = 0x100,
 	REDSOUND_MUSIC_BANK_ENTRY_COUNT = 0x04,
 	REDSOUND_WAVE_BANK_SIZE = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_WAVE_BANK_ENTRY_COUNT,
 	REDSOUND_WAVE_HISTORY_BANK_OFFSET = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT,
 	REDSOUND_SESEP_BANK_SIZE = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_SESEP_BANK_ENTRY_COUNT,
 	REDSOUND_MUSIC_BANK_SIZE = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_MUSIC_BANK_ENTRY_COUNT,
+};
+
+enum RedEntryFileLayoutSize {
+	REDSOUND_MUSIC_SIGNATURE_SIZE = 4,
+	REDSOUND_SESEP_SIGNATURE_SIZE = 8,
+	REDSOUND_SE_INFO_SEQUENCE_MIN_COUNT = 1,
+	REDSOUND_SE_BLOCK_SIGNATURE_SIZE = 8,
+	REDSOUND_SE_BLOCK_ENTRY_MIN_COUNT = 1,
+	REDSOUND_WAVE_SIGNATURE_SIZE = 2,
+	REDSOUND_WAVE_OFFSET_MIN_COUNT = 1,
+};
+
+enum RedHistoryBankFieldOffset {
+	REDSOUND_HISTORY_BANK_ID_OFFSET = 0x00,
+	REDSOUND_HISTORY_BANK_HISTORY_NO_OFFSET = 0x04,
+	REDSOUND_HISTORY_BANK_DATA_OFFSET = 0x08,
+	REDSOUND_HISTORY_BANK_SIZE_OFFSET = 0x0C,
 };
 
 enum RedEntryWaveAramLayout {
@@ -48,7 +68,7 @@ enum RedEntryWaveAramLayout {
 
 struct RedMusicHEAD
 {
-	char m_signature[4];
+	char m_signature[REDSOUND_MUSIC_SIGNATURE_SIZE];
 	short m_musicNo;
 	short m_waveNo;
 	char m_trackCount;
@@ -68,12 +88,14 @@ enum RedMusicHeaderFlag {
 	REDSOUND_MUSIC_PLAY_FLAG_RELEASE_NOTES = 0x40000,
 };
 
+struct RedSeINFO;
+
 struct RedSeSepHEAD
 {
-	char m_signature[8];
+	char m_signature[REDSOUND_SESEP_SIGNATURE_SIZE];
 	int m_seNo;
 	unsigned int m_sizeAndFlags;
-	unsigned char m_unk10;
+	unsigned char m_seInfoFlags;
 	unsigned char m_waveNoLo;
 	unsigned char m_waveNoHi;
 	unsigned char m_unk13;
@@ -81,6 +103,7 @@ struct RedSeSepHEAD
 
 enum RedSeSepHeadLayout {
 	REDSOUND_SESEP_HEADER_SIZE = 0x10,
+	REDSOUND_SESEP_WAVE_NO_HIGH_SCALE = 0x100,
 	REDSOUND_SESEP_SIZE_MASK = 0x7FFFFFFF,
 	REDSOUND_SESEP_FLAGS_MASK = 0x80000000,
 };
@@ -92,7 +115,7 @@ struct RedSeINFO
 	unsigned char m_waveNoHi;
 	unsigned char m_eraseTrack;
 	unsigned char m_attrMask;
-	unsigned char m_sequence[1];
+	unsigned char m_sequence[REDSOUND_SE_INFO_SEQUENCE_MIN_COUNT];
 };
 
 enum RedSeInfoLayout {
@@ -106,16 +129,19 @@ enum RedSeInfoLayout {
 
 struct RedSeBlockHEAD
 {
-	unsigned char m_unk00[0x0A];
+	char m_signature[REDSOUND_SE_BLOCK_SIGNATURE_SIZE];
+	unsigned char m_pad08[0x0A - 0x08];
 	short m_seCount;
 	int m_size;
-	int m_entries[1];
+	int m_entries[REDSOUND_SE_BLOCK_ENTRY_MIN_COUNT];
 };
 
 enum RedSeBlockEntryLayout {
+	REDSOUND_SE_BLOCK_HEADER_SIZE = 0x10,
 	REDSOUND_SE_BLOCK_DATA_FLAG = 0x80000000,
 	REDSOUND_SE_BLOCK_ENTRY_MASK = 0x7FFFFFFF,
 	REDSOUND_SE_BLOCK_ENTRY_EMPTY = -1,
+	REDSOUND_SE_BLOCK_ENTRY_SIZE = sizeof(int),
 	REDSOUND_SE_BLOCK_BANK_MASK = 3,
 	REDSOUND_SE_BLOCK_BANK_COUNT = REDSOUND_SE_BLOCK_BANK_MASK + 1,
 	REDSOUND_SE_BLOCK_BANK_SHIFT = 9,
@@ -125,13 +151,15 @@ enum RedSeBlockEntryLayout {
 
 struct RedWaveHeadWD
 {
-	char m_signature[2];
+	char m_signature[REDSOUND_WAVE_SIGNATURE_SIZE];
 	short m_waveNo;
 	int m_waveSize;
 	int m_tableCount;
 	int m_toneCount;
 	int m_aramAddress;
 	int m_loadSize;
+	unsigned char m_pad18[0x20 - 0x18];
+	int m_waveOffsets[REDSOUND_WAVE_OFFSET_MIN_COUNT];
 };
 
 class CRedEntry
