@@ -20,10 +20,10 @@ extern "C" {
 }
 
 struct RedWaveSettingState {
-    int* slot;
-    int waveID;
-    void* waveData;
-    int waveSize;
+    int* m_slot;
+    int m_waveId;
+    void* m_waveData;
+    int m_waveSize;
 };
 
 enum RedDriverDmaLayoutSize {
@@ -71,11 +71,16 @@ struct RedDriverSyncState {
     RedDmaRequest m_streamDmaQueue[REDSOUND_DMA_QUEUE_ENTRY_COUNT];
     OSThread m_mainThread;
     OSSemaphore m_mainSemaphore;
-    u8 m_pad2240[0x2240 - 0x1F18 - sizeof(OSSemaphore)];
+    u8 m_reserved1F24[0x1F28 - 0x1F18 - sizeof(OSSemaphore)];
+    OSThread m_waveThread;
     OSSemaphore m_waveSemaphore;
-    u8 m_pad2578[0x2578 - 0x2240 - sizeof(OSSemaphore)];
+    RedWaveSettingState m_waveSettingData;
+    u8 m_reserved225C[0x2260 - 0x2240 - sizeof(OSSemaphore) - sizeof(RedWaveSettingState)];
+    OSThread m_dmaThread;
     OSSemaphore m_dmaSemaphore;
-    u8 m_pad28c0[0x28C0 - 0x2578 - sizeof(OSSemaphore)];
+    ARQRequest m_dmaRequest;
+    u8 m_reserved25A4[0x25A8 - 0x2578 - sizeof(OSSemaphore) - sizeof(ARQRequest)];
+    OSThread m_musicThread;
     OSSemaphore m_musicSemaphore;
 };
 
@@ -92,7 +97,7 @@ struct RedMusicPlayCommand {
     int m_musicId;
     int m_volume;
     int m_mode;
-    int m_pad;
+    int m_reserved;
 };
 
 enum RedMusicCommandWord {
@@ -788,7 +793,7 @@ static void _StreamPause(int* command)
  * JP Address: TODO
  * JP Size: TODO
  */
-static int* _EntryExecCommand(void (*func)(int*), int arg1, int arg2, int arg3, int arg4,
+static RedExecCommand* _EntryExecCommand(void (*func)(int*), int arg1, int arg2, int arg3, int arg4,
                        int arg5, int arg6, int arg7)
 {
     unsigned int interruptLevel;
@@ -810,7 +815,7 @@ static int* _EntryExecCommand(void (*func)(int*), int arg1, int arg2, int arg3, 
     }
     p_ExecCommandNow = writePos;
     OSRestoreInterrupts(interruptLevel);
-    return (int*)writePos;
+    return writePos;
 }
 
 /*
@@ -885,8 +890,8 @@ unsigned int GetMyEntryID()
 }
 
 struct RedSleepAlarm {
-    OSAlarm alarm;
-    OSThread* thread;
+    OSAlarm m_alarm;
+    OSThread* m_thread;
 };
 
 /*
@@ -900,7 +905,7 @@ struct RedSleepAlarm {
  */
 static void _MyAlarmHandler(OSAlarm* alarm, OSContext*)
 {
-    OSResumeThread(((RedSleepAlarm*)alarm)->thread);
+    OSResumeThread(((RedSleepAlarm*)alarm)->m_thread);
 }
 
 /*
@@ -921,10 +926,10 @@ void RedSleep(int microseconds)
         microseconds = REDSOUND_CONTROL_TICK_PERIOD;
     }
     interruptLevel = OSDisableInterrupts();
-    alarm.thread = OSGetCurrentThread();
-    OSCreateAlarm(&alarm.alarm);
-    OSSetAlarm(&alarm.alarm, (microseconds * (OS_TIMER_CLOCK / 125000)) >> 3, _MyAlarmHandler);
-    OSSuspendThread(alarm.thread);
+    alarm.m_thread = OSGetCurrentThread();
+    OSCreateAlarm(&alarm.m_alarm);
+    OSSetAlarm(&alarm.m_alarm, (microseconds * (OS_TIMER_CLOCK / 125000)) >> 3, _MyAlarmHandler);
+    OSSuspendThread(alarm.m_thread);
     OSRestoreInterrupts(interruptLevel);
 }
 
@@ -993,8 +998,8 @@ static int _WaveSettingThread(void* threadArg)
         if (m_ThreadControl != 0) {
             RedWaveSettingState* waveSetting = (RedWaveSettingState*)threadArg;
             m_WaveSettingStatus = m_WaveSettingStatus + 1;
-            c_RedEntry.SetWaveData(waveSetting->waveID, waveSetting->waveData, waveSetting->waveSize);
-            *waveSetting->slot = 0;
+            c_RedEntry.SetWaveData(waveSetting->m_waveId, waveSetting->m_waveData, waveSetting->m_waveSize);
+            *waveSetting->m_slot = 0;
             do {
             } while (OSTryWaitSemaphore(&m_WaveSettingSemaphore) > 0);
             m_WaveSettingStatus = 0;
@@ -1847,39 +1852,39 @@ int CRedDriver::ReentrySeSepData(int id)
  */
 int CRedDriver::SePlayState(int seID)
 {
-    int* commandNow;
+    RedExecCommand* commandNow;
     unsigned int uVar1;
-    int* seInfo;
-    int** seInfoBase;
+    RedTrackDATA* seInfo;
+    RedTrackDATA** seInfoBase;
     int result;
-    int* command;
+    RedExecCommand* command;
 
     uVar1 = OSDisableInterrupts();
     result = 0;
-    seInfoBase = (int**)&p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
+    seInfoBase = &p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
     seInfo = *seInfoBase;
     do {
-        if (((u32)*seInfo != 0) && ((seID == -1 || (((RedTrackDATA*)seInfo)->m_seId == seID)))) {
+        if (((u32)seInfo->m_command != 0) && ((seID == -1 || (seInfo->m_seId == seID)))) {
             result = (int)seInfo;
             break;
         }
-        seInfo += REDSOUND_TRACK_SIZE / sizeof(*seInfo);
-    } while (seInfo < (int*)((int)*seInfoBase + REDSOUND_SE_TRACK_ARENA_SIZE));
+        seInfo++;
+    } while (seInfo < *seInfoBase + REDSOUND_SE_TRACK_COUNT);
     if (result == 0) {
-        commandNow = (int*)p_ExecCommandNow;
-        command = (int*)p_ExecCommandOld;
+        commandNow = p_ExecCommandNow;
+        command = p_ExecCommandOld;
         while (commandNow != command) {
-            if ((((u32)*command != 0) &&
-                ((((void (*)(int*))*command == _SeBlockPlay) ||
-                  (((void (*)(int*))*command == _SeSepPlay))) ||
-                 ((void (*)(int*))*command == _SeSepPlaySequence))) &&
-                ((seID == -1 || (seID == command[1])))) {
+            if (((command->m_func != 0) &&
+                (((command->m_func == _SeBlockPlay) ||
+                  (command->m_func == _SeSepPlay)) ||
+                 (command->m_func == _SeSepPlaySequence))) &&
+                ((seID == -1 || (seID == command->m_args[0])))) {
                 result = 1;
                 break;
             }
-            command += 8;
-            if (command == (int*)p_ExecCommand + REDSOUND_EXEC_COMMAND_WORD_COUNT) {
-                command = (int*)p_ExecCommand;
+            command++;
+            if (command == p_ExecCommand + REDSOUND_EXEC_COMMAND_COUNT) {
+                command = p_ExecCommand;
             }
         }
     }
@@ -1924,15 +1929,15 @@ void CRedDriver::SeStopMG(int id1, int id2, int id3, int id4)
  * JP Address: TODO
  * JP Size: TODO
  */
-int CRedDriver::SePlay(int bank, int sep, int autoID, int unk, int volume, int pitch)
+int CRedDriver::SePlay(int bank, int sep, int autoID, int pan, int volume, int pitch)
 {
 	if (bank == -1) {
 		if (sep >= 0) {
-			_EntryExecCommand(_SeSepPlaySequence, autoID, sep, unk, volume, pitch, 0, 0);
+			_EntryExecCommand(_SeSepPlaySequence, autoID, sep, pan, volume, pitch, 0, 0);
 		}
 	} else if ((bank >= 0) && (bank < REDSOUND_SE_BLOCK_BANK_COUNT) && (sep >= 0) &&
 	           (sep < REDSOUND_SE_BLOCK_SEQUENCE_COUNT)) {
-		_EntryExecCommand(_SeBlockPlay, autoID, bank, sep, unk, volume, pitch, 0);
+		_EntryExecCommand(_SeBlockPlay, autoID, bank, sep, pan, volume, pitch, 0);
 	}
     return autoID;
 }
@@ -2059,17 +2064,17 @@ int CRedDriver::GetSeVolume(int seID, int mode)
  */
 int CRedDriver::ReportSeLoop(int seID)
 {
-    unsigned int* seInfo;
+    RedTrackDATA* track;
 
-    seInfo = (unsigned int*)p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
+    track = p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
     while (1) {
-        if ((*seInfo != 0) &&
-            (((seID == -1) || (seID == ((RedTrackDATA*)seInfo)->m_seId)) &&
-             ((seInfo[REDSOUND_TRACK_LOOP_REPORT_WORD_OFFSET] & REDSOUND_TRACK_LOOP_REPORT_ACTIVE) != 0))) {
+        if ((track->m_command != 0) &&
+            (((seID == -1) || (seID == track->m_seId)) &&
+             ((track->m_loopReport & REDSOUND_TRACK_LOOP_REPORT_ACTIVE) != 0))) {
             return 1;
         }
-        seInfo += REDSOUND_TRACK_SIZE / sizeof(*seInfo);
-        if (seInfo < (unsigned int*)((int)p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks + REDSOUND_SE_TRACK_ARENA_SIZE)) {
+        track++;
+        if (track < p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks + REDSOUND_SE_TRACK_COUNT) {
             continue;
         }
         return 0;
@@ -2097,11 +2102,11 @@ void CRedDriver::DisplaySePlayInfo()
  */
 int CRedDriver::StreamPlayState(int streamID)
 {
-	void* commandNow;
+	RedExecCommand* commandNow;
 	unsigned int interrupts;
 	RedStreamDATA* streamData;
 	int result;
-	unsigned int* command;
+	RedExecCommand* command;
 
 	interrupts = OSDisableInterrupts();
 	result = 0;
@@ -2117,16 +2122,16 @@ int CRedDriver::StreamPlayState(int streamID)
 
 	if (result == 0) {
 		commandNow = p_ExecCommandNow;
-		command = (unsigned int*)p_ExecCommandOld;
-		while (commandNow != (void*)command) {
-			if ((*command != 0) && ((void (*)(int*))*command == _StreamPlay) &&
-			    ((streamID == -1) || (streamID == (int)command[1]))) {
+		command = p_ExecCommandOld;
+		while (commandNow != command) {
+			if ((command->m_func != 0) && (command->m_func == _StreamPlay) &&
+			    ((streamID == -1) || (streamID == command->m_args[0]))) {
 				result = 1;
 				break;
 			}
-			command += 8;
-			if (command == (unsigned int*)p_ExecCommand + REDSOUND_EXEC_COMMAND_WORD_COUNT) {
-				command = (unsigned int*)p_ExecCommand;
+			command++;
+			if (command == p_ExecCommand + REDSOUND_EXEC_COMMAND_COUNT) {
+				command = p_ExecCommand;
 			}
 		}
 	}
@@ -2252,9 +2257,9 @@ void CRedDriver::ClearWaveData(int waveID)
  * JP Address: TODO
  * JP Size: TODO
  */
-void CRedDriver::ClearWaveDataM(int param_1, int param_2, int param_3, int param_4)
+void CRedDriver::ClearWaveDataM(int waveNo0, int waveNo1, int waveNo2, int waveNo3)
 {
-    c_RedEntry.ClearWaveDataM(param_1, param_2, param_3, param_4);
+    c_RedEntry.ClearWaveDataM(waveNo0, waveNo1, waveNo2, waveNo3);
 }
 
 /*
@@ -2290,9 +2295,9 @@ void CRedDriver::SetWaveData(int slot, int waveID, void* waveData, int waveSize)
         RedSleep(0);
     }
 
-    m_WaveSettingData.slot = reinterpret_cast<int*>(slot);
-    m_WaveSettingData.waveID = waveID;
-    m_WaveSettingData.waveData = waveData;
+    m_WaveSettingData.m_slot = reinterpret_cast<int*>(slot);
+    m_WaveSettingData.m_waveId = waveID;
+    m_WaveSettingData.m_waveData = waveData;
 
     if (waveSize == -1) {
         RedWaveHeadWD* const waveHeader = (RedWaveHeadWD*)waveData;
@@ -2304,12 +2309,12 @@ void CRedDriver::SetWaveData(int slot, int waveID, void* waveData, int waveSize)
             dataSize += waveHeader->m_toneCount * REDSOUND_WAVE_TONE_ENTRY_SIZE;
             dataSize = waveHeader->m_waveSize + dataSize;
             dataSize += REDSOUND_WAVE_HEADER_COPY_BASE_SIZE;
-            m_WaveSettingData.waveSize = dataSize;
+            m_WaveSettingData.m_waveSize = dataSize;
         } else {
-            m_WaveSettingData.waveSize = 0;
+            m_WaveSettingData.m_waveSize = 0;
         }
     } else {
-        m_WaveSettingData.waveSize = waveSize;
+        m_WaveSettingData.m_waveSize = waveSize;
     }
     OSSignalSemaphore(&m_WaveSettingSemaphore);
 }
@@ -2354,7 +2359,7 @@ void CRedDriver::DisplayWaveInfo()
  */
 void CRedDriver::SetReverb(int bank, int kind)
 {
-    ::SetReverb(bank, t_ReverbModeData[kind].kind, t_ReverbModeData[kind].params);
+    ::SetReverb(bank, t_ReverbModeData[kind].m_kind, t_ReverbModeData[kind].m_params);
 }
 
 /*

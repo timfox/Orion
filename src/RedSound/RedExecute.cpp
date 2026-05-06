@@ -175,27 +175,7 @@ enum RedReverbDelayChannelIndex {
 };
 
 enum RedExecuteAxVoiceLayout {
-    REDSOUND_AX_VOICE_PRIORITY_OFFSET = 0x0C,
-    REDSOUND_AX_VOICE_SYNC_FLAGS_OFFSET = 0x1C,
-    REDSOUND_AX_VOICE_SRC_SELECT_OFFSET = 0x140,
-    REDSOUND_AX_VOICE_MIX_CTRL_OFFSET = 0x144,
-    REDSOUND_AX_VOICE_RUNNING_OFFSET = 0x146,
     REDSOUND_AX_VOICE_LOOP_OFFSET = 0x148,
-    REDSOUND_AX_VOICE_MIX_OFFSET = 0x14A,
-    REDSOUND_AX_VOICE_VOLUME_OFFSET = 0x19C,
-    REDSOUND_AX_VOICE_VOLUME_DELTA_OFFSET = 0x19E,
-    REDSOUND_AX_VOICE_ADDR_LOOP_FLAG_OFFSET = 0x1A6,
-    REDSOUND_AX_VOICE_ADDR_FORMAT_OFFSET = 0x1A8,
-    REDSOUND_AX_VOICE_ADDR_LOOP_HI_OFFSET = 0x1AA,
-    REDSOUND_AX_VOICE_ADDR_LOOP_LO_OFFSET = 0x1AC,
-    REDSOUND_AX_VOICE_ADDR_END_OFFSET = 0x1AE,
-    REDSOUND_AX_VOICE_ADDR_CURRENT_OFFSET = 0x1B2,
-    REDSOUND_AX_VOICE_ADPCM_DATA_OFFSET = 0x1B6,
-    REDSOUND_AX_VOICE_RATIO_HIGH_OFFSET = 0x1DE,
-    REDSOUND_AX_VOICE_RATIO_LOW_OFFSET = 0x1E0,
-    REDSOUND_AX_VOICE_SRC_LAST_SAMPLES_OFFSET = 0x1E4,
-    REDSOUND_AX_VOICE_SRC_LAST_SAMPLES_SIZE = sizeof(((AXPBSRC*)0)->last_samples),
-    REDSOUND_AX_VOICE_ADPCM_LOOP_OFFSET = 0x1EC,
     REDSOUND_AX_MIX_CTRL_DRY_STEREO = 0x3,
     REDSOUND_AX_MIX_CTRL_AUX_A_STEREO = 0x30,
     REDSOUND_AX_MIX_CTRL_AUX_B_STEREO = 0x600,
@@ -233,9 +213,9 @@ enum RedExecuteAdsrStateIndex {
  */
 u8 GetRandomData()
 {
-	signed char* data = &t_RandomData[m_RandomIndex];
+	u8 data = t_RandomData[m_RandomIndex];
 	m_RandomIndex++;
-	return (u8)*data;
+	return data;
 }
 
 /*
@@ -255,7 +235,7 @@ int PitchCompute(int basePitch, int pitchOffset, int wavePitch, int fineTune)
     int noteBand;
 
     octaveAdjust = 0;
-    pitch = pitchOffset + (wavePitch >> 16) + (basePitch >> REDSOUND_FIXED_SHIFT);
+    pitch = (basePitch >> REDSOUND_FIXED_SHIFT) + (pitchOffset + (wavePitch >> 16));
     while (pitch < 0) {
         pitch += REDSOUND_PITCH_OCTAVE_UNITS;
         octaveAdjust -= 1;
@@ -352,9 +332,9 @@ void InitReverb()
 static void _SetReverbData(RedReverbDATA* reverb, int* params)
 {
     int result = 0;
-    switch (reverb->kind) {
+    switch (reverb->m_kind) {
     case REDSOUND_REVERB_KIND_STD: {
-        AXFX_REVERBSTD* std = (AXFX_REVERBSTD*)reverb->context;
+        AXFX_REVERBSTD* std = (AXFX_REVERBSTD*)reverb->m_context;
         std->tempDisableFX = 0;
         std->preDelay = (float)params[REDSOUND_REVERB_PARAM_PRE_DELAY] / s_ReverbTimeScale;
         std->time = (float)params[REDSOUND_REVERB_PARAM_TIME] / s_ReverbTimeScale;
@@ -365,7 +345,7 @@ static void _SetReverbData(RedReverbDATA* reverb, int* params)
         break;
     }
     case REDSOUND_REVERB_KIND_HI: {
-        AXFX_REVERBHI* hi = (AXFX_REVERBHI*)reverb->context;
+        AXFX_REVERBHI* hi = (AXFX_REVERBHI*)reverb->m_context;
         hi->tempDisableFX = 0;
         hi->preDelay = (float)params[REDSOUND_REVERB_PARAM_PRE_DELAY] / s_ReverbTimeScale;
         hi->time = (float)params[REDSOUND_REVERB_PARAM_TIME] / s_ReverbTimeScale;
@@ -377,21 +357,24 @@ static void _SetReverbData(RedReverbDATA* reverb, int* params)
         break;
     }
     case REDSOUND_REVERB_KIND_DELAY: {
-        AXFX_DELAY* delay = (AXFX_DELAY*)reverb->context;
-        delay->delay[REDSOUND_REVERB_DELAY_SURROUND] = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
-        delay->delay[REDSOUND_REVERB_DELAY_RIGHT] = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
-        delay->delay[REDSOUND_REVERB_DELAY_LEFT] = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
-        delay->feedback[REDSOUND_REVERB_DELAY_SURROUND] = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
-        delay->feedback[REDSOUND_REVERB_DELAY_RIGHT] = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
-        delay->feedback[REDSOUND_REVERB_DELAY_LEFT] = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
-        delay->output[REDSOUND_REVERB_DELAY_SURROUND] = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
-        delay->output[REDSOUND_REVERB_DELAY_RIGHT] = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
-        delay->output[REDSOUND_REVERB_DELAY_LEFT] = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
+        AXFX_DELAY* delay = (AXFX_DELAY*)reverb->m_context;
+        u32 delayValue = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
+        delay->delay[REDSOUND_REVERB_DELAY_SURROUND] = delayValue;
+        delay->delay[REDSOUND_REVERB_DELAY_RIGHT] = delayValue;
+        delay->delay[REDSOUND_REVERB_DELAY_LEFT] = delayValue;
+        delayValue = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
+        delay->feedback[REDSOUND_REVERB_DELAY_SURROUND] = delayValue;
+        delay->feedback[REDSOUND_REVERB_DELAY_RIGHT] = delayValue;
+        delay->feedback[REDSOUND_REVERB_DELAY_LEFT] = delayValue;
+        delayValue = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
+        delay->output[REDSOUND_REVERB_DELAY_SURROUND] = delayValue;
+        delay->output[REDSOUND_REVERB_DELAY_RIGHT] = delayValue;
+        delay->output[REDSOUND_REVERB_DELAY_LEFT] = delayValue;
         result = AXFXDelaySettings(delay);
         break;
     }
     case REDSOUND_REVERB_KIND_CHORUS: {
-        AXFX_CHORUS* chorus = (AXFX_CHORUS*)reverb->context;
+        AXFX_CHORUS* chorus = (AXFX_CHORUS*)reverb->m_context;
         chorus->baseDelay = (u32)params[REDSOUND_REVERB_PARAM_CHORUS_BASE_DELAY];
         chorus->variation = (u32)params[REDSOUND_REVERB_PARAM_CHORUS_VARIATION];
         chorus->period = (u32)params[REDSOUND_REVERB_PARAM_CHORUS_PERIOD];
@@ -399,7 +382,7 @@ static void _SetReverbData(RedReverbDATA* reverb, int* params)
         break;
     }
     case REDSOUND_REVERB_KIND_HI_DPL2: {
-        AXFX_REVERBHI_DPL2* hiDpl2 = (AXFX_REVERBHI_DPL2*)reverb->context;
+        AXFX_REVERBHI_DPL2* hiDpl2 = (AXFX_REVERBHI_DPL2*)reverb->m_context;
         hiDpl2->tempDisableFX = 0;
         hiDpl2->preDelay = (float)params[REDSOUND_REVERB_PARAM_PRE_DELAY] / s_ReverbTimeScale;
         hiDpl2->time = (float)params[REDSOUND_REVERB_PARAM_TIME] / s_ReverbTimeScale;
@@ -429,7 +412,7 @@ static void _SetReverbData(RedReverbDATA* reverb, int* params)
 static void _ClearReverb(int bank)
 {
     RedReverbDATA* reverb = p_ReverbData + (bank & 1);
-    if (reverb->callback == 0) {
+    if (reverb->m_callback == 0) {
         return;
     }
 
@@ -439,26 +422,26 @@ static void _ClearReverb(int bank)
         AXRegisterAuxBCallback((void (*)(void*, void*))_ReverbNullCallback, 0);
     }
 
-    switch (reverb->kind) {
+    switch (reverb->m_kind) {
     case REDSOUND_REVERB_KIND_STD:
-        AXFXReverbStdShutdown((AXFX_REVERBSTD*)reverb->context);
+        AXFXReverbStdShutdown((AXFX_REVERBSTD*)reverb->m_context);
         break;
     case REDSOUND_REVERB_KIND_HI:
-        AXFXReverbHiShutdown((AXFX_REVERBHI*)reverb->context);
+        AXFXReverbHiShutdown((AXFX_REVERBHI*)reverb->m_context);
         break;
     case REDSOUND_REVERB_KIND_DELAY:
-        AXFXDelayShutdown((AXFX_DELAY*)reverb->context);
+        AXFXDelayShutdown((AXFX_DELAY*)reverb->m_context);
         break;
     case REDSOUND_REVERB_KIND_CHORUS:
-        AXFXChorusShutdown((AXFX_CHORUS*)reverb->context);
+        AXFXChorusShutdown((AXFX_CHORUS*)reverb->m_context);
         break;
     case REDSOUND_REVERB_KIND_HI_DPL2:
-        AXFXReverbHiShutdownDpl2((AXFX_REVERBHI_DPL2*)reverb->context);
+        AXFXReverbHiShutdownDpl2((AXFX_REVERBHI_DPL2*)reverb->m_context);
         break;
     }
 
-    reverb->callback = 0;
-    RedDelete((int)reverb->context);
+    reverb->m_callback = 0;
+    RedDelete((int)reverb->m_context);
 }
 
 /*
@@ -488,7 +471,7 @@ int* SetReverb(int bank, int kind, int* params)
     }
 
     reverb = p_ReverbData + (bank & 1);
-    if ((reverb->callback != 0) && (reverb->kind == kind)) {
+    if ((reverb->m_callback != 0) && (reverb->m_kind == kind)) {
         _SetReverbData(reverb, params);
         return (int*)p_ReverbSize;
     }
@@ -498,13 +481,12 @@ int* SetReverb(int bank, int kind, int* params)
         _ClearReverb(1);
     }
 
-    reverb->kind = kind;
-    result = 0;
+    reverb->m_kind = kind;
     switch (kind) {
     case REDSOUND_REVERB_KIND_STD: {
-        AXFX_REVERBSTD* std = (AXFX_REVERBSTD*)RedNew(sizeof(AXFX_REVERBSTD));
-        reverb->context = std;
-        reverb->callback = (int)AXFXReverbStdCallback;
+        reverb->m_context = (void*)RedNew(sizeof(AXFX_REVERBSTD));
+        reverb->m_callback = (int)AXFXReverbStdCallback;
+        AXFX_REVERBSTD* std = (AXFX_REVERBSTD*)reverb->m_context;
         std->tempDisableFX = 0;
         std->preDelay = (float)params[REDSOUND_REVERB_PARAM_PRE_DELAY] / s_ReverbTimeScale;
         std->time = (float)params[REDSOUND_REVERB_PARAM_TIME] / s_ReverbTimeScale;
@@ -515,9 +497,9 @@ int* SetReverb(int bank, int kind, int* params)
         break;
     }
     case REDSOUND_REVERB_KIND_HI: {
-        AXFX_REVERBHI* hi = (AXFX_REVERBHI*)RedNew(sizeof(AXFX_REVERBHI));
-        reverb->context = hi;
-        reverb->callback = (int)AXFXReverbHiCallback;
+        reverb->m_context = (void*)RedNew(sizeof(AXFX_REVERBHI));
+        reverb->m_callback = (int)AXFXReverbHiCallback;
+        AXFX_REVERBHI* hi = (AXFX_REVERBHI*)reverb->m_context;
         hi->tempDisableFX = 0;
         hi->preDelay = (float)params[REDSOUND_REVERB_PARAM_PRE_DELAY] / s_ReverbTimeScale;
         hi->time = (float)params[REDSOUND_REVERB_PARAM_TIME] / s_ReverbTimeScale;
@@ -529,25 +511,28 @@ int* SetReverb(int bank, int kind, int* params)
         break;
     }
     case REDSOUND_REVERB_KIND_DELAY: {
-        AXFX_DELAY* delay = (AXFX_DELAY*)RedNew(sizeof(AXFX_DELAY));
-        reverb->context = delay;
-        reverb->callback = (int)AXFXDelayCallback;
-        delay->delay[REDSOUND_REVERB_DELAY_SURROUND] = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
-        delay->delay[REDSOUND_REVERB_DELAY_RIGHT] = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
-        delay->delay[REDSOUND_REVERB_DELAY_LEFT] = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
-        delay->feedback[REDSOUND_REVERB_DELAY_SURROUND] = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
-        delay->feedback[REDSOUND_REVERB_DELAY_RIGHT] = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
-        delay->feedback[REDSOUND_REVERB_DELAY_LEFT] = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
-        delay->output[REDSOUND_REVERB_DELAY_SURROUND] = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
-        delay->output[REDSOUND_REVERB_DELAY_RIGHT] = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
-        delay->output[REDSOUND_REVERB_DELAY_LEFT] = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
+        reverb->m_context = (void*)RedNew(sizeof(AXFX_DELAY));
+        reverb->m_callback = (int)AXFXDelayCallback;
+        AXFX_DELAY* delay = (AXFX_DELAY*)reverb->m_context;
+        u32 delayValue = (u32)params[REDSOUND_REVERB_PARAM_DELAY];
+        delay->delay[REDSOUND_REVERB_DELAY_SURROUND] = delayValue;
+        delay->delay[REDSOUND_REVERB_DELAY_RIGHT] = delayValue;
+        delay->delay[REDSOUND_REVERB_DELAY_LEFT] = delayValue;
+        delayValue = (u32)params[REDSOUND_REVERB_PARAM_FEEDBACK];
+        delay->feedback[REDSOUND_REVERB_DELAY_SURROUND] = delayValue;
+        delay->feedback[REDSOUND_REVERB_DELAY_RIGHT] = delayValue;
+        delay->feedback[REDSOUND_REVERB_DELAY_LEFT] = delayValue;
+        delayValue = (u32)params[REDSOUND_REVERB_PARAM_OUTPUT];
+        delay->output[REDSOUND_REVERB_DELAY_SURROUND] = delayValue;
+        delay->output[REDSOUND_REVERB_DELAY_RIGHT] = delayValue;
+        delay->output[REDSOUND_REVERB_DELAY_LEFT] = delayValue;
         result = AXFXDelayInit(delay);
         break;
     }
     case REDSOUND_REVERB_KIND_CHORUS: {
-        AXFX_CHORUS* chorus = (AXFX_CHORUS*)RedNew(sizeof(AXFX_CHORUS));
-        reverb->context = chorus;
-        reverb->callback = (int)AXFXChorusCallback;
+        reverb->m_context = (void*)RedNew(sizeof(AXFX_CHORUS));
+        reverb->m_callback = (int)AXFXChorusCallback;
+        AXFX_CHORUS* chorus = (AXFX_CHORUS*)reverb->m_context;
         chorus->baseDelay = (u32)params[REDSOUND_REVERB_PARAM_CHORUS_BASE_DELAY];
         chorus->variation = (u32)params[REDSOUND_REVERB_PARAM_CHORUS_VARIATION];
         chorus->period = (u32)params[REDSOUND_REVERB_PARAM_CHORUS_PERIOD];
@@ -555,9 +540,9 @@ int* SetReverb(int bank, int kind, int* params)
         break;
     }
     case REDSOUND_REVERB_KIND_HI_DPL2: {
-        AXFX_REVERBHI_DPL2* hiDpl2 = (AXFX_REVERBHI_DPL2*)RedNew(sizeof(AXFX_REVERBHI_DPL2));
-        reverb->context = hiDpl2;
-        reverb->callback = (int)AXFXReverbHiCallbackDpl2;
+        reverb->m_context = (void*)RedNew(sizeof(AXFX_REVERBHI_DPL2));
+        reverb->m_callback = (int)AXFXReverbHiCallbackDpl2;
+        AXFX_REVERBHI_DPL2* hiDpl2 = (AXFX_REVERBHI_DPL2*)reverb->m_context;
         hiDpl2->tempDisableFX = 0;
         hiDpl2->preDelay = (float)params[REDSOUND_REVERB_PARAM_PRE_DELAY] / s_ReverbTimeScale;
         hiDpl2->time = (float)params[REDSOUND_REVERB_PARAM_TIME] / s_ReverbTimeScale;
@@ -571,10 +556,10 @@ int* SetReverb(int bank, int kind, int* params)
 
     if (result == 1) {
         if (bank == 0) {
-            AXRegisterAuxACallback((void (*)(void*, void*))reverb->callback, reverb->context);
+            AXRegisterAuxACallback((void (*)(void*, void*))reverb->m_callback, reverb->m_context);
         }
         else {
-            AXRegisterAuxBCallback((void (*)(void*, void*))reverb->callback, reverb->context);
+            AXRegisterAuxBCallback((void (*)(void*, void*))reverb->m_callback, reverb->m_context);
         }
     }
     else {
@@ -691,15 +676,14 @@ void SetVoiceVolumeMix(RedVoiceDATA* voice, int pan, int volume)
     s16 rightPan;
     u16 uVar3;
     int volFactor;
-    u16* mixData;
-    int* voiceData = (int*)voice;
+    AXPBMIX* mixData;
 
     if (trackData == 0) {
         return;
     }
 
-    mixData = voice->m_axMix;
-    memset(mixData, 0, REDSOUND_VOICE_AX_MIX_SIZE);
+    mixData = &voice->m_axMix;
+    memset(mixData, 0, sizeof(*mixData));
 
     switch (m_SoundPlayMode) {
     case 1:
@@ -708,43 +692,43 @@ void SetVoiceVolumeMix(RedVoiceDATA* voice, int pan, int volume)
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_DRY_STEREO) != 0) {
             uVar3 = (u16)monoBase;
-            *mixData = uVar3;
-            mixData[REDSOUND_VOICE_AX_MIX_VR_INDEX] = uVar3;
+            mixData->vL = uVar3;
+            mixData->vR = uVar3;
         }
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_STEREO) != 0) {
             u16 monoMix = (u16)((monoBase * ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >> REDSOUND_AX_MIX_SHIFT);
             if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_AUX_A) != 0) {
-                mixData[REDSOUND_VOICE_AX_MIX_AUX_A_L_INDEX] = monoMix;
-                mixData[REDSOUND_VOICE_AX_MIX_AUX_A_R_INDEX] = monoMix;
+                mixData->vAuxAL = monoMix;
+                mixData->vAuxAR = monoMix;
             } else {
-                mixData[REDSOUND_VOICE_AX_MIX_AUX_B_L_INDEX] = monoMix;
-                mixData[REDSOUND_VOICE_AX_MIX_AUX_B_R_INDEX] = monoMix;
+                mixData->vAuxBL = monoMix;
+                mixData->vAuxBR = monoMix;
             }
         }
         break;
     case 2:
-        *mixData = (u16)((volume * t_PanningData[pan]) >> 8);
-        *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_B_L_WORD) = (s16)((volume * t_PanningDataR[pan]) >> 8);
-        *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_VR_WORD) = (s16)((volume * t_PanningData[pan ^ REDSOUND_PAN_BYTE_MASK]) >> 8);
-        *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_B_R_WORD) = (s16)((volume * t_PanningDataR[pan ^ REDSOUND_PAN_BYTE_MASK]) >> 8);
+        mixData->vL = (u16)((volume * t_PanningData[pan]) >> 8);
+        mixData->vAuxBL = (u16)((volume * t_PanningDataR[pan]) >> 8);
+        mixData->vR = (u16)((volume * t_PanningData[pan ^ REDSOUND_PAN_BYTE_MASK]) >> 8);
+        mixData->vAuxBR = (u16)((volume * t_PanningDataR[pan ^ REDSOUND_PAN_BYTE_MASK]) >> 8);
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_LEFT) != 0) {
-            *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_A_L_WORD) =
-                (s16)((int)((u32)*mixData * ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >> REDSOUND_AX_MIX_SHIFT);
-            *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_A_S_WORD) =
-                (s16)((int)((u32)*(u16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_B_L_WORD) *
+            mixData->vAuxAL =
+                (s16)((int)((u32)mixData->vL * ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >> REDSOUND_AX_MIX_SHIFT);
+            mixData->vAuxAS =
+                (u16)((int)((u32)mixData->vAuxBL *
                              ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >>
                       REDSOUND_AX_MIX_SHIFT);
         }
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_RIGHT) != 0) {
-            *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_A_R_WORD) =
-                (s16)((int)((u32)*(u16*)(voiceData + REDSOUND_VOICE_AX_MIX_VR_WORD) *
+            mixData->vAuxAR =
+                (u16)((int)((u32)mixData->vR *
                              ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >>
                       REDSOUND_AX_MIX_SHIFT);
-            *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_B_S_WORD) =
-                (s16)((int)((u32)*(u16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_B_R_WORD) *
+            mixData->vAuxBS =
+                (u16)((int)((u32)mixData->vAuxBR *
                              ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >>
                       REDSOUND_AX_MIX_SHIFT);
         }
@@ -760,28 +744,28 @@ void SetVoiceVolumeMix(RedVoiceDATA* voice, int pan, int volume)
         int rightMix = (volume * rightPan) >> 8;
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_DRY_LEFT) != 0) {
-            *mixData = (u16)leftMix;
+            mixData->vL = (u16)leftMix;
         }
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_DRY_RIGHT) != 0) {
-            *(s16*)(voiceData + REDSOUND_VOICE_AX_MIX_VR_WORD) = (s16)rightMix;
+            mixData->vR = (u16)rightMix;
         }
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_LEFT) != 0) {
             iVar1 = (leftMix * ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >> REDSOUND_AX_MIX_SHIFT;
             if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_AUX_A) != 0) {
-                *(u16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_A_L_WORD) = (u16)iVar1;
+                mixData->vAuxAL = (u16)iVar1;
             } else {
-                *(u16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_B_L_WORD) = (u16)iVar1;
+                mixData->vAuxBL = (u16)iVar1;
             }
         }
 
         if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_RIGHT) != 0) {
             iVar2 = (rightMix * ((trackData->m_reverbDepth >> REDSOUND_FIXED_SHIFT) + 1)) >> REDSOUND_AX_MIX_SHIFT;
             if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_REVERB_AUX_A) != 0) {
-                *(u16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_A_R_WORD) = (u16)iVar2;
+                mixData->vAuxAR = (u16)iVar2;
             } else {
-                *(u16*)(voiceData + REDSOUND_VOICE_AX_MIX_AUX_B_R_WORD) = (u16)iVar2;
+                mixData->vAuxBR = (u16)iVar2;
             }
         }
         break;
@@ -815,10 +799,10 @@ static void _VolumeExecute(RedVoiceDATA* voice, int volume)
                REDSOUND_VOLUME_MOD_SCALE_SHIFT;
 
     if (voice->m_velocity != 0) {
-        if (voice->m_velocity == 0) {
-            envelopeMul = 0;
-        } else {
+        if (voice->m_velocity != 0) {
             envelopeMul = voice->m_velocity + 1;
+        } else {
+            envelopeMul = 0;
         }
         voiceMix = voiceMix * envelopeMul >> 7;
     }
@@ -828,16 +812,13 @@ static void _VolumeExecute(RedVoiceDATA* voice, int volume)
         envelopeMul = envelopeMul + 1;
     }
 
+    voiceMix = voiceMix * envelopeMul >> REDSOUND_VOLUME_MOD_SCALE_SHIFT;
+    voiceMix = voiceMix * (*voice->m_trackVolume >> REDSOUND_FIXED_SHIFT) >> REDSOUND_VOLUME_TRACK_SCALE_SHIFT;
     pan = voice->m_waveData->m_volume & REDSOUND_PAN_BYTE_MASK;
     if (pan != 0) {
         pan = pan + 1;
     }
-
-    voiceMix = (int)(((voiceMix * envelopeMul >> REDSOUND_VOLUME_MOD_SCALE_SHIFT) *
-                      (*voice->m_trackVolume >> REDSOUND_FIXED_SHIFT) >>
-                      REDSOUND_VOLUME_TRACK_SCALE_SHIFT) *
-                     pan) >>
-               REDSOUND_VOLUME_MOD_SCALE_SHIFT;
+    voiceMix = voiceMix * pan >> REDSOUND_VOLUME_MOD_SCALE_SHIFT;
 
     if (voice->m_track->m_tremoloFunc != 0) {
         if (voice->m_volumeModDelay == 0) {
@@ -846,15 +827,15 @@ static void _VolumeExecute(RedVoiceDATA* voice, int volume)
                 envelopeMul = envelopeMul + 1;
             }
 
+            modVolume = voiceMix * envelopeMul >> 8;
             iVar1 = voice->m_track->m_tremoloFunc((unsigned int)voice->m_volumeModPhase >> REDSOUND_FIXED_SHIFT);
-            modVolume = (voiceMix * envelopeMul >> 8) * (iVar1 >> REDSOUND_VOLUME_MOD_WAVE_SHIFT) >>
-                        REDSOUND_FIXED_SHIFT;
+            modVolume = modVolume * (iVar1 >> REDSOUND_VOLUME_MOD_WAVE_SHIFT) >> REDSOUND_FIXED_SHIFT;
 
             if (voice->m_volumeModFrames != 0) {
                 iVar1 = voice->m_volumeModFrame;
                 voice->m_volumeModFrame = voice->m_volumeModFrame + 1;
                 modVolume = (modVolume * iVar1) / voice->m_volumeModFrames;
-                if (voice->m_volumeModFrames <= voice->m_volumeModFrame) {
+                if (voice->m_volumeModFrame >= voice->m_volumeModFrames) {
                     voice->m_volumeModFrames = 0;
                 }
             }
@@ -862,7 +843,7 @@ static void _VolumeExecute(RedVoiceDATA* voice, int volume)
             voiceMix = voiceMix + modVolume;
             voice->m_volumeModPhase = voice->m_volumeModPhase + voice->m_track->m_tremoloRate;
 
-            if (voiceMix >= REDSOUND_ENVELOPE_LEVEL_FULL) {
+            if (voiceMix > REDSOUND_AX_MIX_MAX) {
                 voiceMix = REDSOUND_AX_MIX_MAX;
             } else if (voiceMix < 0) {
                 voiceMix = 0;
@@ -872,31 +853,34 @@ static void _VolumeExecute(RedVoiceDATA* voice, int volume)
 
     if (m_SoundPlayMode == 1) {
         pan = REDSOUND_PAN_BYTE_CENTER;
-    } else if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_PAIRED_PAN) == 0) {
-        if ((voice->m_waveData->m_pan & REDSOUND_PAN_BYTE_SIGN_BIT) == 0) {
-            pan = *voice->m_trackPan >> REDSOUND_FIXED_SHIFT;
+    } else if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_PAIRED_PAN) != 0) {
+        if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_PAIRED_LEFT) != 0) {
+            pan = 0;
         } else {
+            pan = REDSOUND_PAN_BYTE_MASK;
+        }
+    } else {
+        if ((voice->m_waveData->m_pan & REDSOUND_PAN_BYTE_SIGN_BIT) != 0) {
             pan = voice->m_waveData->m_pan & REDSOUND_PAN_BYTE_MASK;
             if (pan == 0) {
                 pan = REDSOUND_PAN_BYTE_CENTER;
             }
+        } else {
+            pan = *voice->m_trackPan >> REDSOUND_FIXED_SHIFT;
         }
 
         if (voice->m_randomPan != 0) {
             pan = pan + ((int)(pan * voice->m_randomPan) >> REDSOUND_VOLUME_MOD_SCALE_SHIFT);
         }
 
-        pan = (pan + voice->m_track->m_shakePan) & 0xff;
-    } else if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_PAIRED_LEFT) == 0) {
-        pan = REDSOUND_PAN_BYTE_MASK;
-    } else {
-        pan = 0;
+        pan = pan + voice->m_track->m_shakePan;
+        pan &= 0xff;
     }
 
     if (voice->m_randomVolume != 0) {
         voiceMix =
             voiceMix + (voiceMix * voice->m_randomVolume >> REDSOUND_VOLUME_MOD_SCALE_SHIFT);
-        if (voiceMix >= REDSOUND_ENVELOPE_LEVEL_FULL) {
+        if (voiceMix > REDSOUND_AX_MIX_MAX) {
             voiceMix = REDSOUND_AX_MIX_MAX;
         } else if (voiceMix < 0) {
             voiceMix = 0;
@@ -921,15 +905,17 @@ static void _PitchExecute(RedVoiceDATA* voice)
     int pitchDelta = 0;
     int* voiceData = (int*)voice;
 
+    int targetPitchDelta;
+
     if ((voice->m_track->m_vibrateFunc != 0) && (voice->m_pitchModDelay == 0)) {
-        int pitchLfo = voice->m_track->m_vibrateDepth >> REDSOUND_FIXED_SHIFT;
+        u32 pitchLfo = voice->m_track->m_vibrateDepth >> REDSOUND_FIXED_SHIFT;
         if (pitchLfo < REDSOUND_PITCH_MOD_DEPTH_SPLIT) {
             pitchDelta = (pitchLfo + 1) * REDSOUND_PITCH_MOD_SHALLOW_SCALE;
         } else {
             pitchDelta = ((pitchLfo & REDSOUND_PAN_BYTE_MASK) + 1) * REDSOUND_PITCH_MOD_DEEP_SCALE;
         }
 
-        int pitchBend = voice->m_track->m_pitchBend + voice->m_track->m_keyTranspose + pitchDelta;
+        int pitchBend = voice->m_track->m_keyTranspose + voice->m_track->m_pitchBend + pitchDelta;
         int basePitch;
         if ((voice->m_stateFlags & REDSOUND_VOICE_STATE_PLAYING_MASK) != 0) {
             basePitch = voice->m_basePitch + voice->m_track->m_pitch;
@@ -938,29 +924,28 @@ static void _PitchExecute(RedVoiceDATA* voice)
         }
         pitchDelta = PitchCompute(basePitch, pitchBend, voice->m_waveData->m_pitch, voice->m_track->m_fineTune);
 
-        {
-            int currentPitch = voice->m_pitch;
-            RedSwingFunc pitchWaveFunc = voice->m_track->m_vibrateFunc;
-            int pitchWave = pitchWaveFunc((u32)voice->m_pitchModPhase >> REDSOUND_FIXED_SHIFT);
-            pitchDelta = ((pitchDelta - currentPitch) * (pitchWave >> REDSOUND_PITCH_MOD_WAVE_SHIFT)) >>
-                         REDSOUND_FIXED_SHIFT;
-        }
+        pitchDelta =
+            ((pitchDelta - voice->m_pitch) *
+             (voice->m_track->m_vibrateFunc((u32)voice->m_pitchModPhase >> REDSOUND_FIXED_SHIFT) >> REDSOUND_PITCH_MOD_WAVE_SHIFT)) >>
+            REDSOUND_FIXED_SHIFT;
 
         if (voice->m_pitchModFrames != 0) {
             int frame = voice->m_pitchModFrame;
             int rampedPitch = pitchDelta * frame;
             voice->m_pitchModFrame = voice->m_pitchModFrame + 1;
             pitchDelta = rampedPitch / voice->m_pitchModFrames;
-            if (voice->m_pitchModFrames <= voice->m_pitchModFrame) {
+            if (voice->m_pitchModFrame >= voice->m_pitchModFrames) {
                 voice->m_pitchModFrames = 0;
             }
         }
 
+        targetPitchDelta = pitchDelta;
         if (pitchDelta < 0) {
-            pitchDelta >>= 1;
+            targetPitchDelta = pitchDelta >> 1;
         }
 
         voice->m_pitchModPhase += voice->m_track->m_vibrateRate;
+        pitchDelta = targetPitchDelta;
     }
 
     voice->m_targetPitch = pitchDelta + voice->m_pitch + voice->m_randomPitch;
@@ -1019,214 +1004,217 @@ static RedWaveDATA* _WaveSplitSelect(RedWaveDATA* wave, RedNoteDATA* note)
  * JP Address: TODO
  * JP Size: TODO
  */
-static void _VoiceDataAsign(RedTrackDATA* param_1, RedVoiceDATA* param_2, RedNoteDATA* param_3, int* param_4)
+static void _VoiceDataAsign(RedTrackDATA* track, RedVoiceDATA* voice, RedNoteDATA* noteData, int* voiceMask)
 {
     int iVar1;
     int iVar5;
     int pitchWork[4];
-    int* voiceData = (int*)param_2;
-    s8 note = param_3->m_key;
-    unsigned int* voiceMask = (unsigned int*)param_4;
 
-    param_2->m_track = param_1;
-    param_2->m_active = 1;
+    voice->m_track = track;
+    voice->m_active = 1;
 
-    if ((param_1->m_portamentTime == 0) ||
-        (param_1->m_portamentPitch < 0)) {
-        param_1->m_portamentPitch = note << REDSOUND_PITCH_BASE_NOTE_SHIFT;
-        if (param_2->m_waveData != 0) {
-            if ((param_2->m_waveData->m_flags & REDSOUND_WAVE_FLAG_USE_WAVE_KEY) == 0) {
-                param_2->m_basePitch = note << REDSOUND_PITCH_BASE_NOTE_SHIFT;
-                if (param_1->m_keySignatureData != 0) {
-                    iVar5 = param_2->m_basePitch >> REDSOUND_PITCH_BASE_NOTE_SHIFT;
-                    iVar1 = iVar5 / REDSOUND_NOTES_PER_OCTAVE + (param_2->m_basePitch >> 0x1f);
+    if ((track->m_portamentTime != 0) &&
+        (track->m_portamentPitch >= 0)) {
+        track->m_portamentPitch &= REDSOUND_FIXED_WHOLE_MASK;
+        voice->m_basePitch = track->m_portamentPitch;
+        track->m_sweepDelta = track->m_portamentTime;
+        pitchWork[0] = 0;
+        track->m_sweepAdd =
+            DataAddCompute(pitchWork, noteData->m_key * REDSOUND_PITCH_NOTE_UNIT -
+                                          (track->m_portamentPitch >> REDSOUND_FIXED_SHIFT),
+                           &track->m_sweepDelta);
+    } else {
+        track->m_portamentPitch = noteData->m_key << REDSOUND_PITCH_BASE_NOTE_SHIFT;
+        if (voice->m_waveData != 0) {
+            if ((voice->m_waveData->m_flags & REDSOUND_WAVE_FLAG_USE_WAVE_KEY) == 0) {
+                voice->m_basePitch = noteData->m_key << REDSOUND_PITCH_BASE_NOTE_SHIFT;
+                if (track->m_keySignatureData != 0) {
+                    iVar5 = voice->m_basePitch >> REDSOUND_PITCH_BASE_NOTE_SHIFT;
+                    iVar1 = iVar5 / REDSOUND_NOTES_PER_OCTAVE + (voice->m_basePitch >> 0x1f);
                     pitchWork[0] =
-                        param_1->m_keySignatureData[iVar5 + (iVar1 - (iVar1 >> 0x1f)) * -REDSOUND_NOTES_PER_OCTAVE];
-                    param_2->m_basePitch += pitchWork[0] * REDSOUND_PITCH_KEY_SIGNATURE_UNIT;
+                        track->m_keySignatureData[iVar5 + (iVar1 - (iVar1 >> 0x1f)) * -REDSOUND_NOTES_PER_OCTAVE];
+                    voice->m_basePitch += pitchWork[0] * REDSOUND_PITCH_KEY_SIGNATURE_UNIT;
                 }
             } else {
-                param_2->m_basePitch =
-                    param_2->m_waveData->m_splitKey << REDSOUND_PITCH_BASE_NOTE_SHIFT;
+                voice->m_basePitch =
+                    voice->m_waveData->m_splitKey << REDSOUND_PITCH_BASE_NOTE_SHIFT;
             }
         }
-    } else {
-        param_1->m_portamentPitch &= REDSOUND_FIXED_WHOLE_MASK;
-        param_2->m_basePitch = param_1->m_portamentPitch;
-        param_1->m_sweepDelta = param_1->m_portamentTime;
-        pitchWork[0] = 0;
-        DataAddCompute(pitchWork, note * REDSOUND_PITCH_NOTE_UNIT -
-                                     (param_1->m_portamentPitch >> REDSOUND_FIXED_SHIFT),
-                       &param_1->m_sweepDelta);
     }
 
-    voiceData[REDSOUND_VOICE_NOTE_WORD] = *(int*)param_3;
-    param_2->m_trackVolume = &param_1->m_volume;
-    param_2->m_trackExpression = &param_1->m_expression;
-    param_2->m_trackPan = &param_1->m_pan;
+    *(int*)&voice->m_key = *(int*)noteData;
+    voice->m_trackVolume = &track->m_volume;
+    voice->m_trackExpression = &track->m_expression;
+    voice->m_trackPan = &track->m_pan;
 
-    if (param_2->m_waveData == 0) {
-        memset(param_2->m_adsrTime, 0, REDSOUND_TRACK_ADSR_SIZE);
+    if (voice->m_waveData == 0) {
+        memset(voice->m_adsrTime, 0, REDSOUND_TRACK_ADSR_SIZE);
     } else {
-        memcpy(param_2->m_adsrTime,
-               param_1->m_waveData->m_adsr,
+        memcpy(voice->m_adsrTime,
+               track->m_waveData->m_adsr,
                REDSOUND_TRACK_ADSR_SIZE);
     }
 
-    param_2->m_voiceSwitch = param_1->m_voiceSwitch;
-    if (param_2->m_waveData != 0 &&
-        param_2->m_waveData->m_reverbMix != 0) {
+    voice->m_voiceSwitch = track->m_voiceSwitch;
+    if (voice->m_waveData != 0 &&
+        voice->m_waveData->m_reverbMix != 0) {
         unsigned int maskBits;
-        param_2->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_MIX_MASK;
-        if (param_2->m_waveData->m_reverbMix == 1) {
+        voice->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_MIX_MASK;
+        if (voice->m_waveData->m_reverbMix == 1) {
             maskBits = REDSOUND_VOICE_SWITCH_MIX_ALL;
         } else {
             maskBits = REDSOUND_VOICE_SWITCH_DRY_STEREO;
         }
-        param_2->m_voiceSwitch |= maskBits;
+        voice->m_voiceSwitch |= maskBits;
     }
 
-    pitchWork[0] = param_1->m_keyTranspose + param_1->m_pitchBend;
-    if ((param_2->m_stateFlags & REDSOUND_VOICE_STATE_PLAYING_MASK) == 0) {
-        iVar5 = param_2->m_basePitch + p_MusicPitchControl->m_value;
+    pitchWork[0] = track->m_keyTranspose + track->m_pitchBend;
+    if ((voice->m_stateFlags & REDSOUND_VOICE_STATE_PLAYING_MASK) == 0) {
+        iVar5 = voice->m_basePitch + p_MusicPitchControl->m_value;
     } else {
-        iVar5 = param_2->m_basePitch + param_1->m_pitch;
+        iVar5 = voice->m_basePitch + track->m_pitch;
     }
 
-    if (param_2->m_waveData == 0) {
+    if (voice->m_waveData == 0) {
         iVar5 = 0;
     } else {
-        iVar5 = PitchCompute(iVar5, pitchWork[0], param_2->m_waveData->m_pitch, param_1->m_fineTune);
+        iVar5 = PitchCompute(iVar5, pitchWork[0], voice->m_waveData->m_pitch, track->m_fineTune);
     }
-    param_2->m_targetPitch = iVar5;
+    voice->m_pitch = iVar5;
 
-    if (((param_1->m_flags & REDSOUND_TRACK_FLAG_SLUR_RELEASE) == 0) ||
-        ((((s8)param_1->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_DIRECT_MASK) == 0) &&
-          ((param_1->m_flags & (REDSOUND_TRACK_FLAG_SLUR | REDSOUND_TRACK_FLAG_TENUTO)) == 0)) ||
-         ((((s8)param_1->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_DIRECT_MASK) != 0) &&
-          ((param_1->m_flags & REDSOUND_TRACK_FLAG_SLUR) == 0))) {
-        if (param_1->m_vibrateFunc != 0) {
-            param_2->m_pitchModDelay = param_1->m_vibrateDelay;
-            pitchWork[0] = REDSOUND_MOD_DELAY_PHASE_SCALE;
-            if ((param_1->m_vibrateRate >> REDSOUND_FIXED_SHIFT) != 0) {
-                pitchWork[0] =
-                    REDSOUND_MOD_DELAY_PHASE_SCALE / (param_1->m_vibrateRate >> REDSOUND_FIXED_SHIFT);
+    if ((track->m_flags & REDSOUND_TRACK_FLAG_SLUR_RELEASE) != 0) {
+        if ((((s8)track->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_DIRECT_MASK) == 0) ||
+            ((track->m_flags & (REDSOUND_TRACK_FLAG_SLUR | REDSOUND_TRACK_FLAG_TENUTO)) != 0)) {
+            if ((((s8)track->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_DIRECT_MASK) != 0) ||
+                ((track->m_flags & REDSOUND_TRACK_FLAG_SLUR) != 0)) {
+                goto skipModSetup;
             }
-            if (param_1->m_vibrateDelayDepth == 0) {
-                iVar5 = 0;
-            } else {
-                iVar5 = param_1->m_vibrateDelayDepth * pitchWork[0] * REDSOUND_MOD_DELAY_FRAME_SCALE;
-            }
-            param_2->m_pitchModFrames = iVar5;
-            param_2->m_pitchModFrame = 0;
-            param_2->m_pitchModPhase = 0;
-        }
-
-        if (param_1->m_tremoloFunc != 0) {
-            param_2->m_volumeModDelay = param_1->m_tremoloDelay;
-            pitchWork[0] = REDSOUND_MOD_DELAY_PHASE_SCALE;
-            if ((param_1->m_tremoloRate >> REDSOUND_FIXED_SHIFT) != 0) {
-                pitchWork[0] =
-                    REDSOUND_MOD_DELAY_PHASE_SCALE / (param_1->m_tremoloRate >> REDSOUND_FIXED_SHIFT);
-            }
-            if (param_1->m_tremoloDelayDepth == 0) {
-                iVar5 = 0;
-            } else {
-                iVar5 = param_1->m_tremoloDelayDepth * pitchWork[0] * REDSOUND_MOD_DELAY_FRAME_SCALE;
-            }
-            param_2->m_volumeModFrames = iVar5;
-            param_2->m_volumeModFrame = 0;
-            param_2->m_volumeModPhase = 0;
         }
     }
 
-    if ((param_2->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_PITCH) == 0) {
-        param_2->m_randomPitch = 0;
-    } else {
+    if (voice->m_track->m_vibrateFunc != 0) {
+        voice->m_pitchModDelay = track->m_vibrateDelay;
+        pitchWork[0] = REDSOUND_MOD_DELAY_PHASE_SCALE;
+        if ((track->m_vibrateRate >> REDSOUND_FIXED_SHIFT) != 0) {
+            pitchWork[0] =
+                REDSOUND_MOD_DELAY_PHASE_SCALE / (track->m_vibrateRate >> REDSOUND_FIXED_SHIFT);
+        }
+        if (track->m_vibrateDelayDepth == 0) {
+            iVar5 = 0;
+        } else {
+            iVar5 = track->m_vibrateDelayDepth * (pitchWork[0] * REDSOUND_MOD_DELAY_FRAME_SCALE);
+        }
+        voice->m_pitchModFrames = iVar5;
+        voice->m_pitchModFrame = 0;
+        voice->m_pitchModPhase = 0;
+    }
+
+    if (voice->m_track->m_tremoloFunc != 0) {
+        voice->m_volumeModDelay = track->m_tremoloDelay;
+        pitchWork[0] = REDSOUND_MOD_DELAY_PHASE_SCALE;
+        if ((track->m_tremoloRate >> REDSOUND_FIXED_SHIFT) != 0) {
+            pitchWork[0] =
+                REDSOUND_MOD_DELAY_PHASE_SCALE / (track->m_tremoloRate >> REDSOUND_FIXED_SHIFT);
+        }
+        if (track->m_tremoloDelayDepth == 0) {
+            iVar5 = 0;
+        } else {
+            iVar5 = track->m_tremoloDelayDepth * (pitchWork[0] * REDSOUND_MOD_DELAY_FRAME_SCALE);
+        }
+        voice->m_volumeModFrames = iVar5;
+        voice->m_volumeModFrame = 0;
+        voice->m_volumeModPhase = 0;
+    }
+
+skipModSetup:
+
+    if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_PITCH) != 0) {
         unsigned int random = GetRandomData();
         iVar5 = ((int)(random & REDSOUND_RANDOM_BYTE_MASK) + 1) *
-                param_2->m_targetPitch *
-                param_1->m_fuzzyPitchDepth;
+                (voice->m_pitch * voice->m_track->m_fuzzyPitchDepth);
         pitchWork[0] = iVar5 >> REDSOUND_RANDOM_FUZZY_PITCH_SHIFT;
         if ((random & REDSOUND_RANDOM_BYTE_SIGN_BIT) == 0) {
-            param_2->m_randomPitch = pitchWork[0];
+            voice->m_randomPitch = pitchWork[0];
         } else {
-            param_2->m_randomPitch = -(iVar5 >> REDSOUND_RANDOM_FUZZY_PITCH_NEGATIVE_SHIFT);
+            voice->m_randomPitch = -(pitchWork[0] >> 1);
         }
+    } else {
+        voice->m_randomPitch = 0;
     }
 
-    if ((param_2->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_VOLUME) == 0) {
-        param_2->m_randomVolume = 0;
-    } else {
+    if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_VOLUME) != 0) {
         s8 random = (s8)GetRandomData();
-        param_2->m_randomVolume =
-            (param_1->m_fuzzyVolumeDepth * random) >> REDSOUND_RANDOM_FUZZY_DEPTH_SHIFT;
+        voice->m_randomVolume =
+            (track->m_fuzzyVolumeDepth * random) >> REDSOUND_RANDOM_FUZZY_DEPTH_SHIFT;
+    } else {
+        voice->m_randomVolume = 0;
     }
 
-    if ((param_2->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_PAN) == 0) {
-        param_2->m_randomPan = 0;
-    } else {
+    if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_PAN) != 0) {
         s8 random = (s8)GetRandomData();
-        param_2->m_randomPan =
-            (param_1->m_fuzzyPanDepth * random) >> REDSOUND_RANDOM_FUZZY_DEPTH_SHIFT;
+        voice->m_randomPan =
+            (track->m_fuzzyPanDepth * random) >> REDSOUND_RANDOM_FUZZY_DEPTH_SHIFT;
+    } else {
+        voice->m_randomPan = 0;
     }
 
-    if (param_2->m_waveData == 0) {
-        memset(param_2->m_adsrTime, 0, REDSOUND_TRACK_ADSR_SIZE);
-    } else {
-        memcpy(param_2->m_adsrTime,
-               param_2->m_waveData->m_adsr,
+    if (voice->m_waveData != 0) {
+        memcpy(voice->m_adsrTime,
+               voice->m_waveData->m_adsr,
                REDSOUND_TRACK_ADSR_SIZE);
-        if ((s8)param_1->m_adsrAL != -1) {
-            param_2->m_adsrLevel[REDSOUND_VOICE_ADSR_ATTACK] =
-                param_1->m_adsrAL;
+        if ((s8)track->m_adsrAL != -1) {
+            voice->m_adsrLevel[REDSOUND_VOICE_ADSR_ATTACK] =
+                track->m_adsrAL;
         }
-        if ((s16)param_1->m_adsrAR != -1) {
-            param_2->m_adsrTime[REDSOUND_VOICE_ADSR_ATTACK] =
-                param_1->m_adsrAR;
+        if ((s16)track->m_adsrAR != -1) {
+            voice->m_adsrTime[REDSOUND_VOICE_ADSR_ATTACK] =
+                track->m_adsrAR;
         }
-        if ((s8)param_1->m_adsrDL != -1) {
-            param_2->m_adsrLevel[REDSOUND_VOICE_ADSR_DECAY] =
-                param_1->m_adsrDL;
+        if ((s8)track->m_adsrDL != -1) {
+            voice->m_adsrLevel[REDSOUND_VOICE_ADSR_DECAY] =
+                track->m_adsrDL;
         }
-        if ((s16)param_1->m_adsrDR != -1) {
-            param_2->m_adsrTime[REDSOUND_VOICE_ADSR_DECAY] =
-                param_1->m_adsrDR;
+        if ((s16)track->m_adsrDR != -1) {
+            voice->m_adsrTime[REDSOUND_VOICE_ADSR_DECAY] =
+                track->m_adsrDR;
         }
-        if ((s8)param_1->m_adsrSL != -1) {
-            param_2->m_adsrLevel[REDSOUND_VOICE_ADSR_SUSTAIN] =
-                param_1->m_adsrSL;
+        if ((s8)track->m_adsrSL != -1) {
+            voice->m_adsrLevel[REDSOUND_VOICE_ADSR_SUSTAIN] =
+                track->m_adsrSL;
         }
-        if ((s16)param_1->m_adsrSR != -1) {
-            param_2->m_adsrTime[REDSOUND_VOICE_ADSR_SUSTAIN] =
-                param_1->m_adsrSR;
+        if ((s16)track->m_adsrSR != -1) {
+            voice->m_adsrTime[REDSOUND_VOICE_ADSR_SUSTAIN] =
+                track->m_adsrSR;
         }
-        if ((s8)param_1->m_adsrRL != -1) {
-            param_2->m_adsrLevel[REDSOUND_VOICE_ADSR_RELEASE] =
-                param_1->m_adsrRL;
+        if ((s8)track->m_adsrRL != -1) {
+            voice->m_adsrLevel[REDSOUND_VOICE_ADSR_RELEASE] =
+                track->m_adsrRL;
         }
-        if ((s16)param_1->m_adsrRR != -1) {
-            param_2->m_adsrTime[REDSOUND_VOICE_ADSR_RELEASE] =
-                param_1->m_adsrRR;
+        if ((s16)track->m_adsrRR != -1) {
+            voice->m_adsrTime[REDSOUND_VOICE_ADSR_RELEASE] =
+                track->m_adsrRR;
         }
-        if ((param_2->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_ADSR) != 0) {
+        if ((voice->m_voiceSwitch & REDSOUND_VOICE_SWITCH_FUZZY_ADSR) != 0) {
             u16 random = GetRandomData();
-            param_2->m_adsrTime[REDSOUND_VOICE_ADSR_ATTACK] =
-                (u16)(param_1->m_fuzzyAdsrDepth *
-                      (random & REDSOUND_RANDOM_BYTE_MASK));
+            u16 attack = (u16)(track->m_fuzzyAdsrDepth *
+                               (random & REDSOUND_RANDOM_BYTE_MASK));
+            voice->m_adsrTime[REDSOUND_VOICE_ADSR_ATTACK] = attack;
         }
+    } else {
+        memset(voice->m_adsrTime, 0, REDSOUND_TRACK_ADSR_SIZE);
     }
 
-    iVar5 = ((int)param_2 - (int)p_VoiceData) / REDSOUND_VOICE_SIZE + (((int)param_2 - (int)p_VoiceData) >> 0x1f);
-    if (REDSOUND_VOICE_INDEX_MASK < iVar5 - (iVar5 >> 0x1f)) {
+    iVar5 = ((int)voice - (int)p_VoiceData) / REDSOUND_VOICE_SIZE;
+    if (REDSOUND_VOICE_INDEX_MASK < iVar5) {
         voiceMask += 1;
     }
 
-    if (((param_1->m_flags & REDSOUND_TRACK_FLAG_SLUR) == 0) ||
-        ((param_1->m_flags & REDSOUND_TRACK_FLAG_SLUR_RELEASE) == 0)) {
-        param_1->m_flags |= REDSOUND_TRACK_FLAG_SLUR_RELEASE;
-        *voiceMask |= 1u << param_2->m_voiceIndex;
+    if (((track->m_flags & REDSOUND_TRACK_FLAG_SLUR) == 0) ||
+        ((track->m_flags & REDSOUND_TRACK_FLAG_SLUR_RELEASE) == 0)) {
+        track->m_flags |= REDSOUND_TRACK_FLAG_SLUR_RELEASE;
+        *voiceMask |= (int)(1u << voice->m_voiceIndex);
     }
-    param_2->m_updateFlags |= REDSOUND_VOICE_UPDATE_ALL;
+    voice->m_updateFlags |= REDSOUND_VOICE_UPDATE_ALL;
 }
 
 /*
@@ -1481,44 +1469,26 @@ void EnvelopeKeyExecute()
     int* voiceData = (int*)p_VoiceData;
 
     while (true) {
-        if (voiceData[REDSOUND_VOICE_ACTIVE_WORD] == 0) {
-            voiceData[REDSOUND_VOICE_ENVELOPE_WORD] = 0;
-            voiceData[REDSOUND_VOICE_WAVE_DATA_WORD] = 0;
-            int voice = voiceData[REDSOUND_VOICE_AX_VOICE_WORD];
-            if (voice != 0) {
-                if (*(s16*)(voice + REDSOUND_AX_VOICE_RUNNING_OFFSET) == 0) {
-                    if (*(int*)(voice + REDSOUND_AX_VOICE_PRIORITY_OFFSET) != 0) {
-                        AXFreeVoice((AXVPB*)voice);
-                    }
-                    voiceData[REDSOUND_VOICE_AX_VOICE_WORD] = 0;
-                    voiceData[REDSOUND_VOICE_TRACK_WORD] = 0;
-                } else {
-                    *(u16*)(voice + REDSOUND_AX_VOICE_RUNNING_OFFSET) = 0;
-                    *(u16*)(voice + REDSOUND_AX_VOICE_VOLUME_OFFSET) = 0;
-                    *(u32*)(voice + REDSOUND_AX_VOICE_SYNC_FLAGS_OFFSET) |= AX_SYNC_FLAG_COPYVOL | AX_SYNC_FLAG_COPYSTATE;
-                }
-            }
-        } else {
+        if (voiceData[REDSOUND_VOICE_ACTIVE_WORD] != 0) {
             int voice;
 
             if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_START) != 0) {
                 voice = voiceData[REDSOUND_VOICE_AX_VOICE_WORD];
-                if ((voice != 0) && (*(int*)(voice + REDSOUND_AX_VOICE_PRIORITY_OFFSET) != 0)) {
+                if ((voice != 0) && (((AXVPB*)voice)->priority != 0)) {
                     AXFreeVoice((AXVPB*)voice);
                     voiceData[REDSOUND_VOICE_AX_VOICE_WORD] = 0;
                 }
 
-                if ((((u8*)voiceData)[REDSOUND_VOICE_STATE_FLAGS_OFFSET] & REDSOUND_VOICE_STATE_PLAYING_MASK) == 0) {
-                    int prio = ((int)voiceData - (int)p_VoiceData) / REDSOUND_VOICE_SIZE +
-                               (((int)voiceData - (int)p_VoiceData) >> 0x1F);
-                    prio = (REDSOUND_VOICE_COUNT - (prio - (prio >> 0x1F)) >> 1) - 1;
+                if ((((u8*)voiceData)[REDSOUND_VOICE_STATE_FLAGS_OFFSET] & REDSOUND_VOICE_STATE_PLAYING_MASK) != 0) {
+                    voiceData[REDSOUND_VOICE_AX_VOICE_WORD] =
+                        (int)AXAcquireVoice(REDSOUND_VOICE_INDEX_MASK, _VoiceDropedCallback, 0);
+                } else {
+                    int prio = ((int)voiceData - (int)p_VoiceData) / REDSOUND_VOICE_SIZE;
+                    prio = (REDSOUND_VOICE_COUNT - prio >> 1) - 1;
                     if (prio < 1) {
                         prio = 1;
                     }
                     voiceData[REDSOUND_VOICE_AX_VOICE_WORD] = (int)AXAcquireVoice(prio, _VoiceDropedCallback, 0);
-                } else {
-                    voiceData[REDSOUND_VOICE_AX_VOICE_WORD] =
-                        (int)AXAcquireVoice(REDSOUND_VOICE_INDEX_MASK, _VoiceDropedCallback, 0);
                 }
             }
 
@@ -1535,24 +1505,23 @@ void EnvelopeKeyExecute()
             if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_PITCH_DIRTY) != 0) {
                 int pitch = voiceData[REDSOUND_VOICE_TARGET_PITCH_WORD];
                 voiceFlags = AX_SYNC_FLAG_COPYRATIO;
-                *(u16*)(voice + REDSOUND_AX_VOICE_RATIO_HIGH_OFFSET) = (u16)(((u32)pitch >> 0x10) & 3);
-                *(s16*)(voice + REDSOUND_AX_VOICE_RATIO_LOW_OFFSET) = (s16)pitch;
+                ((AXVPB*)voice)->pb.src.ratioHi = (u16)(((u32)pitch >> 0x10) & 3);
+                ((AXVPB*)voice)->pb.src.ratioLo = (u16)pitch;
             }
 
             if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_ADPCM_DIRTY) != 0) {
                 if ((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_PAUSE) == 0) {
-                    memcpy((void*)(voice + REDSOUND_AX_VOICE_MIX_OFFSET), voiceData + REDSOUND_VOICE_AX_MIX_WORD,
-                           REDSOUND_VOICE_AX_MIX_SIZE);
+                    memcpy(&((AXVPB*)voice)->pb.mix, &((RedVoiceDATA*)voiceData)->m_axMix, sizeof(((AXVPB*)voice)->pb.mix));
                 } else {
-                    memset((void*)(voice + REDSOUND_AX_VOICE_MIX_OFFSET), 0, REDSOUND_VOICE_AX_MIX_SIZE);
+                    memset(&((AXVPB*)voice)->pb.mix, 0, sizeof(((AXVPB*)voice)->pb.mix));
                 }
 
-                *(u16*)(voice + REDSOUND_AX_VOICE_MIX_CTRL_OFFSET) = REDSOUND_AX_MIX_CTRL_DRY_STEREO;
+                ((AXVPB*)voice)->pb.mixerCtrl = REDSOUND_AX_MIX_CTRL_DRY_STEREO;
                 if ((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_REVERB_STEREO) != 0) {
-                    if ((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_REVERB_AUX_A) == 0) {
-                        *(u16*)(voice + REDSOUND_AX_VOICE_MIX_CTRL_OFFSET) |= REDSOUND_AX_MIX_CTRL_AUX_B_STEREO;
+                    if ((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_REVERB_AUX_A) != 0) {
+                        ((AXVPB*)voice)->pb.mixerCtrl |= REDSOUND_AX_MIX_CTRL_AUX_A_STEREO;
                     } else {
-                        *(u16*)(voice + REDSOUND_AX_VOICE_MIX_CTRL_OFFSET) |= REDSOUND_AX_MIX_CTRL_AUX_A_STEREO;
+                        ((AXVPB*)voice)->pb.mixerCtrl |= REDSOUND_AX_MIX_CTRL_AUX_B_STEREO;
                     }
                 }
                 voiceFlags |= AX_SYNC_FLAG_COPYAXPBMIX | AX_SYNC_FLAG_COPYMXRCTRL;
@@ -1564,17 +1533,49 @@ void EnvelopeKeyExecute()
                 envChanged = 1;
             }
 
-            if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_START) == 0) {
-                if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_RELEASED) == 0) {
-                    if ((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_PAUSE) == 0) {
-                        if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_ADSR_START) == 0) {
-                            envChanged |= _AdsrDataExecute((RedVoiceDATA*)voiceData);
-                            voiceData[REDSOUND_VOICE_ENVELOPE_WORD] =
-                                voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] >> REDSOUND_FIXED_SHIFT;
-                        }
-                        voiceData[REDSOUND_VOICE_FLAGS_WORD] &= ~REDSOUND_VOICE_FLAGS_ADSR_START;
-                    }
+            if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_START) != 0) {
+                voiceData[REDSOUND_VOICE_FLAGS_WORD] &= REDSOUND_VOICE_FLAGS_CLEAR_RELEASE_ACTIVE_MASK;
+                RedWaveDATA* waveData = (RedWaveDATA*)voiceData[REDSOUND_VOICE_WAVE_DATA_WORD];
+                RedTrackDATA* trackData = (RedTrackDATA*)voiceData[REDSOUND_VOICE_TRACK_WORD];
+                if ((waveData == 0) || (trackData == 0)) {
+                    voiceData[REDSOUND_VOICE_ACTIVE_WORD] = 0;
                 } else {
+                    envChanged += 1;
+                    int key = (trackData->m_waveBase + waveData->m_sampleStart + 1) * 2;
+                    int keyBase = key - 2;
+
+                    *(u16*)(voice + REDSOUND_AX_VOICE_LOOP_OFFSET) =
+                        (u16)((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_LOOP) != 0);
+                    ((AXVPB*)voice)->pb.srcSelect = 1;
+                    ((AXVPB*)voice)->pb.state = 1;
+
+                    memcpy(&((AXVPB*)voice)->pb.adpcm, &waveData->m_adpcm.m_data, sizeof(waveData->m_adpcm.m_data));
+                    memcpy(&((AXVPB*)voice)->pb.adpcmLoop, &waveData->m_adpcm.m_loop, sizeof(waveData->m_adpcm.m_loop));
+                    memset(((AXVPB*)voice)->pb.src.last_samples, 0, sizeof(((AXVPB*)voice)->pb.src.last_samples));
+                    ((AXVPB*)voice)->pb.addr.format = 0;
+                    *(u32*)&((AXVPB*)voice)->pb.addr.currentAddressHi = key;
+
+                    if (waveData->m_loopStart < 0) {
+                        ((AXVPB*)voice)->pb.addr.loopFlag = 0;
+                        key = keyBase;
+                    } else {
+                        ((AXVPB*)voice)->pb.addr.loopFlag = 1;
+                        key = keyBase + waveData->m_loopStart;
+                    }
+
+                    ((AXVPB*)voice)->pb.addr.loopAddressHi = (u16)((u32)key >> 0x10);
+                    ((AXVPB*)voice)->pb.addr.loopAddressLo = (u16)key;
+                    *(u32*)&((AXVPB*)voice)->pb.addr.endAddressHi = keyBase + waveData->m_loopEnd;
+
+                    voiceFlags |= AX_SYNC_FLAG_COPYADPCMLOOP | AX_SYNC_FLAG_COPYSRC | AX_SYNC_FLAG_COPYADPCM |
+                                  AX_SYNC_FLAG_COPYCURADDR | AX_SYNC_FLAG_COPYADDR | AX_SYNC_FLAG_COPYTYPE |
+                                  AX_SYNC_FLAG_COPYSTATE | AX_SYNC_FLAG_COPYSELECT;
+                    voiceData[REDSOUND_VOICE_FLAGS_WORD] |= REDSOUND_VOICE_FLAGS_ADSR_START;
+                    voiceData[REDSOUND_VOICE_ENVELOPE_WORD] = REDSOUND_ENVELOPE_LEVEL_FULL;
+                    voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] = 0;
+                }
+            } else {
+                if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_RELEASED) != 0) {
                     voiceData[REDSOUND_VOICE_FLAGS_WORD] |= REDSOUND_VOICE_FLAGS_RELEASE_ACTIVE;
                     voiceData[REDSOUND_VOICE_ADSR_STAGE_WORD] = REDSOUND_VOICE_ADSR_RELEASE;
                     voiceData[REDSOUND_VOICE_ADSR_STEP_FRAMES_WORD] =
@@ -1588,50 +1589,15 @@ void EnvelopeKeyExecute()
                     }
                     voiceData[REDSOUND_VOICE_ENVELOPE_WORD] =
                         voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] >> REDSOUND_FIXED_SHIFT;
-                }
-            } else {
-                voiceData[REDSOUND_VOICE_FLAGS_WORD] &= REDSOUND_VOICE_FLAGS_CLEAR_RELEASE_ACTIVE_MASK;
-                int waveData = voiceData[REDSOUND_VOICE_WAVE_DATA_WORD];
-                int trackData = voiceData[REDSOUND_VOICE_TRACK_WORD];
-                if ((waveData == 0) || (trackData == 0)) {
-                    voiceData[REDSOUND_VOICE_ACTIVE_WORD] = 0;
                 } else {
-                    envChanged += 1;
-                    int key = (*(int*)(trackData + 0x11C) + *(int*)(waveData + REDSOUND_WAVE_SAMPLE_START_OFFSET) + 1) * 2;
-                    int keyBase = key - 2;
-
-                    *(u16*)(voice + REDSOUND_AX_VOICE_LOOP_OFFSET) =
-                        (u16)((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_LOOP) != 0);
-                    *(u16*)(voice + REDSOUND_AX_VOICE_SRC_SELECT_OFFSET) = 1;
-                    *(u16*)(voice + REDSOUND_AX_VOICE_RUNNING_OFFSET) = 1;
-
-                    memcpy((void*)(voice + REDSOUND_AX_VOICE_ADPCM_DATA_OFFSET),
-                           (void*)(waveData + REDSOUND_WAVE_ADPCM_DATA_OFFSET), REDSOUND_WAVE_ADPCM_DATA_SIZE);
-                    memcpy((void*)(voice + REDSOUND_AX_VOICE_ADPCM_LOOP_OFFSET),
-                           (void*)(waveData + REDSOUND_WAVE_ADPCM_LOOP_OFFSET), REDSOUND_WAVE_ADPCM_LOOP_SIZE);
-                    memset((void*)(voice + REDSOUND_AX_VOICE_SRC_LAST_SAMPLES_OFFSET), 0, REDSOUND_AX_VOICE_SRC_LAST_SAMPLES_SIZE);
-                    *(u16*)(voice + REDSOUND_AX_VOICE_ADDR_FORMAT_OFFSET) = 0;
-                    *(int*)(voice + REDSOUND_AX_VOICE_ADDR_CURRENT_OFFSET) = key;
-
-                    if (*(int*)(waveData + REDSOUND_WAVE_LOOP_START_OFFSET) < 0) {
-                        *(u16*)(voice + REDSOUND_AX_VOICE_ADDR_LOOP_FLAG_OFFSET) = 0;
-                        key = keyBase;
-                    } else {
-                        *(u16*)(voice + REDSOUND_AX_VOICE_ADDR_LOOP_FLAG_OFFSET) = 1;
-                        key = keyBase + *(int*)(waveData + REDSOUND_WAVE_LOOP_START_OFFSET);
+                    if ((voiceData[REDSOUND_VOICE_SWITCH_WORD] & REDSOUND_VOICE_SWITCH_PAUSE) == 0) {
+                        if ((voiceData[REDSOUND_VOICE_FLAGS_WORD] & REDSOUND_VOICE_FLAGS_ADSR_START) == 0) {
+                            envChanged |= _AdsrDataExecute((RedVoiceDATA*)voiceData);
+                            voiceData[REDSOUND_VOICE_ENVELOPE_WORD] =
+                                voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] >> REDSOUND_FIXED_SHIFT;
+                        }
+                        voiceData[REDSOUND_VOICE_FLAGS_WORD] &= ~REDSOUND_VOICE_FLAGS_ADSR_START;
                     }
-
-                    *(s16*)(voice + REDSOUND_AX_VOICE_ADDR_LOOP_HI_OFFSET) = (s16)((u32)key >> 0x10);
-                    *(s16*)(voice + REDSOUND_AX_VOICE_ADDR_LOOP_LO_OFFSET) = (s16)key;
-                    *(int*)(voice + REDSOUND_AX_VOICE_ADDR_END_OFFSET) =
-                        keyBase + *(int*)(waveData + REDSOUND_WAVE_LOOP_END_OFFSET);
-
-                    voiceFlags |= AX_SYNC_FLAG_COPYADPCMLOOP | AX_SYNC_FLAG_COPYSRC | AX_SYNC_FLAG_COPYADPCM |
-                                  AX_SYNC_FLAG_COPYCURADDR | AX_SYNC_FLAG_COPYADDR | AX_SYNC_FLAG_COPYTYPE |
-                                  AX_SYNC_FLAG_COPYSTATE | AX_SYNC_FLAG_COPYSELECT;
-                    voiceData[REDSOUND_VOICE_FLAGS_WORD] |= REDSOUND_VOICE_FLAGS_ADSR_START;
-                    voiceData[REDSOUND_VOICE_ENVELOPE_WORD] = REDSOUND_ENVELOPE_LEVEL_FULL;
-                    voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] = 0;
                 }
             }
 
@@ -1640,21 +1606,38 @@ void EnvelopeKeyExecute()
                 voiceData[REDSOUND_VOICE_ACTIVE_WORD] = 0;
                 voiceFlags |= AX_SYNC_FLAG_COPYVOL | AX_SYNC_FLAG_COPYSTATE;
                 voiceData[REDSOUND_VOICE_TRACK_WORD] = 0;
-                *(u16*)(voice + REDSOUND_AX_VOICE_RUNNING_OFFSET) = 0;
+                ((AXVPB*)voice)->pb.state = 0;
                 voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] = 0;
                 voiceData[REDSOUND_VOICE_ENVELOPE_WORD] = 0;
-                *(u16*)(voice + REDSOUND_AX_VOICE_VOLUME_OFFSET) = 0;
-                *(u16*)(voice + REDSOUND_AX_VOICE_VOLUME_DELTA_OFFSET) = 0;
+                ((AXVPB*)voice)->pb.ve.currentVolume = 0;
+                ((AXVPB*)voice)->pb.ve.currentDelta = 0;
             } else if ((envChanged != 0) &&
-                       ((u32)*(u16*)(voice + REDSOUND_AX_VOICE_VOLUME_OFFSET) !=
+                       ((u32)((AXVPB*)voice)->pb.ve.currentVolume !=
                         ((voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] >> REDSOUND_FIXED_SHIFT) & 0xFFFFU))) {
                 voiceFlags |= AX_SYNC_FLAG_COPYVOL;
-                *(u16*)(voice + REDSOUND_AX_VOICE_VOLUME_DELTA_OFFSET) = 0;
-                *(s16*)(voice + REDSOUND_AX_VOICE_VOLUME_OFFSET) =
-                    (s16)(voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] >> REDSOUND_FIXED_SHIFT);
+                ((AXVPB*)voice)->pb.ve.currentDelta = 0;
+                ((AXVPB*)voice)->pb.ve.currentVolume =
+                    (u16)(voiceData[REDSOUND_VOICE_ADSR_CURRENT_WORD] >> REDSOUND_FIXED_SHIFT);
             }
 
-            *(u32*)(voice + REDSOUND_AX_VOICE_SYNC_FLAGS_OFFSET) |= voiceFlags;
+            ((AXVPB*)voice)->sync |= voiceFlags;
+        } else {
+            voiceData[REDSOUND_VOICE_ENVELOPE_WORD] = 0;
+            voiceData[REDSOUND_VOICE_WAVE_DATA_WORD] = 0;
+            int voice = voiceData[REDSOUND_VOICE_AX_VOICE_WORD];
+            if (voice != 0) {
+                if (((AXVPB*)voice)->pb.state != 0) {
+                    ((AXVPB*)voice)->pb.state = 0;
+                    ((AXVPB*)voice)->pb.ve.currentVolume = 0;
+                    ((AXVPB*)voice)->sync |= AX_SYNC_FLAG_COPYVOL | AX_SYNC_FLAG_COPYSTATE;
+                } else {
+                    if (((AXVPB*)voice)->priority != 0) {
+                        AXFreeVoice((AXVPB*)voice);
+                    }
+                    voiceData[REDSOUND_VOICE_AX_VOICE_WORD] = 0;
+                    voiceData[REDSOUND_VOICE_TRACK_WORD] = 0;
+                }
+            }
         }
 
         voiceData[REDSOUND_VOICE_FLAGS_WORD] &= REDSOUND_VOICE_FLAGS_EXECUTE_KEEP_MASK;
@@ -1672,18 +1655,21 @@ void EnvelopeKeyExecute()
  */
 static void _KeyOnControl()
 {
-    u32 local_24 = 0;
-    u32 local_28 = 0;
-    int* reserve = (int*)p_KeyOnData;
-    unsigned int* voiceData = (unsigned int*)p_VoiceData;
+    u32 voiceStartMask[2];
+    int* reserve;
+    unsigned int* voiceData;
     int (*waveFunc)(int);
 
     _VoiceEnvelopeCheck();
+    voiceStartMask[0] = 0;
+    voiceStartMask[1] = 0;
 
     if (m_KeyOnEntry != 0) {
+        reserve = (int*)p_KeyOnData;
+        voiceData = (unsigned int*)p_VoiceData;
         do {
             if (((u32)*reserve != 0) && (((RedTrackDATA*)*reserve)->m_waveData != 0)) {
-                voiceData = (unsigned int*)_VoiceDataSelect((RedTrackDATA*)*reserve, (RedNoteDATA*)(reserve + 1), (int*)&local_28);
+                voiceData = (unsigned int*)_VoiceDataSelect((RedTrackDATA*)*reserve, (RedNoteDATA*)(reserve + 1), (int*)voiceStartMask);
             }
             reserve += 2;
         } while ((voiceData != 0) && (reserve < (int*)p_KeyOnData + REDSOUND_KEY_ON_TOTAL_WORD_COUNT));
@@ -1695,10 +1681,9 @@ static void _KeyOnControl()
         do {
             if ((track->m_command != 0) && (track->m_shakeFunc != 0)) {
                 waveFunc = track->m_shakeFunc;
-                track->m_shakePan =
-                    (((track->m_shakeDepth >> REDSOUND_FIXED_SHIFT) + 1) *
-                     waveFunc((u32)track->m_shakeOutput >> REDSOUND_FIXED_SHIFT)) >>
-                    0x10;
+                int shakeDepth = (track->m_shakeDepth >> REDSOUND_FIXED_SHIFT) + 1;
+                int shakeValue = waveFunc((u32)track->m_shakeOutput >> REDSOUND_FIXED_SHIFT);
+                track->m_shakePan = (shakeDepth * shakeValue) >> 0x10;
                 track->m_shakeOutput += track->m_shakeRate;
             }
             track++;
@@ -1706,25 +1691,21 @@ static void _KeyOnControl()
                  p_SoundControlBuffer->m_tracks + p_SoundControlBuffer->m_trackCount);
     }
 
-    if ((*(s16*)((u8*)p_SoundControlBuffer + REDSOUND_CONTROL_SECONDARY_ACTIVE_TRACK_COUNT_OFFSET) != 0) &&
-        ((((u32*)p_SoundControlBuffer)[REDSOUND_CONTROL_SECONDARY_FLAGS_WORD_OFFSET] &
+    if ((p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_activeTrackCount != 0) &&
+        ((p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_flags &
           REDSOUND_CONTROL_FLAG_PAUSE) == 0)) {
-        int* track = (int*)((u32*)p_SoundControlBuffer)[REDSOUND_CONTROL_SECONDARY_TRACKS_WORD_OFFSET];
-        u32* trackBase = (u32*)p_SoundControlBuffer + REDSOUND_CONTROL_SECONDARY_TRACKS_WORD_OFFSET;
+        RedTrackDATA* track = p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_tracks;
+        RedTrackDATA* trackBase = p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_tracks;
         do {
-            if (((u32)*track != 0) && (track[REDSOUND_TRACK_SHAKE_FUNC_WORD_OFFSET] != 0)) {
-                waveFunc = (int (*)(int))track[REDSOUND_TRACK_SHAKE_FUNC_WORD_OFFSET];
-                track[REDSOUND_TRACK_SHAKE_PAN_WORD_OFFSET] =
-                    (((track[REDSOUND_TRACK_SHAKE_DEPTH_WORD_OFFSET] >> REDSOUND_FIXED_SHIFT) + 1) *
-                     waveFunc((u32)track[REDSOUND_TRACK_SHAKE_OUTPUT_WORD_OFFSET] >> REDSOUND_FIXED_SHIFT)) >>
-                    0x10;
-                track[REDSOUND_TRACK_SHAKE_OUTPUT_WORD_OFFSET] += track[REDSOUND_TRACK_SHAKE_RATE_WORD_OFFSET];
+            if ((track->m_command != 0) && (track->m_shakeFunc != 0)) {
+                waveFunc = track->m_shakeFunc;
+                int shakeDepth = (track->m_shakeDepth >> REDSOUND_FIXED_SHIFT) + 1;
+                int shakeValue = waveFunc((u32)track->m_shakeOutput >> REDSOUND_FIXED_SHIFT);
+                track->m_shakePan = (shakeDepth * shakeValue) >> 0x10;
+                track->m_shakeOutput += track->m_shakeRate;
             }
-            track += REDSOUND_TRACK_SIZE / sizeof(*track);
-        } while (track < (int*)(*trackBase + (u32) *
-                                             ((u8*)p_SoundControlBuffer +
-                                              REDSOUND_CONTROL_SECONDARY_TRACK_COUNT_OFFSET) *
-                                             REDSOUND_TRACK_SIZE));
+            track++;
+        } while (track < trackBase + p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_trackCount);
     }
 
     {
@@ -1732,10 +1713,9 @@ static void _KeyOnControl()
         do {
             if ((track->m_command != 0) && (track->m_shakeFunc != 0)) {
                 waveFunc = track->m_shakeFunc;
-                track->m_shakePan =
-                    (((track->m_shakeDepth >> REDSOUND_FIXED_SHIFT) + 1) *
-                     waveFunc((u32)track->m_shakeOutput >> REDSOUND_FIXED_SHIFT)) >>
-                    0x10;
+                int shakeDepth = (track->m_shakeDepth >> REDSOUND_FIXED_SHIFT) + 1;
+                int shakeValue = waveFunc((u32)track->m_shakeOutput >> REDSOUND_FIXED_SHIFT);
+                track->m_shakePan = (shakeDepth * shakeValue) >> 0x10;
                 track->m_shakeOutput += track->m_shakeRate;
             }
             track++;
@@ -1743,35 +1723,48 @@ static void _KeyOnControl()
     }
 
     {
-        unsigned int* voice = (unsigned int*)p_VoiceData;
+        RedVoiceDATA* voice = p_VoiceData;
         do {
-            if ((voice[REDSOUND_VOICE_ACTIVE_WORD] != 0) && (voice[REDSOUND_VOICE_TRACK_WORD] != 0) &&
-                ((((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD])->m_voiceSwitch & 9) == 0)) {
-                if ((((RedVoiceDATA*)voice)->m_updateFlags & REDSOUND_VOICE_UPDATE_VOLUME) != 0 ||
-                    (((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD])->m_tremoloFunc != 0) ||
-                    (((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD])->m_shakeFunc != 0)) {
+            if ((voice->m_active != 0) && (voice->m_track != 0) &&
+                ((voice->m_track->m_voiceSwitch & 9) == 0)) {
+                if ((voice->m_updateFlags & REDSOUND_VOICE_UPDATE_VOLUME) != 0 ||
+                    (voice->m_track->m_tremoloFunc != 0) ||
+                    (voice->m_track->m_shakeFunc != 0)) {
                     int volume;
-                    if (((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD] < p_SoundControlBuffer->m_tracks) ||
-                        (p_SoundControlBuffer->m_tracks + p_SoundControlBuffer->m_trackCount <=
-                         (RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD])) {
+                    RedSoundCONTROL* soundControl = p_SoundControlBuffer;
+                    RedTrackDATA* trackData = voice->m_track;
+                    if ((soundControl->m_tracks <= trackData) &&
+                        (trackData < soundControl->m_tracks + soundControl->m_trackCount)) {
+                        int idx = trackData->m_trackNo;
+                        if (((1U << (idx % REDSOUND_MUTE_BITS_PER_WORD)) &
+                             m_Mute[idx / REDSOUND_MUTE_BITS_PER_WORD]) == 0) {
+                            volume = ((soundControl->m_volumeScale + 1) *
+                                      (soundControl->m_volume >> REDSOUND_FIXED_SHIFT)) >>
+                                     7;
+                            if (soundControl->m_masterVolumeDelta != 0) {
+                                volume = (volume * (soundControl->m_masterVolume >> REDSOUND_FIXED_SHIFT)) >> 9;
+                            }
+                            volume = (volume * m_MasterMusicVolume) >> 9;
+                        } else {
+                            volume = 0;
+                        }
+                    } else {
                         volume = m_MasterSEVolume;
-                        if ((p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_tracks <=
-                             (RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD]) &&
-                            ((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD] <
-                             p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_tracks +
-                                 p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_trackCount)) {
-                            u32 idx = (u32)((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD])->m_trackNo;
+                        if ((soundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_tracks <= trackData) &&
+                            (trackData <
+                             soundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_tracks +
+                                 soundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_trackCount)) {
+                            int idx = trackData->m_trackNo;
 
-                            if (((1U << (idx & REDSOUND_VOICE_INDEX_MASK)) &
-                                 m_Mute[((int)idx >> REDSOUND_MUTE_WORD_SHIFT) +
-                                        (u32)((int)idx < 0 && (idx & REDSOUND_VOICE_INDEX_MASK) != 0)]) == 0) {
-                                volume = ((p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_volumeScale + 1) *
-                                          (p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_volume >>
+                            if (((1U << (idx % REDSOUND_MUTE_BITS_PER_WORD)) &
+                                 m_Mute[idx / REDSOUND_MUTE_BITS_PER_WORD]) == 0) {
+                                volume = ((soundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_volumeScale + 1) *
+                                          (soundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_volume >>
                                            REDSOUND_FIXED_SHIFT)) >>
                                          7;
-                                if (p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_masterVolumeDelta != 0) {
+                                if (soundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_masterVolumeDelta != 0) {
                                     volume = (volume *
-                                              (p_SoundControlBuffer[REDSOUND_CONTROL_MUSIC_SECONDARY].m_masterVolume >>
+                                              (soundControl[REDSOUND_CONTROL_MUSIC_SECONDARY].m_masterVolume >>
                                                REDSOUND_FIXED_SHIFT)) >>
                                              9;
                                 }
@@ -1780,59 +1773,44 @@ static void _KeyOnControl()
                                 volume = 0;
                             }
                         }
-                    } else {
-                        u32 idx = (u32)((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD])->m_trackNo;
-                        if (((1U << (idx & REDSOUND_VOICE_INDEX_MASK)) &
-                             m_Mute[((int)idx >> REDSOUND_MUTE_WORD_SHIFT) +
-                                    (u32)((int)idx < 0 && (idx & REDSOUND_VOICE_INDEX_MASK) != 0)]) == 0) {
-                            volume = ((p_SoundControlBuffer->m_volumeScale + 1) *
-                                      (p_SoundControlBuffer->m_volume >> REDSOUND_FIXED_SHIFT)) >>
-                                     7;
-                            if (p_SoundControlBuffer->m_masterVolumeDelta != 0) {
-                                volume = (volume * (p_SoundControlBuffer->m_masterVolume >> REDSOUND_FIXED_SHIFT)) >> 9;
-                            }
-                            volume = (volume * m_MasterMusicVolume) >> 9;
-                        } else {
-                            volume = 0;
-                        }
                     }
-                    _VolumeExecute((RedVoiceDATA*)voice, volume);
+                    _VolumeExecute(voice, volume);
                 }
 
-                if ((((RedVoiceDATA*)voice)->m_updateFlags & REDSOUND_VOICE_UPDATE_PITCH) != 0 ||
-                    (((RedTrackDATA*)voice[REDSOUND_VOICE_TRACK_WORD])->m_vibrateFunc != 0)) {
-                    _PitchExecute((RedVoiceDATA*)voice);
+                if ((voice->m_updateFlags & REDSOUND_VOICE_UPDATE_PITCH) != 0 ||
+                    (voice->m_track->m_vibrateFunc != 0)) {
+                    _PitchExecute(voice);
                 }
-                ((RedVoiceDATA*)voice)->m_updateFlags = 0;
+                voice->m_updateFlags = 0;
             }
-            voice += REDSOUND_VOICE_SIZE / sizeof(*voice);
-        } while (voice < (unsigned int*)(p_VoiceData + REDSOUND_VOICE_COUNT));
+            voice++;
+        } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
     }
 
     {
         u32 bit = 1;
-        unsigned int* voice = (unsigned int*)p_VoiceData;
+        RedVoiceDATA* voice = p_VoiceData;
         do {
-            if ((local_28 & bit) != 0) {
-                local_28 &= ~bit;
-                voice[REDSOUND_VOICE_FLAGS_WORD] |= REDSOUND_VOICE_FLAGS_START;
+            if ((voiceStartMask[0] & bit) != 0) {
+                voiceStartMask[0] &= ~bit;
+                voice->m_flags |= REDSOUND_VOICE_FLAGS_START;
             }
             bit <<= 1;
-            voice += REDSOUND_VOICE_SIZE / sizeof(*voice);
-        } while (local_28 != 0);
+            voice++;
+        } while (voiceStartMask[0] != 0);
     }
 
     {
         u32 bit = 1;
-        unsigned int* voice = (unsigned int*)p_VoiceData + REDSOUND_VOICE_SECOND_MASK_WORD_OFFSET;
+        RedVoiceDATA* voice = p_VoiceData + REDSOUND_MUTE_BITS_PER_WORD;
         do {
-            if ((local_24 & bit) != 0) {
-                local_24 &= ~bit;
-                voice[REDSOUND_VOICE_FLAGS_WORD] |= REDSOUND_VOICE_FLAGS_START;
+            if ((voiceStartMask[1] & bit) != 0) {
+                voiceStartMask[1] &= ~bit;
+                voice->m_flags |= REDSOUND_VOICE_FLAGS_START;
             }
             bit <<= 1;
-            voice += REDSOUND_VOICE_SIZE / sizeof(*voice);
-        } while (local_24 != 0);
+            voice++;
+        } while (voiceStartMask[1] != 0);
     }
 }
 
@@ -1890,7 +1868,7 @@ static void _ExecuteExtraData()
         voice = p_VoiceData;
         do {
             if ((voice->m_stateFlags & REDSOUND_VOICE_STATE_PLAYING_MASK) == 0) {
-                voice->m_targetPitch = PitchCompute(
+                voice->m_pitch = PitchCompute(
                     voice->m_basePitch + p_MusicPitchControl->m_value,
                     (int)voice->m_track->m_keyTranspose + (int)voice->m_track->m_pitchBend,
                     voice->m_waveData->m_pitch,
@@ -1906,7 +1884,11 @@ static void _ExecuteExtraData()
         if ((soundControl->m_tickCounter != 0) && (soundControl->m_volumeDelta != 0)) {
             soundControl->m_volumeDelta--;
             soundControl->m_volume += soundControl->m_volumeAdd;
-            if ((soundControl->m_flags & REDSOUND_CONTROL_FLAG_STOP_ON_VOLUME_ZERO) == 0) {
+            if ((soundControl->m_flags & REDSOUND_CONTROL_FLAG_STOP_ON_VOLUME_ZERO) != 0) {
+                if ((soundControl->m_volumeDelta == 0) && (soundControl->m_musicId >= 0)) {
+                    MusicStop(soundControl->m_musicId);
+                }
+            } else {
                 track = soundControl->m_tracks;
                 do {
                     voice = p_VoiceData;
@@ -1920,8 +1902,6 @@ static void _ExecuteExtraData()
                     }
                     track++;
                 } while (track < soundControl->m_tracks + soundControl->m_trackCount);
-            } else if ((soundControl->m_volumeDelta == 0) && (-1 < soundControl->m_musicId)) {
-                MusicStop(soundControl->m_musicId);
             }
         }
         soundBase += REDSOUND_CONTROL_WORD_COUNT;
@@ -1936,14 +1916,15 @@ static void _ExecuteExtraData()
 static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
 {
     u32 updateFlags = 0;
-    int* trackData = (int*)track;
-    int* voiceData;
+    RedVoiceDATA* voiceData;
 
     track->m_playTime += frames;
 
     if (track->m_volumeDelta != 0) {
-        int step = frames;
-        if (track->m_volumeDelta <= frames) {
+        int step;
+        if (frames < track->m_volumeDelta) {
+            step = frames;
+        } else {
             step = track->m_volumeDelta;
         }
         updateFlags = REDSOUND_VOICE_UPDATE_VOLUME;
@@ -1952,8 +1933,10 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
     }
 
     if (track->m_expressionDelta != 0) {
-        int step = frames;
-        if (track->m_expressionDelta <= frames) {
+        int step;
+        if (frames < track->m_expressionDelta) {
+            step = frames;
+        } else {
             step = track->m_expressionDelta;
         }
         updateFlags = REDSOUND_VOICE_UPDATE_VOLUME;
@@ -1962,8 +1945,10 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
     }
 
     if (track->m_panDelta != 0) {
-        int step = frames;
-        if (track->m_panDelta <= frames) {
+        int step;
+        if (frames < track->m_panDelta) {
+            step = frames;
+        } else {
             step = track->m_panDelta;
         }
         updateFlags = REDSOUND_VOICE_UPDATE_VOLUME;
@@ -1972,8 +1957,10 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
     }
 
     if (track->m_reverbDepthDelta != 0) {
-        int step = frames;
-        if (track->m_reverbDepthDelta <= frames) {
+        int step;
+        if (frames < track->m_reverbDepthDelta) {
+            step = frames;
+        } else {
             step = track->m_reverbDepthDelta;
         }
         updateFlags = REDSOUND_VOICE_UPDATE_VOLUME;
@@ -1982,10 +1969,12 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
     }
 
     if (track->m_sweepDelta != 0) {
-        int step = frames;
+        int step;
         int addPitch;
 
-        if (track->m_sweepDelta <= frames) {
+        if (frames < track->m_sweepDelta) {
+            step = frames;
+        } else {
             step = track->m_sweepDelta;
         }
         updateFlags |= REDSOUND_VOICE_UPDATE_PITCH;
@@ -1993,33 +1982,37 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
         addPitch = step * track->m_sweepAdd;
         track->m_portamentPitch += addPitch;
 
-        voiceData = (int*)p_VoiceData;
+        voiceData = p_VoiceData;
         do {
-            if ((RedTrackDATA*)voiceData[REDSOUND_VOICE_TRACK_WORD] == track) {
-                ((RedVoiceDATA*)voiceData)->m_basePitch += addPitch;
-                if (((RedVoiceDATA*)voiceData)->m_waveData != 0) {
-                    ((RedVoiceDATA*)voiceData)->m_pitch =
-                        PitchCompute(((RedVoiceDATA*)voiceData)->m_basePitch + p_MusicPitchControl->m_value,
+            if (voiceData->m_track == track) {
+                voiceData->m_basePitch += addPitch;
+                if (voiceData->m_waveData != 0) {
+                    voiceData->m_pitch =
+                        PitchCompute(voiceData->m_basePitch + p_MusicPitchControl->m_value,
                                      (int)(s16)track->m_keyTranspose + (int)(s16)track->m_pitchBend,
-                                     ((RedVoiceDATA*)voiceData)->m_waveData->m_pitch, (s8)track->m_fineTune);
+                                     voiceData->m_waveData->m_pitch, (s8)track->m_fineTune);
                 }
             }
-            voiceData += REDSOUND_VOICE_SIZE / sizeof(*voiceData);
-        } while (voiceData < (int*)(p_VoiceData + REDSOUND_VOICE_COUNT));
+            voiceData++;
+        } while (voiceData < p_VoiceData + REDSOUND_VOICE_COUNT);
     }
 
     if (track->m_vibrateFunc != 0) {
         if (track->m_vibrateRateDelta != 0) {
-            int step = frames;
-            if (track->m_vibrateRateDelta <= frames) {
+            int step;
+            if (frames < track->m_vibrateRateDelta) {
+                step = frames;
+            } else {
                 step = track->m_vibrateRateDelta;
             }
             track->m_vibrateRateDelta -= (s16)step;
             track->m_vibrateRate += track->m_vibrateRateAdd * step;
         }
         if (track->m_vibrateDepthDelta != 0) {
-            int step = frames;
-            if (track->m_vibrateDepthDelta <= frames) {
+            int step;
+            if (frames < track->m_vibrateDepthDelta) {
+                step = frames;
+            } else {
                 step = track->m_vibrateDepthDelta;
             }
             track->m_vibrateDepthDelta -= (s16)step;
@@ -2029,16 +2022,20 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
 
     if (track->m_tremoloFunc != 0) {
         if (track->m_tremoloRateDelta != 0) {
-            int step = frames;
-            if (track->m_tremoloRateDelta <= frames) {
+            int step;
+            if (frames < track->m_tremoloRateDelta) {
+                step = frames;
+            } else {
                 step = track->m_tremoloRateDelta;
             }
             track->m_tremoloRateDelta -= (s16)step;
             track->m_tremoloRate += track->m_tremoloRateAdd * step;
         }
         if (track->m_tremoloDepthDelta != 0) {
-            int step = frames;
-            if (track->m_tremoloDepthDelta <= frames) {
+            int step;
+            if (frames < track->m_tremoloDepthDelta) {
+                step = frames;
+            } else {
                 step = track->m_tremoloDepthDelta;
             }
             track->m_tremoloDepthDelta -= (s16)step;
@@ -2046,19 +2043,23 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
         }
     }
 
-    voiceData = (int*)p_VoiceData;
+    voiceData = p_VoiceData;
     if (track->m_shakeFunc != 0) {
         if (track->m_shakeRateDelta != 0) {
-            int step = frames;
-            if (track->m_shakeRateDelta <= frames) {
+            int step;
+            if (frames < track->m_shakeRateDelta) {
+                step = frames;
+            } else {
                 step = track->m_shakeRateDelta;
             }
             track->m_shakeRateDelta -= (s16)step;
             track->m_shakeRate += track->m_shakeRateAdd * step;
         }
         if (track->m_shakeDepthDelta != 0) {
-            int step = frames;
-            if (track->m_shakeDepthDelta <= frames) {
+            int step;
+            if (frames < track->m_shakeDepthDelta) {
+                step = frames;
+            } else {
                 step = track->m_shakeDepthDelta;
             }
             track->m_shakeDepthDelta -= (s16)step;
@@ -2067,25 +2068,29 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
     }
 
     do {
-        if (*voiceData == (int)track) {
-            if (((RedVoiceDATA*)voiceData)->m_pitchModDelay != 0) {
-                int step = frames;
-                if (((RedVoiceDATA*)voiceData)->m_pitchModDelay <= frames) {
-                    step = ((RedVoiceDATA*)voiceData)->m_pitchModDelay;
+        if (voiceData->m_track == track) {
+            if (voiceData->m_pitchModDelay != 0) {
+                int step;
+                if (frames < voiceData->m_pitchModDelay) {
+                    step = frames;
+                } else {
+                    step = voiceData->m_pitchModDelay;
                 }
-                ((RedVoiceDATA*)voiceData)->m_pitchModDelay -= (s16)step;
+                voiceData->m_pitchModDelay -= (s16)step;
             }
-            if (((RedVoiceDATA*)voiceData)->m_volumeModDelay != 0) {
-                int step = frames;
-                if (((RedVoiceDATA*)voiceData)->m_volumeModDelay <= frames) {
-                    step = ((RedVoiceDATA*)voiceData)->m_volumeModDelay;
+            if (voiceData->m_volumeModDelay != 0) {
+                int step;
+                if (frames < voiceData->m_volumeModDelay) {
+                    step = frames;
+                } else {
+                    step = voiceData->m_volumeModDelay;
                 }
-                ((RedVoiceDATA*)voiceData)->m_volumeModDelay -= (s16)step;
+                voiceData->m_volumeModDelay -= (s16)step;
             }
-            ((RedVoiceDATA*)voiceData)->m_updateFlags |= updateFlags;
+            voiceData->m_updateFlags |= updateFlags;
         }
-        voiceData += REDSOUND_VOICE_SIZE / sizeof(*voiceData);
-    } while (voiceData < (int*)(p_VoiceData + REDSOUND_VOICE_COUNT));
+        voiceData++;
+    } while (voiceData < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
 
 /*
@@ -2459,8 +2464,9 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (track->m_volumeDelta != 0) {
-		step = frames;
-		if (track->m_volumeDelta <= frames) {
+		if (frames < track->m_volumeDelta) {
+			step = frames;
+		} else {
 			step = track->m_volumeDelta;
 		}
 		track->m_volumeDelta -= step;
@@ -2469,8 +2475,9 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (track->m_expressionDelta != 0) {
-		step = frames;
-		if (track->m_expressionDelta <= frames) {
+		if (frames < track->m_expressionDelta) {
+			step = frames;
+		} else {
 			step = track->m_expressionDelta;
 		}
 		track->m_expressionDelta -= step;
@@ -2479,8 +2486,9 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (track->m_panDelta != 0) {
-		step = frames;
-		if (track->m_panDelta <= frames) {
+		if (frames < track->m_panDelta) {
+			step = frames;
+		} else {
 			step = track->m_panDelta;
 		}
 		track->m_panDelta -= step;
@@ -2489,8 +2497,9 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (track->m_reverbDepthDelta != 0) {
-		step = frames;
-		if (track->m_reverbDepthDelta <= frames) {
+		if (frames < track->m_reverbDepthDelta) {
+			step = frames;
+		} else {
 			step = track->m_reverbDepthDelta;
 		}
 		track->m_reverbDepthDelta -= step;
@@ -2499,8 +2508,9 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (track->m_mixVolumeDelta != 0) {
-		step = frames;
-		if (track->m_mixVolumeDelta <= frames) {
+		if (frames < track->m_mixVolumeDelta) {
+			step = frames;
+		} else {
 			step = track->m_mixVolumeDelta;
 		}
 		track->m_mixVolumeDelta -= step;
@@ -2513,8 +2523,9 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (track->m_pitchDelta != 0) {
-		step = frames;
-		if (track->m_pitchDelta <= frames) {
+		if (frames < track->m_pitchDelta) {
+			step = frames;
+		} else {
 			step = track->m_pitchDelta;
 		}
 		track->m_pitchDelta -= step;
@@ -2523,8 +2534,9 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (track->m_sweepDelta != 0) {
-		step = frames;
-		if (track->m_sweepDelta <= frames) {
+		if (frames < track->m_sweepDelta) {
+			step = frames;
+		} else {
 			step = track->m_sweepDelta;
 		}
 		track->m_sweepDelta -= step;
@@ -2534,7 +2546,7 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (((voice->m_updateFlags & REDSOUND_VOICE_UPDATE_PITCH) != 0) && (voice->m_waveData != 0)) {
-		voice->m_targetPitch =
+		voice->m_pitch =
 			PitchCompute(voice->m_basePitch + track->m_pitch,
 			             (int)(s16)track->m_keyTranspose + (int)(s16)track->m_pitchBend,
 			             voice->m_waveData->m_pitch, (int)(s8)track->m_fineTune);
@@ -2542,16 +2554,18 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 
 	if (track->m_vibrateFunc != 0) {
 		if (track->m_vibrateRateDelta != 0) {
-			step = frames;
-			if (track->m_vibrateRateDelta <= frames) {
+			if (frames < track->m_vibrateRateDelta) {
+				step = frames;
+			} else {
 				step = track->m_vibrateRateDelta;
 			}
 			track->m_vibrateRateDelta = track->m_vibrateRateDelta - (short)step;
 			track->m_vibrateRate += track->m_vibrateRateAdd * step;
 		}
 		if (track->m_vibrateDepthDelta != 0) {
-			step = frames;
-			if (track->m_vibrateDepthDelta <= frames) {
+			if (frames < track->m_vibrateDepthDelta) {
+				step = frames;
+			} else {
 				step = track->m_vibrateDepthDelta;
 			}
 			track->m_vibrateDepthDelta = track->m_vibrateDepthDelta - (short)step;
@@ -2561,16 +2575,18 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 
 	if (track->m_tremoloFunc != 0) {
 		if (track->m_tremoloRateDelta != 0) {
-			step = frames;
-			if (track->m_tremoloRateDelta <= frames) {
+			if (frames < track->m_tremoloRateDelta) {
+				step = frames;
+			} else {
 				step = track->m_tremoloRateDelta;
 			}
 			track->m_tremoloRateDelta = track->m_tremoloRateDelta - (short)step;
 			track->m_tremoloRate += track->m_tremoloRateAdd * step;
 		}
 		if (track->m_tremoloDepthDelta != 0) {
-			step = frames;
-			if (track->m_tremoloDepthDelta <= frames) {
+			if (frames < track->m_tremoloDepthDelta) {
+				step = frames;
+			} else {
 				step = track->m_tremoloDepthDelta;
 			}
 			track->m_tremoloDepthDelta = track->m_tremoloDepthDelta - (short)step;
@@ -2580,16 +2596,18 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 
 	if (track->m_shakeFunc != 0) {
 		if (track->m_shakeRateDelta != 0) {
-			step = frames;
-			if (track->m_shakeRateDelta <= frames) {
+			if (frames < track->m_shakeRateDelta) {
+				step = frames;
+			} else {
 				step = track->m_shakeRateDelta;
 			}
 			track->m_shakeRateDelta = track->m_shakeRateDelta - (short)step;
 			track->m_shakeRate += track->m_shakeRateAdd * step;
 		}
 		if (track->m_shakeDepthDelta != 0) {
-			step = frames;
-			if (track->m_shakeDepthDelta <= frames) {
+			if (frames < track->m_shakeDepthDelta) {
+				step = frames;
+			} else {
 				step = track->m_shakeDepthDelta;
 			}
 			track->m_shakeDepthDelta = track->m_shakeDepthDelta - (short)step;
@@ -2598,16 +2616,18 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
 	}
 
 	if (voice->m_pitchModDelay != 0) {
-		step = frames;
-		if (voice->m_pitchModDelay <= frames) {
+		if (frames < voice->m_pitchModDelay) {
+			step = frames;
+		} else {
 			step = voice->m_pitchModDelay;
 		}
 		voice->m_pitchModDelay = voice->m_pitchModDelay - (short)step;
 	}
 
 	if (voice->m_volumeModDelay != 0) {
-		step = frames;
-		if (voice->m_volumeModDelay <= frames) {
+		if (frames < voice->m_volumeModDelay) {
+			step = frames;
+		} else {
 			step = voice->m_volumeModDelay;
 		}
 		voice->m_volumeModDelay = voice->m_volumeModDelay - (short)step;

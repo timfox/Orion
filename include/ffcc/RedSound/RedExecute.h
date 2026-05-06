@@ -10,9 +10,9 @@ struct RedSoundCONTROL;
 struct RedKeyOnDATA;
 
 struct RedReverbDATA {
-	int callback;
-	void* context;
-	int kind;
+	int m_callback;
+	void* m_context;
+	int m_kind;
 };
 
 enum RedReverbKind {
@@ -33,7 +33,7 @@ struct RedNoteDATA {
 	signed char m_key;
 	signed char m_velocity;
 	unsigned char m_allocFlags;
-	unsigned char m_pad03;
+	unsigned char m_reserved03;
 };
 
 enum RedNoteAllocFlag {
@@ -44,23 +44,27 @@ enum RedNoteAllocFlag {
 	REDSOUND_NOTE_ALLOC_DIRECT_MASK = REDSOUND_NOTE_ALLOC_DIRECT | REDSOUND_NOTE_ALLOC_RESERVED,
 };
 
+struct RedWaveADPCMInfo {
+	AXPBADPCM m_data;
+	AXPBADPCMLOOP m_loop;
+};
+
 struct RedWaveDATA {
 	unsigned int m_flags;
 	int m_sampleStart;
 	int m_loopStart;
 	int m_loopEnd;
-	unsigned char m_pad10[0x14 - 0x10];
+	unsigned char m_reserved10[0x14 - 0x10];
 	int m_pitch;
 	signed char m_splitKey;
 	unsigned char m_splitVelocity;
 	unsigned char m_volume;
 	unsigned char m_pan;
 	signed char m_reverbMix;
-	unsigned char m_pad1D[0x22 - 0x1D];
-	unsigned char m_adpcmData[0x4A - 0x22];
-	unsigned char m_adpcmLoop[0x50 - 0x4A];
+	unsigned char m_reserved1D[0x22 - 0x1D];
+	RedWaveADPCMInfo m_adpcm;
 	unsigned char m_adsr[0x5C - 0x50];
-	unsigned char m_pad5C[0x60 - 0x5C];
+	unsigned char m_reserved5C[0x60 - 0x5C];
 };
 
 enum RedWaveLayoutSize {
@@ -83,10 +87,6 @@ enum RedWaveLayoutOffset {
 	REDSOUND_WAVE_VOLUME_OFFSET = 0x1A,
 	REDSOUND_WAVE_PAN_OFFSET = 0x1B,
 	REDSOUND_WAVE_REVERB_MIX_OFFSET = 0x1C,
-	REDSOUND_WAVE_ADPCM_DATA_OFFSET = 0x22,
-	REDSOUND_WAVE_ADPCM_LOOP_OFFSET = 0x4A,
-	REDSOUND_WAVE_ADPCM_DATA_SIZE = REDSOUND_WAVE_ADPCM_LOOP_OFFSET - REDSOUND_WAVE_ADPCM_DATA_OFFSET,
-	REDSOUND_WAVE_ADPCM_LOOP_SIZE = 0x50 - REDSOUND_WAVE_ADPCM_LOOP_OFFSET,
 };
 
 enum RedWaveLayoutWord {
@@ -96,7 +96,6 @@ enum RedWaveLayoutWord {
 enum RedVoiceLayoutCount {
 	REDSOUND_VOICE_ADSR_TIME_COUNT = 4,
 	REDSOUND_VOICE_ADSR_LEVEL_COUNT = 4,
-	REDSOUND_VOICE_AX_MIX_COUNT = 0x12,
 	REDSOUND_TERMINATE_NOTE_WORD_COUNT = 1,
 };
 
@@ -110,40 +109,40 @@ struct RedVoiceDATA {
 	signed char m_key;
 	signed char m_velocity;
 	unsigned char m_stateFlags;
-	unsigned char m_notePad;
+	unsigned char m_reserved1B;
 	int m_pitchModPhase;
 	int m_pitchModFrames;
 	int m_pitchModFrame;
 	short m_pitchModDelay;
-	unsigned char m_pad2A[0x2C - 0x2A];
+	unsigned char m_reserved2A[0x2C - 0x2A];
 	int m_volumeModPhase;
 	int m_volumeModFrames;
 	int m_volumeModFrame;
 	short m_volumeModDelay;
-	unsigned char m_pad3A[0x3C - 0x3A];
+	unsigned char m_reserved3A[0x3C - 0x3A];
 	int m_randomPitch;
 	int m_randomVolume;
 	int m_randomPan;
-	unsigned char m_pad48[0x50 - 0x48];
+	unsigned char m_reserved48[0x50 - 0x48];
 	unsigned short m_adsrTime[REDSOUND_VOICE_ADSR_TIME_COUNT];
 	unsigned char m_adsrLevel[REDSOUND_VOICE_ADSR_LEVEL_COUNT];
 	int m_adsrStage;
 	int m_adsrStepFrames;
 	int m_adsrStepAdd;
-	unsigned short m_axMix[REDSOUND_VOICE_AX_MIX_COUNT];
+	AXPBMIX m_axMix;
 	int m_active;
 	unsigned int m_flags;
 	unsigned int m_voiceSwitch;
 	int m_pitch;
 	int m_targetPitch;
 	int m_basePitch;
-	unsigned char m_padA4[0xA8 - 0xA4];
+	unsigned char m_reservedA4[0xA8 - 0xA4];
 	int m_voiceIndex;
 	int m_adsrCurrentLevel;
 	int m_envelopeLevel;
-	unsigned char m_padB4[0xB8 - 0xB4];
+	unsigned char m_reservedB4[0xB8 - 0xB4];
 	unsigned int m_updateFlags;
-	unsigned char m_padBC[0xC0 - 0xBC];
+	unsigned char m_reservedBC[0xC0 - 0xBC];
 };
 
 enum RedVoiceAdsrIndex {
@@ -176,12 +175,10 @@ enum RedVoiceAdsrLayout {
 enum RedVoiceLayoutOffset {
 	REDSOUND_VOICE_TRACK_OFFSET = 0x00,
 	REDSOUND_VOICE_STATE_FLAGS_OFFSET = 0x1A,
-	REDSOUND_VOICE_AX_MIX_OFFSET = 0x68,
 	REDSOUND_VOICE_ACTIVE_OFFSET = 0x8C,
 	REDSOUND_VOICE_FLAGS_OFFSET = 0x90,
 	REDSOUND_VOICE_SWITCH_OFFSET = 0x94,
 	REDSOUND_VOICE_INDEX_OFFSET = 0xA8,
-	REDSOUND_VOICE_AX_MIX_SIZE = 0x24,
 };
 
 enum RedVoiceLayoutWord {
@@ -203,7 +200,6 @@ enum RedVoiceLayoutWord {
 	REDSOUND_VOICE_RANDOM_PITCH_WORD = 0x0F,
 	REDSOUND_VOICE_RANDOM_VOLUME_WORD = 0x10,
 	REDSOUND_VOICE_RANDOM_PAN_WORD = 0x11,
-	REDSOUND_VOICE_AX_MIX_WORD = REDSOUND_VOICE_AX_MIX_OFFSET / sizeof(u32),
 	REDSOUND_VOICE_ACTIVE_WORD = REDSOUND_VOICE_ACTIVE_OFFSET / sizeof(u32),
 	REDSOUND_VOICE_FLAGS_WORD = REDSOUND_VOICE_FLAGS_OFFSET / sizeof(u32),
 	REDSOUND_VOICE_SWITCH_WORD = REDSOUND_VOICE_SWITCH_OFFSET / sizeof(u32),
@@ -219,28 +215,6 @@ enum RedVoiceLayoutWord {
 	REDSOUND_VOICE_ADSR_CURRENT_WORD = 0x2B,
 	REDSOUND_VOICE_ENVELOPE_WORD = 0x2C,
 	REDSOUND_VOICE_UPDATE_FLAGS_WORD = 0x2E,
-};
-
-enum RedVoiceAxMixWord {
-	REDSOUND_VOICE_AX_MIX_VL_WORD = REDSOUND_VOICE_AX_MIX_WORD,
-	REDSOUND_VOICE_AX_MIX_VR_WORD = REDSOUND_VOICE_AX_MIX_WORD + 1,
-	REDSOUND_VOICE_AX_MIX_AUX_A_L_WORD = REDSOUND_VOICE_AX_MIX_WORD + 2,
-	REDSOUND_VOICE_AX_MIX_AUX_A_R_WORD = REDSOUND_VOICE_AX_MIX_WORD + 3,
-	REDSOUND_VOICE_AX_MIX_AUX_B_L_WORD = REDSOUND_VOICE_AX_MIX_WORD + 4,
-	REDSOUND_VOICE_AX_MIX_AUX_B_R_WORD = REDSOUND_VOICE_AX_MIX_WORD + 5,
-	REDSOUND_VOICE_AX_MIX_AUX_B_S_WORD = REDSOUND_VOICE_AX_MIX_WORD + 6,
-	REDSOUND_VOICE_AX_MIX_AUX_A_S_WORD = REDSOUND_VOICE_AX_MIX_WORD + 8,
-};
-
-enum RedVoiceAxMixIndex {
-	REDSOUND_VOICE_AX_MIX_VL_INDEX = 0,
-	REDSOUND_VOICE_AX_MIX_VR_INDEX = 2,
-	REDSOUND_VOICE_AX_MIX_AUX_A_L_INDEX = 4,
-	REDSOUND_VOICE_AX_MIX_AUX_A_R_INDEX = 6,
-	REDSOUND_VOICE_AX_MIX_AUX_B_L_INDEX = 8,
-	REDSOUND_VOICE_AX_MIX_AUX_B_R_INDEX = 10,
-	REDSOUND_VOICE_AX_MIX_AUX_B_S_INDEX = 12,
-	REDSOUND_VOICE_AX_MIX_AUX_A_S_INDEX = 16,
 };
 
 enum RedVoiceBufferWordOffset {
