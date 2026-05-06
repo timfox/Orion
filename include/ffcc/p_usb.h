@@ -46,17 +46,4 @@ extern CUSBPcs USBPcs;
 extern int s_usbReadPollFrameCounter;
 extern char s_usbReadPollInitialized;
 
-inline CUSBPcs::CUSBPcs()
-{
-    m_table__7CUSBPcs.m_words[0] = m_table_desc0__7CUSBPcs[0];
-    m_table__7CUSBPcs.m_words[1] = m_table_desc0__7CUSBPcs[1];
-    m_table__7CUSBPcs.m_words[2] = m_table_desc0__7CUSBPcs[2];
-    m_table__7CUSBPcs.m_words[3] = m_table_desc1__7CUSBPcs[0];
-    m_table__7CUSBPcs.m_words[4] = m_table_desc1__7CUSBPcs[1];
-    m_table__7CUSBPcs.m_words[5] = m_table_desc1__7CUSBPcs[2];
-    m_table__7CUSBPcs.m_words[6] = m_table_desc2__7CUSBPcs[0];
-    m_table__7CUSBPcs.m_words[7] = m_table_desc2__7CUSBPcs[1];
-    m_table__7CUSBPcs.m_words[8] = m_table_desc2__7CUSBPcs[2];
-}
-
 #endif
