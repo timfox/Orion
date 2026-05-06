@@ -1176,23 +1176,25 @@ void CMenuPcs::GetEquipItem()
  */
 int CMenuPcs::ChkEquipActive(int index)
 {
-	u32 caravanWork = Game.m_scriptFoodBase[0];
+	CCaravanWork* caravanWork = reinterpret_cast<CCaravanWork*>(Game.m_scriptFoodBase[0]);
 	s16* entries = GetLetterBuffer__6JoyBusFi(&Joybus, 0);
-	s16* entryList = entries + 1;
-	int equipIndex = static_cast<int>(*reinterpret_cast<s16*>(*reinterpret_cast<int*>(reinterpret_cast<char*>(this) + 0x82c) + 0x26));
-	u32 active;
+	int entryCount = entries[0];
+	s16* itemEntries = entries + 1;
+	int equipIndex = GetEquipState(this)[0x13];
+	unsigned int active;
 
-	if ((index < 0) || (entries[0] <= index)) {
+	if ((index < 0) || (entryCount <= index)) {
 		active = 0;
 	} else if (index == 0) {
 		if (equipIndex < 3) {
 			active = 0;
 		} else {
-			active = (u32)(int)*reinterpret_cast<s16*>(caravanWork + equipIndex * 2 + 0xac) >> 0x1f ^ 1;
+			active = (unsigned int)(int)caravanWork->m_equipment[equipIndex] >> 0x1f ^ 1;
 		}
 	} else {
-		int item = static_cast<int>(*reinterpret_cast<s16*>(caravanWork + entryList[index - 1] * 2 + 0xb6));
+		int item = caravanWork->m_inventoryItems[itemEntries[index - 1]];
 		active = ChkEquipPossible__8CMenuPcsFi(this, item);
+
 		if (((active & 0xff) != 0) && (GetEquipType__8CMenuPcsFi(this, item) != equipIndex)) {
 			active = 0;
 		}
