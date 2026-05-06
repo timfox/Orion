@@ -439,9 +439,26 @@ void CGItemObj::onFrameStat()
 
 			if (Game.m_gameWork.m_menuStageMode != 0) {
 				CGPartyObj* carryObj = *(CGPartyObj**)(self + 0x550);
-				if (Game.m_gameWork.m_bossArtifactStageIndex < 0xF &&
-				    (static_cast<unsigned int>(carryObj->GetCID()) & 0x6D) == 0x6D &&
+				bool condA = false;
+				bool condB = false;
+				bool condC = false;
+
+				if (Game.m_gameWork.m_menuStageMode != 0 &&
+				    Game.m_gameWork.m_bossArtifactStageIndex < 0xF) {
+					condC = true;
+				}
+				if (condC) {
+					unsigned int cid = static_cast<unsigned int>(carryObj->GetCID());
+					unsigned int stageCarry = (unsigned int)__cntlzw(0x6D - (cid & 0x6D));
+					if (((stageCarry >> 5) & 0xFF) != 0) {
+						condB = true;
+					}
+				}
+				if (condB &&
 				    *reinterpret_cast<int*>(reinterpret_cast<unsigned char*>(carryObj->m_scriptHandle) + 0x3B4) != 0) {
+					condA = true;
+				}
+				if (condA) {
 					useBossAttachName = true;
 				}
 			}
@@ -1085,10 +1102,7 @@ void CGItemObj::carry(CGPartyObj* partyObj, int carryState, int carryMode)
 			changeStat__8CGPrgObjFiii(this, ((int)~(carryState - 1 | 1 - carryState) >> 0x1F) + 0xD, 0, 0);
 		}
 
-		self[0x94] = 0;
-		self[0x95] = 0;
-		self[0x96] = 0x11;
-		self[0x97] = 0x94;
+		*reinterpret_cast<u32*>(self + 0x94) = 0x1194;
 	}
 
 	if ((*(unsigned int*)(self + 0x5C) & 0x10) != 0 && canSystemCall != 0) {
@@ -1178,15 +1192,19 @@ void CGItemObj::onHitParticle(int effectIndex, int, int, int, Vec*, PPPIFPARAM* 
 			int particleNo;
 			int classControl;
 
-			if (particleAttr == 1) {
+			switch (particleAttr) {
+			case 1:
 				particleNo = 0x20;
 				classControl = 0x491;
-			} else if (particleAttr == 0) {
+				break;
+			case 0:
 				particleNo = 0x1F;
 				classControl = 0x492;
-			} else if (particleAttr == 4) {
+				break;
+			case 4:
 				particleNo = 0x2F;
 				classControl = 0x493;
+				break;
 			}
 
 			EndParticleSlot__13CFlatRuntime2Fii(CFlat, *(int*)(self + 0x55C), 0);
