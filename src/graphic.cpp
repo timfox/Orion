@@ -1354,31 +1354,30 @@ void CGraphic::CopySaveFrameBuffer()
  */
 _GXTexObj* CGraphic::GetBackBufferRect(int& x, int& y, int& width, int& height, int doClear)
 {
-    u32 xBits = x;
-    if (((xBits & 1) ^ (xBits >> 31)) != (xBits >> 31)) {
+    if ((x % 2) != 0) {
         x -= 1;
     }
-    u32 yBits = y;
-    if (((yBits & 1) ^ (yBits >> 31)) != (yBits >> 31)) {
+    if ((y % 2) != 0) {
         y -= 1;
     }
 
     int xEnd = x + width;
     int yEnd = y + height;
 
-    u32 xEndBits = xEnd;
-    if (((xEndBits & 1) ^ (xEndBits >> 31)) != (xEndBits >> 31)) {
+    if ((xEnd % 2) != 0) {
         xEnd += 1;
         width += 1;
     }
-    u32 yEndBits = yEnd;
-    if (((yEndBits & 1) ^ (yEndBits >> 31)) != (yEndBits >> 31)) {
+    if ((yEnd % 2) != 0) {
         yEnd += 1;
         height += 1;
     }
 
-    if ((xEnd < 0) || (yEnd < 0)) {
-        return 0;
+    if (xEnd < 0) {
+        return;
+    }
+    if (yEnd < 0) {
+        return;
     }
 
     void* renderMode = PtrAt(this, 0x71E0);
@@ -1391,7 +1390,6 @@ _GXTexObj* CGraphic::GetBackBufferRect(int& x, int& y, int& width, int& height, 
 
     if (xEnd > efbWidth) {
         width -= (xEnd - efbWidth);
-        xEnd = efbWidth;
     }
 
     if (x < 0) {
@@ -1406,7 +1404,6 @@ _GXTexObj* CGraphic::GetBackBufferRect(int& x, int& y, int& width, int& height, 
 
     if (yEnd > efbHeight) {
         height -= (yEnd - efbHeight);
-        yEnd = efbHeight;
     }
 
     if ((xEnd == x) || (yEnd == y)) {
