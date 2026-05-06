@@ -514,8 +514,7 @@ void CFont::SetTlut(int index)
  */
 void CFont::SetColor(_GXColor color)
 {
-	unsigned char red = color.r;
-	m_color.r = red;
+	m_color.r = color.r;
 	unsigned char green = color.g;
 	unsigned char blue = color.b;
 	m_color.g = green;
