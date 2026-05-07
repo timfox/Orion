@@ -896,11 +896,6 @@ void UpdateParticle(VYmBreath* vYmBreath, PYmBreath* pYmBreath, PARTICLE_DATA* p
     }
 }
 
-extern "C" const char lbl_80330CB8[] = "FFCC";
-extern "C" const char lbl_80330CC0[] = "GDS";
-extern "C" const char lbl_80330CC4[] = "GC";
-extern "C" const char lbl_80330CC8[] = "1.00";
-
 /*
  * --INFO--
  * PAL Address: 0x800c118c
@@ -1062,6 +1057,11 @@ void BirthParticle(_pppPObject*, VYmBreath* vYmBreath, PYmBreath* pYmBreath, VCo
         particleColor->m_colorFrameDeltas[3] = params->m_colorFrameDelta3;
     }
 }
+
+extern "C" const char lbl_80330CB8[] = "FFCC";
+extern "C" const char lbl_80330CC0[] = "GDS";
+extern "C" const char lbl_80330CC4[] = "GC";
+extern "C" const char lbl_80330CC8[] = "1.00";
 
 /*
  * --INFO--
