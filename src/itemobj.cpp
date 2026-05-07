@@ -1154,7 +1154,8 @@ void CGItemObj::onFrameAlways()
 	if (countdown != 0) {
 		int next = countdown - 1;
 		*(int*)(self + 0x56C) = next & ~(next >> 0x1F);
-		*(float*)(self + 0x144) = *(float*)(self + 0x568) * (float)(8 - *(int*)(self + 0x56C)) * FLOAT_80331b68;
+		float radius = *(float*)(self + 0x568) * (float)(8 - *(int*)(self + 0x56C));
+		*(float*)(self + 0x144) = radius * FLOAT_80331b68;
 	}
 
 	if (*(int*)(self + 0x500) == 0xA) {
