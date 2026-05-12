@@ -692,8 +692,11 @@ void CSystem::Init()
             m_mapBuffer = new ((CMemory::CStage*)m_mapStage, const_cast<char*>(s_system_cpp), 0x123) unsigned char[mapSize];
             for (offset = 0; (int)remaining != 0; remaining -= count)
             {
-                count = 0x100000;
-                if (remaining < 0x100000)
+                if (remaining >= 0x100000)
+                {
+                    count = 0x100000;
+                }
+                else
                 {
                     count = remaining;
                 }
