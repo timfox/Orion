@@ -1,38 +1,81 @@
 #ifndef _FFCC_REDSOUND_REDENTRY_H
 #define _FFCC_REDSOUND_REDENTRY_H
 
+struct RedMusicHEAD;
+struct RedSeSepHEAD;
+struct RedWaveHeadWD;
+
 struct RedHistoryBANK
 {
 	int m_id;
 	int m_historyNo;
-	int m_data;
+	union {
+		int m_data;
+		int m_address;
+		void* m_pointer;
+		RedWaveHeadWD* m_waveHead;
+		RedSeSepHEAD* m_seSepHead;
+		RedMusicHEAD* m_musicHead;
+	};
 	int m_size;
 };
 
 enum RedEntryBankLayoutSize {
 	REDSOUND_HISTORY_BANK_EMPTY_ID = -1,
+	REDSOUND_HISTORY_BANK_NOT_FOUND = -1,
+	REDSOUND_WAVE_NO_NONE = -1,
+	REDSOUND_WAVE_ADD_FAILED = -1,
+	REDSOUND_WAVE_SIZE_AUTO = -1,
+	REDSOUND_WAVE_CLEAR_ALL = -1,
+	REDSOUND_WAVE_CLEAR_UNBANKED = -2,
+	REDSOUND_WAVE_CLEAR_UNBANKED_USED = -3,
+	REDSOUND_SESEP_SEARCH_FIRST = -1,
+	REDSOUND_SESEP_CLEAR_ALL = -1,
+	REDSOUND_MUSIC_CLEAR_ALL = -1,
 	REDSOUND_HISTORY_BANK_ENTRY_SIZE = sizeof(RedHistoryBANK),
+	REDSOUND_HISTORY_BANK_ID_OFFSET = 0x00,
+	REDSOUND_HISTORY_BANK_HISTORY_NO_OFFSET = 0x04,
+	REDSOUND_HISTORY_BANK_DATA_OFFSET = 0x08,
+	REDSOUND_HISTORY_BANK_SIZE_OFFSET = 0x0C,
 	REDSOUND_WAVE_BANK_ENTRY_COUNT = 0x40,
 	REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT = 0x10,
 	REDSOUND_WAVE_PRIMARY_BANK_MASK = REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT - 1,
 	REDSOUND_WAVE_RELEASE_HISTORY_NO = REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT + 4,
 	REDSOUND_SESEP_BANK_ENTRY_COUNT = 0x100,
 	REDSOUND_MUSIC_BANK_ENTRY_COUNT = 0x04,
+	REDSOUND_WAVE_PRIMARY_BANK_SIZE = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT,
+	REDSOUND_WAVE_HISTORY_BANK_SIZE =
+	    REDSOUND_HISTORY_BANK_ENTRY_SIZE * (REDSOUND_WAVE_BANK_ENTRY_COUNT - REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT),
 	REDSOUND_WAVE_BANK_SIZE = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_WAVE_BANK_ENTRY_COUNT,
 	REDSOUND_WAVE_HISTORY_BANK_OFFSET = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT,
 	REDSOUND_SESEP_BANK_SIZE = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_SESEP_BANK_ENTRY_COUNT,
 	REDSOUND_MUSIC_BANK_SIZE = REDSOUND_HISTORY_BANK_ENTRY_SIZE * REDSOUND_MUSIC_BANK_ENTRY_COUNT,
+	REDSOUND_WAVE_PRIMARY_BANK_ALLOC_SIZE = 0x100,
+	REDSOUND_WAVE_HISTORY_BANK_ALLOC_SIZE = 0x300,
+	REDSOUND_WAVE_BANK_ALLOC_SIZE = 0x400,
+	REDSOUND_SESEP_BANK_ALLOC_SIZE = 0x1000,
+	REDSOUND_MUSIC_BANK_ALLOC_SIZE = 0x40,
+	REDSOUND_ENTRY_BANK_ARENA_SIZE = REDSOUND_WAVE_BANK_SIZE + REDSOUND_SESEP_BANK_SIZE + REDSOUND_MUSIC_BANK_SIZE,
+	REDSOUND_ENTRY_BANK_ARENA_ALLOC_SIZE = 0x1440,
+};
+
+enum RedHistoryMode {
+	REDSOUND_HISTORY_MODE_RELEASE = 0,
+	REDSOUND_HISTORY_MODE_USE = 1,
 };
 
 enum RedEntryFileLayoutSize {
 	REDSOUND_MUSIC_SIGNATURE_SIZE = 4,
 	REDSOUND_SESEP_SIGNATURE_SIZE = 8,
+	REDSOUND_SESEP_RESERVED13_SIZE = 0x01,
 	REDSOUND_SE_INFO_SEQUENCE_MIN_COUNT = 1,
 	REDSOUND_SE_BLOCK_SIGNATURE_SIZE = 8,
+	REDSOUND_SE_BLOCK_RESERVED08_SIZE = 0x02,
 	REDSOUND_SE_BLOCK_ENTRY_MIN_COUNT = 1,
 	REDSOUND_WAVE_SIGNATURE_SIZE = 2,
 	REDSOUND_WAVE_SIGNATURE_MAGIC0 = 'W',
 	REDSOUND_WAVE_SIGNATURE_MAGIC1 = 'D',
+	REDSOUND_WAVE_HEAD_RESERVED18_SIZE = 0x08,
 	REDSOUND_WAVE_OFFSET_MIN_COUNT = 1,
 };
 
@@ -61,6 +104,30 @@ enum RedEntryWaveAramLayout {
 	REDSOUND_WAVE_LARGE_REGION_SIZE = 0x400000,
 };
 
+enum RedMusicSignature {
+	REDSOUND_MUSIC_SIGNATURE_0 = 'B',
+	REDSOUND_MUSIC_SIGNATURE_1 = 'G',
+	REDSOUND_MUSIC_SIGNATURE_2 = 'M',
+};
+
+enum RedSeSepSignature {
+	REDSOUND_SESEP_SIGNATURE_0 = 'S',
+	REDSOUND_SESEP_SIGNATURE_1 = 'e',
+	REDSOUND_SESEP_SIGNATURE_2 = 'S',
+	REDSOUND_SESEP_SIGNATURE_3 = 'e',
+	REDSOUND_SESEP_SIGNATURE_4 = 'p',
+};
+
+enum RedSeBlockSignature {
+	REDSOUND_SE_BLOCK_SIGNATURE_0 = 'S',
+	REDSOUND_SE_BLOCK_SIGNATURE_1 = 'e',
+	REDSOUND_SE_BLOCK_SIGNATURE_2 = 'B',
+	REDSOUND_SE_BLOCK_SIGNATURE_3 = 'l',
+	REDSOUND_SE_BLOCK_SIGNATURE_4 = 'o',
+	REDSOUND_SE_BLOCK_SIGNATURE_5 = 'c',
+	REDSOUND_SE_BLOCK_SIGNATURE_6 = 'k',
+};
+
 struct RedMusicHEAD
 {
 	char m_signature[REDSOUND_MUSIC_SIGNATURE_SIZE];
@@ -69,7 +136,7 @@ struct RedMusicHEAD
 	char m_trackCount;
 	char m_reverbKind;
 	short m_reverbDepth;
-	unsigned short m_flags;
+	short m_flags;
 	unsigned short m_reserved0E;
 	int m_size;
 	unsigned int m_playFlags;
@@ -77,8 +144,43 @@ struct RedMusicHEAD
 	int m_reserved1C;
 };
 
+struct RedMusicTrackBlock
+{
+	unsigned char m_sizeLo;
+	unsigned char m_sizeHi0;
+	unsigned char m_sizeHi1;
+	unsigned char m_sizeHi2;
+	unsigned char m_command[1];
+};
+
+enum RedMusicTrackBlockLayout {
+	REDSOUND_MUSIC_TRACK_BLOCK_SIZE_LO_OFFSET = 0,
+	REDSOUND_MUSIC_TRACK_BLOCK_SIZE_HI0_OFFSET = 1,
+	REDSOUND_MUSIC_TRACK_BLOCK_SIZE_HI1_OFFSET = 2,
+	REDSOUND_MUSIC_TRACK_BLOCK_SIZE_HI2_OFFSET = 3,
+	REDSOUND_MUSIC_TRACK_BLOCK_COMMAND_OFFSET = 4,
+	REDSOUND_MUSIC_TRACK_BLOCK_MIN_SIZE = 5,
+};
+
 enum RedMusicHeaderFlag {
 	REDSOUND_MUSIC_HEADER_SIZE = sizeof(RedMusicHEAD),
+	REDSOUND_MUSIC_HEADER_SIGNATURE_OFFSET = 0x00,
+	REDSOUND_MUSIC_HEADER_MUSIC_NO_OFFSET = 0x04,
+	REDSOUND_MUSIC_HEADER_WAVE_NO_OFFSET = 0x06,
+	REDSOUND_MUSIC_HEADER_TRACK_COUNT_OFFSET = 0x08,
+	REDSOUND_MUSIC_HEADER_REVERB_KIND_OFFSET = 0x09,
+	REDSOUND_MUSIC_HEADER_REVERB_DEPTH_OFFSET = 0x0A,
+	REDSOUND_MUSIC_HEADER_FLAGS_OFFSET = 0x0C,
+	REDSOUND_MUSIC_HEADER_RESERVED0E_OFFSET = 0x0E,
+	REDSOUND_MUSIC_HEADER_DATA_SIZE_OFFSET = 0x10,
+	REDSOUND_MUSIC_HEADER_PLAY_FLAGS_OFFSET = 0x14,
+	REDSOUND_MUSIC_HEADER_RESERVED18_OFFSET = 0x18,
+	REDSOUND_MUSIC_HEADER_RESERVED1C_OFFSET = 0x1C,
+	REDSOUND_MUSIC_HEADER_RESERVED0E_SIZE =
+	    REDSOUND_MUSIC_HEADER_DATA_SIZE_OFFSET - REDSOUND_MUSIC_HEADER_RESERVED0E_OFFSET,
+	REDSOUND_MUSIC_HEADER_RESERVED18_SIZE =
+	    REDSOUND_MUSIC_HEADER_RESERVED1C_OFFSET - REDSOUND_MUSIC_HEADER_RESERVED18_OFFSET,
+	REDSOUND_MUSIC_HEADER_RESERVED1C_SIZE = REDSOUND_MUSIC_HEADER_SIZE - REDSOUND_MUSIC_HEADER_RESERVED1C_OFFSET,
 	REDSOUND_MUSIC_HEADER_VOLUME_SCALE_MASK = 0x7F,
 	REDSOUND_MUSIC_PLAY_FLAG_RELEASE_NOTES = 0x40000,
 };
@@ -98,9 +200,30 @@ struct RedSeSepHEAD
 
 enum RedSeSepHeadLayout {
 	REDSOUND_SESEP_HEADER_SIZE = 0x10,
+	REDSOUND_SESEP_STRUCT_SIZE = 0x14,
+	REDSOUND_SESEP_SIGNATURE_OFFSET = 0x00,
+	REDSOUND_SESEP_SE_NO_OFFSET = 0x08,
+	REDSOUND_SESEP_SIZE_AND_FLAGS_OFFSET = 0x0C,
+	REDSOUND_SESEP_INFO_OFFSET = 0x10,
+	REDSOUND_SESEP_WAVE_NO_LO_OFFSET = 0x11,
+	REDSOUND_SESEP_WAVE_NO_HI_OFFSET = 0x12,
+	REDSOUND_SESEP_RESERVED13_OFFSET = 0x13,
 	REDSOUND_SESEP_WAVE_NO_HIGH_SCALE = 0x100,
 	REDSOUND_SESEP_SIZE_MASK = 0x7FFFFFFF,
 	REDSOUND_SESEP_FLAGS_MASK = 0x80000000,
+};
+
+#define RedSeSepGetInfo(seSepHead) reinterpret_cast<RedSeINFO*>(&(seSepHead)->m_seInfoFlags)
+
+struct RedSeInfoSequence
+{
+	unsigned char m_offsetLo;
+	unsigned char m_offsetHiAndFlags;
+};
+
+enum RedSeInfoSequenceLayout {
+	REDSOUND_SE_INFO_SEQUENCE_OFFSET_LO_OFFSET = 0,
+	REDSOUND_SE_INFO_SEQUENCE_OFFSET_HI_AND_FLAGS_OFFSET = 1,
 };
 
 struct RedSeINFO
@@ -110,22 +233,29 @@ struct RedSeINFO
 	unsigned char m_waveNoHi;
 	unsigned char m_eraseTrack;
 	unsigned char m_attrMask;
-	unsigned char m_sequence[REDSOUND_SE_INFO_SEQUENCE_MIN_COUNT];
+	RedSeInfoSequence m_sequence[REDSOUND_SE_INFO_SEQUENCE_MIN_COUNT];
 };
 
 enum RedSeInfoLayout {
+	REDSOUND_SE_INFO_FLAGS_AND_COUNT_OFFSET = 0,
+	REDSOUND_SE_INFO_WAVE_NO_LO_OFFSET = 1,
+	REDSOUND_SE_INFO_WAVE_NO_HI_OFFSET = 2,
+	REDSOUND_SE_INFO_ERASE_TRACK_OFFSET = 3,
+	REDSOUND_SE_INFO_ATTR_MASK_OFFSET = 4,
+	REDSOUND_SE_INFO_SEQUENCE_OFFSET = 5,
+	REDSOUND_SE_INFO_MIN_SIZE = 7,
 	REDSOUND_SE_INFO_U16_HIGH_SCALE = 0x100,
 	REDSOUND_SE_INFO_MULTI_FLAG = 0x80,
 	REDSOUND_SE_INFO_COUNT_MASK = 0x7F,
 	REDSOUND_SE_INFO_SEQUENCE_CONTINUE_FLAG = 0x80,
 	REDSOUND_SE_INFO_SEQUENCE_OFFSET_MASK = 0x7FFF,
-	REDSOUND_SE_INFO_SEQUENCE_ENTRY_SIZE = 2,
+	REDSOUND_SE_INFO_SEQUENCE_ENTRY_SIZE = sizeof(RedSeInfoSequence),
 };
 
 struct RedSeBlockHEAD
 {
 	char m_signature[REDSOUND_SE_BLOCK_SIGNATURE_SIZE];
-	unsigned char m_reserved08[0x0A - 0x08];
+	unsigned char m_reserved08[REDSOUND_SE_BLOCK_RESERVED08_SIZE];
 	short m_seCount;
 	int m_size;
 	int m_entries[REDSOUND_SE_BLOCK_ENTRY_MIN_COUNT];
@@ -133,6 +263,12 @@ struct RedSeBlockHEAD
 
 enum RedSeBlockEntryLayout {
 	REDSOUND_SE_BLOCK_HEADER_SIZE = 0x10,
+	REDSOUND_SE_BLOCK_STRUCT_SIZE = 0x14,
+	REDSOUND_SE_BLOCK_SIGNATURE_OFFSET = 0x00,
+	REDSOUND_SE_BLOCK_RESERVED08_OFFSET = 0x08,
+	REDSOUND_SE_BLOCK_SE_COUNT_OFFSET = 0x0A,
+	REDSOUND_SE_BLOCK_SIZE_OFFSET = 0x0C,
+	REDSOUND_SE_BLOCK_ENTRIES_OFFSET = 0x10,
 	REDSOUND_SE_BLOCK_DATA_FLAG = 0x80000000,
 	REDSOUND_SE_BLOCK_ENTRY_MASK = 0x7FFFFFFF,
 	REDSOUND_SE_BLOCK_ENTRY_EMPTY = -1,
@@ -144,6 +280,19 @@ enum RedSeBlockEntryLayout {
 	REDSOUND_SE_BLOCK_SEQUENCE_COUNT = REDSOUND_SE_BLOCK_SEQUENCE_MASK + 1,
 };
 
+#define RedSeBlockGetInfo(seBlock, seIndex)                                                       \
+	reinterpret_cast<RedSeINFO*>(reinterpret_cast<unsigned char*>((seBlock)->m_entries) +          \
+	                             (seBlock)->m_seCount * REDSOUND_SE_BLOCK_ENTRY_SIZE +             \
+	                             ((seBlock)->m_entries[(seIndex)] & REDSOUND_SE_BLOCK_ENTRY_MASK))
+
+#define RedSeBlockGetInfoFromEntries(seBlock, entries, seIndex)                                   \
+	reinterpret_cast<RedSeINFO*>(reinterpret_cast<unsigned char*>(entries) +                        \
+	                             (seBlock)->m_seCount * REDSOUND_SE_BLOCK_ENTRY_SIZE +             \
+	                             ((entries)[(seIndex)] & REDSOUND_SE_BLOCK_ENTRY_MASK))
+
+#define RedSeBlockGetInfoFromOffset(entries, infoOffset)                                          \
+	reinterpret_cast<RedSeINFO*>(reinterpret_cast<unsigned char*>(entries) + (infoOffset))
+
 struct RedWaveHeadWD
 {
 	char m_signature[REDSOUND_WAVE_SIGNATURE_SIZE];
@@ -153,8 +302,31 @@ struct RedWaveHeadWD
 	int m_toneCount;
 	int m_aramAddress;
 	int m_loadSize;
-	unsigned char m_reserved18[0x20 - 0x18];
+	unsigned char m_reserved18[REDSOUND_WAVE_HEAD_RESERVED18_SIZE];
 	int m_waveOffsets[REDSOUND_WAVE_OFFSET_MIN_COUNT];
+};
+
+enum RedWaveHeadLayout {
+	REDSOUND_WAVE_HEAD_MIN_SIZE = 0x24,
+	REDSOUND_WAVE_HEAD_SIGNATURE_OFFSET = 0x00,
+	REDSOUND_WAVE_HEAD_WAVE_NO_OFFSET = 0x02,
+	REDSOUND_WAVE_HEAD_WAVE_SIZE_OFFSET = 0x04,
+	REDSOUND_WAVE_HEAD_TABLE_COUNT_OFFSET = 0x08,
+	REDSOUND_WAVE_HEAD_TONE_COUNT_OFFSET = 0x0C,
+	REDSOUND_WAVE_HEAD_ARAM_ADDRESS_OFFSET = 0x10,
+	REDSOUND_WAVE_HEAD_LOAD_SIZE_OFFSET = 0x14,
+	REDSOUND_WAVE_HEAD_RESERVED18_OFFSET = 0x18,
+	REDSOUND_WAVE_HEAD_OFFSETS_OFFSET = 0x20,
+};
+
+enum RedEntryLayout {
+	REDSOUND_ENTRY_WAVE_BANK_BASE_OFFSET = 0x00,
+	REDSOUND_ENTRY_SESEP_BANK_BASE_OFFSET = 0x04,
+	REDSOUND_ENTRY_MUSIC_BANK_BASE_OFFSET = 0x08,
+	REDSOUND_ENTRY_WAVE_LOAD_NO_OFFSET = 0x0C,
+	REDSOUND_ENTRY_WAVE_LOAD_SIZE_OFFSET = 0x10,
+	REDSOUND_ENTRY_WAVE_LOAD_ADDRESS_OFFSET = 0x14,
+	REDSOUND_ENTRY_SIZE = 0x18,
 };
 
 class CRedEntry
@@ -165,51 +337,53 @@ public:
 
 	void Init();
 
-	void WaveHistoryAdd(int);
-	void WaveHistoryDelete(int);
-	void WaveHistoryChoice(RedHistoryBANK*);
-	int SearchWaveSequence(int);
-	int SearchUseWave(int);
-	int WaveDelete(RedHistoryBANK*);
-	int WaveOldClear(int, int);
-	int WaveHeadAdd(int, RedWaveHeadWD*, int);
-	int SetWaveData(int, void*, int);
-	void ClearWaveData(int);
-	void ClearWaveDataM(int, int, int, int);
-	void ClearWaveBank(int);
-	int GetWaveBank(int);
-	RedWaveHeadWD* SearchWaveBase(int);
-	int ReentryWaveData(int);
-	void WaveHistoryManager(int, int);
+	void WaveHistoryAdd(int waveNo);
+	void WaveHistoryDelete(int historyNo);
+	void WaveHistoryChoice(RedHistoryBANK* bank);
+	int SearchWaveSequence(int waveNo);
+	int SearchUseWave(int waveNo);
+	int WaveDelete(RedHistoryBANK* bank);
+	int WaveOldClear(int waveNo, int aramOffset);
+	int WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo);
+	int SetWaveData(int waveBankNo, void* waveData, int waveDataSize);
+	void ClearWaveData(int waveNo);
+	void ClearWaveDataM(int waveNo0, int waveNo1, int waveNo2, int waveNo3);
+	void ClearWaveBank(int waveBankNo);
+	RedHistoryBANK* GetWaveBank(int waveNo);
+	RedWaveHeadWD* SearchWaveBase(int waveNo);
+	int ReentryWaveData(int waveNo);
+	void WaveHistoryManager(int mode, int waveNo);
 	void DisplayWaveInfo();
 
 	void SeSepHistoryAdd();
-	void SeSepHistoryDelete(int);
-	void SeSepHistoryChoice(RedHistoryBANK*);
-	int SearchSeSepSequence(int);
-	int SeSepMemoryFree(RedHistoryBANK*);
+	void SeSepHistoryDelete(int historyNo);
+	void SeSepHistoryChoice(RedHistoryBANK* bank);
+	int SearchSeSepSequence(int seNo);
+	int SeSepMemoryFree(RedHistoryBANK* bank);
 	RedHistoryBANK* SeSepOldDelete();
-	RedSeSepHEAD* SeSepHeadAdd(RedSeSepHEAD*);
-	RedSeSepHEAD* SetSeSepData(RedSeSepHEAD*);
-	int ClearSeSepData(int);
-	int ClearSeSepDataMG(int, int, int, int);
-	RedHistoryBANK* SearchSeSepBank(int);
-	int ReentrySeSepData(int);
-	void SeSepHistoryManager(int, int);
+	RedSeSepHEAD* SeSepHeadAdd(RedSeSepHEAD* seSepHead);
+	RedSeSepHEAD* SetSeSepData(RedSeSepHEAD* seSepHead);
+	int ClearSeSepData(int seNo);
+	int ClearSeSepDataMG(int bank, int sep, int group, int kind);
+	RedHistoryBANK* SearchSeSepBank(int seNo);
+	int ReentrySeSepData(int seNo);
+	void SeSepHistoryManager(int mode, int seNo);
 	void DisplaySePlayInfo();
 
 	void MusicHistoryAdd();
-	void MusicHistoryDelete(int);
-	void MusicHistoryChoice(RedHistoryBANK*);
-	int SearchMusicSequence(int);
-	int MusicMemoryFree(RedHistoryBANK*);
+	void MusicHistoryDelete(int historyNo);
+	void MusicHistoryChoice(RedHistoryBANK* bank);
+	int SearchMusicSequence(int musicNo);
+	int MusicMemoryFree(RedHistoryBANK* bank);
 	int MusicOldClear();
 	RedHistoryBANK* MusicOldChoice();
-	RedHistoryBANK* SearchMusicBank(int);
-	int ReentryMusicData(int);
-	void MusicHistoryManager(int, int);
-	RedMusicHEAD* MusicHeadAdd(RedMusicHEAD*);
-	RedMusicHEAD* SetMusicData(RedMusicHEAD*);
+	RedHistoryBANK* SearchMusicBank(int musicNo);
+	int ReentryMusicData(int musicNo);
+	void MusicHistoryManager(int mode, int musicNo);
+	RedMusicHEAD* MusicHeadAdd(RedMusicHEAD* musicHead);
+	RedMusicHEAD* SetMusicData(RedMusicHEAD* musicHead);
+	int ClearMusicData(int musicNo);
+	void DisplayMusicInfo();
 	void DisplayMMemoryInfo();
 
 	RedHistoryBANK* m_waveBankBase;

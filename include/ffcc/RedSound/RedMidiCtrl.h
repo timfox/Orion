@@ -10,13 +10,24 @@ enum RedMidiLayoutSize {
 	REDSOUND_KEY_ON_SLOT_COUNT = 0x40,
 	REDSOUND_MUSIC_TRACK_SAVE_COUNT = 0x40,
 	REDSOUND_TRACK_LOOP_STACK_COUNT = 4,
+	REDSOUND_SWING_FUNCTION_COUNT = 0x10,
+	REDSOUND_MIDI_CONTROL_FUNCTION_COUNT = 0x80,
+	REDSOUND_TRACK_RESERVED04_SIZE = 0x04,
+	REDSOUND_TRACK_RESERVED88_SIZE = 0x04,
+	REDSOUND_TRACK_RESERVEDA8_SIZE = 0x04,
+	REDSOUND_TRACK_RESERVED149_SIZE = 0x02,
+	REDSOUND_TRACK_RESERVED14C_SIZE = 0x01,
+	REDSOUND_TRACK_RESERVED151_SIZE = 0x03,
+	REDSOUND_CONTROL_RESERVED04_SIZE = 0x04,
+	REDSOUND_CONTROL_RESERVED460_SIZE = 0x0C,
+	REDSOUND_CONTROL_RESERVED493_SIZE = 0x01,
 };
 
-typedef int (*RedSwingFunc)(int);
+typedef int (*RedSwingFunc)(int phase);
 
 struct RedTrackDATA {
 	unsigned char* m_command;
-	unsigned char m_reserved04[0x08 - 0x04];
+	unsigned char m_reserved04[REDSOUND_TRACK_RESERVED04_SIZE];
 	unsigned char* m_loopCommand[REDSOUND_TRACK_LOOP_STACK_COUNT];
 	RedWaveHeadWD* m_waveBankData;
 	RedWaveDATA* m_waveData;
@@ -46,7 +57,7 @@ struct RedTrackDATA {
 	int m_vibrateRateAdd;
 	int m_vibrateDepth;
 	int m_vibrateDepthAdd;
-	unsigned char m_reserved88[0x8C - 0x88];
+	unsigned char m_reserved88[REDSOUND_TRACK_RESERVED88_SIZE];
 	short m_vibrateRateDelta;
 	short m_vibrateDepthDelta;
 	short m_vibrateDelay;
@@ -56,7 +67,7 @@ struct RedTrackDATA {
 	int m_tremoloRateAdd;
 	int m_tremoloDepth;
 	int m_tremoloDepthAdd;
-	unsigned char m_reservedA8[0xAC - 0xA8];
+	unsigned char m_reservedA8[REDSOUND_TRACK_RESERVEDA8_SIZE];
 	short m_tremoloRateDelta;
 	short m_tremoloDepthDelta;
 	short m_tremoloDelay;
@@ -70,14 +81,7 @@ struct RedTrackDATA {
 	int m_shakePan;
 	short m_shakeRateDelta;
 	short m_shakeDepthDelta;
-	unsigned short m_adsrAR;
-	unsigned short m_adsrDR;
-	unsigned short m_adsrSR;
-	unsigned short m_adsrRR;
-	unsigned char m_adsrAL;
-	unsigned char m_adsrDL;
-	unsigned char m_adsrSL;
-	unsigned char m_adsrRL;
+	RedAdsrDATA m_adsr;
 	int m_fuzzyPitchDepth;
 	int m_fuzzyVolumeDepth;
 	int m_fuzzyPanDepth;
@@ -107,20 +111,20 @@ struct RedTrackDATA {
 	short m_loopStepCurrent;
 	short m_seTickCounter;
 	signed char m_fineTune;
-	unsigned char m_reserved149[0x14B - 0x149];
+	unsigned char m_reserved149[REDSOUND_TRACK_RESERVED149_SIZE];
 	signed char m_pitchBendRange;
-	unsigned char m_reserved14C[0x14D - 0x14C];
+	unsigned char m_reserved14C[REDSOUND_TRACK_RESERVED14C_SIZE];
 	unsigned char m_waveBankNo;
 	signed char m_trackNo;
 	unsigned char m_eraseTrack;
 	unsigned char m_attrMask;
-	unsigned char m_reserved151[0x154 - 0x151];
+	unsigned char m_reserved151[REDSOUND_TRACK_RESERVED151_SIZE];
 };
 
 enum RedTrackAdsrLayout {
 	REDSOUND_TRACK_ADSR_DEFAULT_BYTE = 0xFF,
 	REDSOUND_TRACK_ADSR_DEFAULT_WORD = -1,
-	REDSOUND_TRACK_ADSR_SIZE = 0x0C,
+	REDSOUND_TRACK_ADSR_SIZE = REDSOUND_ADSR_DATA_SIZE,
 	REDSOUND_TRACK_ADSR_TIME_ATTACK_HALFWORD = 0x6A,
 	REDSOUND_TRACK_ADSR_TIME_DECAY_HALFWORD = REDSOUND_TRACK_ADSR_TIME_ATTACK_HALFWORD + 1,
 	REDSOUND_TRACK_ADSR_TIME_SUSTAIN_HALFWORD = REDSOUND_TRACK_ADSR_TIME_ATTACK_HALFWORD + 2,
@@ -132,6 +136,10 @@ enum RedTrackAdsrLayout {
 };
 
 enum RedTrackLayoutWord {
+	REDSOUND_TRACK_COMMAND_WORD_OFFSET = 0x00,
+	REDSOUND_TRACK_LOOP_COMMAND_WORD_OFFSET = 0x02,
+	REDSOUND_TRACK_WAVE_BANK_DATA_WORD_OFFSET = 0x06,
+	REDSOUND_TRACK_KEY_SIGNATURE_DATA_WORD_OFFSET = 0x08,
 	REDSOUND_TRACK_VOLUME_WORD_OFFSET = 0x0A,
 	REDSOUND_TRACK_VOLUME_ADD_WORD_OFFSET = 0x0B,
 	REDSOUND_TRACK_VOLUME_DELTA_WORD_OFFSET = 0x0C,
@@ -181,20 +189,48 @@ enum RedTrackLayoutWord {
 	REDSOUND_TRACK_FUZZY_PITCH_DEPTH_WORD_OFFSET = 0x38,
 	REDSOUND_TRACK_FUZZY_VOLUME_DEPTH_WORD_OFFSET = 0x39,
 	REDSOUND_TRACK_FUZZY_PAN_DEPTH_WORD_OFFSET = 0x3A,
+	REDSOUND_TRACK_FUZZY_DELTA_TIME_DEPTH_WORD_OFFSET = 0x3B,
 	REDSOUND_TRACK_FUZZY_ADSR_DEPTH_WORD_OFFSET = 0x3C,
+	REDSOUND_TRACK_SE_SEP_ID_WORD_OFFSET = 0x3D,
+	REDSOUND_TRACK_SE_ID_WORD_OFFSET = 0x3E,
 	REDSOUND_TRACK_FLAGS_WORD_OFFSET = 0x41,
+	REDSOUND_TRACK_DELTA_TIME_WORD_OFFSET = 0x42,
+	REDSOUND_TRACK_PLAY_TIME_WORD_OFFSET = 0x43,
 	REDSOUND_TRACK_SWEEP_DELTA_WORD_OFFSET = 0x44,
+	REDSOUND_TRACK_SWEEP_ADD_WORD_OFFSET = 0x45,
 	REDSOUND_TRACK_PORTAMENT_TIME_WORD_OFFSET = 0x46,
+	REDSOUND_TRACK_WAVE_BASE_WORD_OFFSET = 0x47,
 	REDSOUND_TRACK_PORTAMENT_PITCH_WORD_OFFSET = 0x48,
+	REDSOUND_TRACK_PORTAMENT_PITCH_NONE = -1,
+	REDSOUND_TRACK_WAVE_NO_WORD_OFFSET = 0x49,
 };
 
 enum RedTrackLayoutHalfword {
+	REDSOUND_TRACK_LOOP_COUNT_HALFWORD = 0x94,
+	REDSOUND_TRACK_LOOP_STEP_HALFWORD = 0x98,
+	REDSOUND_TRACK_STEP_HALFWORD = 0x9C,
+	REDSOUND_TRACK_STEP2_HALFWORD = 0x9D,
+	REDSOUND_TRACK_LOOP_DEPTH_HALFWORD = 0x9E,
 	REDSOUND_TRACK_PITCH_BEND_HALFWORD = 0x9F,
+	REDSOUND_TRACK_PITCH_BEND_RAW_HALFWORD = 0xA0,
 	REDSOUND_TRACK_KEY_TRANSPOSE_HALFWORD = 0xA1,
+	REDSOUND_TRACK_LOOP_STEP_CURRENT_HALFWORD = 0xA2,
+	REDSOUND_TRACK_SE_TICK_COUNTER_HALFWORD = 0xA3,
 };
 
 enum RedTrackLayoutByte {
+	REDSOUND_TRACK_RESERVED04_BYTE = 0x04,
+	REDSOUND_TRACK_RESERVED88_BYTE = 0x88,
+	REDSOUND_TRACK_RESERVEDA8_BYTE = 0xA8,
 	REDSOUND_TRACK_FINE_TUNE_BYTE = 0x148,
+	REDSOUND_TRACK_RESERVED149_BYTE = 0x149,
+	REDSOUND_TRACK_PITCH_BEND_RANGE_BYTE = 0x14B,
+	REDSOUND_TRACK_RESERVED14C_BYTE = 0x14C,
+	REDSOUND_TRACK_WAVE_BANK_NO_BYTE = 0x14D,
+	REDSOUND_TRACK_TRACK_NO_BYTE = 0x14E,
+	REDSOUND_TRACK_ERASE_TRACK_BYTE = 0x14F,
+	REDSOUND_TRACK_ATTR_MASK_BYTE = 0x150,
+	REDSOUND_TRACK_RESERVED151_BYTE = 0x151,
 };
 
 enum RedTrackWordLayout {
@@ -212,6 +248,8 @@ enum RedTrackWordLayout {
 
 enum RedKeySignatureLayout {
 	REDSOUND_KEY_SIGNATURE_INDEX_MASK = 0x1F,
+	REDSOUND_KEY_SIGNATURE_INDEX_COUNT = REDSOUND_KEY_SIGNATURE_INDEX_MASK + 1,
+	REDSOUND_KEY_SIGNATURE_DATA_COUNT = 0x2E,
 	REDSOUND_KEY_SIGNATURE_DEFAULT_OFFSET = 0x0B,
 };
 
@@ -224,6 +262,13 @@ enum RedTrackFlag {
 struct RedKeyOnSlot {
 	RedTrackDATA* m_track;
 	RedNoteDATA m_note;
+};
+
+enum RedKeyOnSlotLayout {
+	REDSOUND_KEY_ON_SLOT_TRACK_OFFSET = 0x00,
+	REDSOUND_KEY_ON_SLOT_NOTE_OFFSET = 0x04,
+	REDSOUND_KEY_ON_SLOT_SIZE = 0x08,
+	REDSOUND_KEY_ON_SLOT_WORD_COUNT = REDSOUND_KEY_ON_SLOT_SIZE / sizeof(int),
 };
 
 struct RedKeyOnDATA {
@@ -244,9 +289,30 @@ enum RedKeyOnByteOffset {
 	REDSOUND_KEY_ON_END_BYTE_OFFSET = REDSOUND_KEY_ON_TOTAL_WORD_COUNT * sizeof(int),
 };
 
+struct RedSoundControlPosition {
+	int m_measure;
+	int m_tick;
+	int m_ticksPerMeasure;
+	short m_timeNumerator;
+	short m_timeDenominator;
+};
+
+struct RedSoundControlTempo {
+	int m_tempo;
+	int m_tempoAdd;
+	int m_tempoDelta;
+};
+
+struct RedSavedTrackDATA {
+	unsigned char* m_command[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
+	int m_delta[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
+	unsigned int m_flags[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
+	RedNoteDATA m_note[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
+};
+
 struct RedSoundCONTROL {
 	RedTrackDATA* m_tracks;
-	unsigned char m_reserved04[0x08 - 0x04];
+	unsigned char m_reserved04[REDSOUND_CONTROL_RESERVED04_SIZE];
 	signed char* m_keySignatureData;
 	int m_measure;
 	int m_tick;
@@ -256,25 +322,17 @@ struct RedSoundCONTROL {
 	int m_volume;
 	int m_volumeAdd;
 	int m_volumeDelta;
-	unsigned char* m_savedCommand[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
-	int m_savedDelta[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
-	unsigned int m_savedFlags[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
-	RedNoteDATA m_savedNote[REDSOUND_MUSIC_TRACK_SAVE_COUNT];
-	int m_savedTempo;
-	int m_savedTempoAdd;
-	int m_savedTempoDelta;
+	RedSavedTrackDATA m_savedTracks;
+	RedSoundControlTempo m_savedTempo;
 	int m_savedActiveTrackCount;
-	int m_savedMeasure;
-	int m_savedTick;
-	int m_savedTicksPerMeasure;
-	int m_savedTimeSignature;
+	RedSoundControlPosition m_savedPosition;
 	int m_tempo;
 	int m_tempoAdd;
 	int m_tempoDelta;
 	int m_masterVolume;
 	int m_masterVolumeAdd;
 	int m_masterVolumeDelta;
-	unsigned char m_reserved460[0x46C - 0x460];
+	unsigned char m_reserved460[REDSOUND_CONTROL_RESERVED460_SIZE];
 	unsigned int m_flags;
 	int m_musicId;
 	int m_skipFrames;
@@ -299,6 +357,13 @@ enum RedSoundControlFlag {
 	REDSOUND_CONTROL_FLAG_CLEAR_STOP_ON_VOLUME_ZERO_MASK = ~REDSOUND_CONTROL_FLAG_STOP_ON_VOLUME_ZERO,
 };
 
+enum RedSoundControlDefault {
+	REDSOUND_CONTROL_INITIAL_TICK_COUNTER = 1,
+	REDSOUND_CONTROL_DEFAULT_TICKS_PER_MEASURE = 10000,
+	REDSOUND_CONTROL_INITIAL_TICK = -1,
+	REDSOUND_CONTROL_INITIAL_MEASURE = 1,
+};
+
 enum RedSoundControlWordOffset {
 	REDSOUND_CONTROL_MEASURE_WORD_OFFSET = 0x03,
 	REDSOUND_CONTROL_SAVED_COMMAND_WORD_OFFSET = 0x0A,
@@ -313,6 +378,31 @@ enum RedSoundControlWordOffset {
 	REDSOUND_CONTROL_TEMPO_WORD_OFFSET = 0x112,
 };
 
+enum RedSoundControlByteOffset {
+	REDSOUND_CONTROL_TRACKS_OFFSET = 0x00,
+	REDSOUND_CONTROL_RESERVED04_OFFSET = 0x04,
+	REDSOUND_CONTROL_KEY_SIGNATURE_DATA_OFFSET = 0x08,
+	REDSOUND_CONTROL_TICK_OFFSET = 0x10,
+	REDSOUND_CONTROL_TICKS_PER_MEASURE_OFFSET = 0x14,
+	REDSOUND_CONTROL_TIME_NUMERATOR_OFFSET = 0x18,
+	REDSOUND_CONTROL_TIME_DENOMINATOR_OFFSET = 0x1A,
+	REDSOUND_CONTROL_VOLUME_OFFSET = 0x1C,
+	REDSOUND_CONTROL_RESERVED460_OFFSET = 0x460,
+	REDSOUND_CONTROL_FLAGS_OFFSET = 0x46C,
+	REDSOUND_CONTROL_SKIP_FRAMES_OFFSET = 0x474,
+	REDSOUND_CONTROL_ELAPSED_TIME_OFFSET = 0x478,
+	REDSOUND_CONTROL_WAVE_NO_OFFSET = 0x47C,
+	REDSOUND_CONTROL_KEY_SIGNATURE_OFFSET = 0x480,
+	REDSOUND_CONTROL_LOOP_BASE_OFFSET = 0x484,
+	REDSOUND_CONTROL_UPDATE_FLAGS_OFFSET = 0x488,
+	REDSOUND_CONTROL_TICK_COUNTER_OFFSET = 0x48C,
+	REDSOUND_CONTROL_ACTIVE_TRACK_COUNT_OFFSET = 0x48E,
+	REDSOUND_CONTROL_CHANNEL_ALLOC_OFFSET = 0x490,
+	REDSOUND_CONTROL_TRACK_COUNT_OFFSET = 0x491,
+	REDSOUND_CONTROL_VOLUME_SCALE_OFFSET = 0x492,
+	REDSOUND_CONTROL_RESERVED493_OFFSET = 0x493,
+};
+
 enum RedSoundControlBufferOffset {
 	REDSOUND_CONTROL_WORD_COUNT = 0x125,
 	REDSOUND_CONTROL_SECONDARY_TRACKS_WORD_OFFSET = 0x125,
@@ -324,17 +414,34 @@ enum RedSoundControlBufferOffset {
 };
 
 enum RedSoundControlSaveSize {
-	REDSOUND_CONTROL_SAVED_POSITION_SIZE = sizeof(int) * 4,
-	REDSOUND_CONTROL_SAVED_TEMPO_SIZE = sizeof(int) * 3,
+	REDSOUND_CONTROL_SAVED_POSITION_WORD_COUNT = 4,
+	REDSOUND_CONTROL_SAVED_POSITION_ALLOC_SIZE = 0x10,
+	REDSOUND_CONTROL_SAVED_POSITION_SIZE = sizeof(RedSoundControlPosition),
+	REDSOUND_CONTROL_SAVED_TEMPO_WORD_COUNT = 3,
+	REDSOUND_CONTROL_SAVED_TEMPO_ALLOC_SIZE = 0x0C,
+	REDSOUND_CONTROL_SAVED_TEMPO_SIZE = sizeof(RedSoundControlTempo),
 };
 
-typedef void (*RedMidiControlFunc)(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
-int DataAddCompute(int*, int, int*);
-void KeyOnReserveClear(RedKeyOnDATA*, RedTrackDATA*);
-void KeyOnReserve(RedKeyOnDATA*, RedTrackDATA*);
-void KeyOffSet(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*);
+typedef void (*RedMidiControlFunc)(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA* track);
 
-extern RedMidiControlFunc p_MidiControl_Function[];
-extern RedSwingFunc SwingEntryFunction[];
+class CRedMidiCtrl
+{
+public:
+	CRedMidiCtrl();
+	~CRedMidiCtrl();
+
+	void Init();
+
+private:
+	int m_status[3];
+};
+
+int DataAddCompute(int* current, int target, int* delta);
+void KeyOnReserveClear(RedKeyOnDATA* keyOnData, RedTrackDATA* track);
+void KeyOnReserve(RedKeyOnDATA* keyOnData, RedTrackDATA* track);
+void KeyOffSet(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA* track);
+
+extern RedMidiControlFunc p_MidiControl_Function[REDSOUND_MIDI_CONTROL_FUNCTION_COUNT];
+extern RedSwingFunc SwingEntryFunction[REDSOUND_SWING_FUNCTION_COUNT];
 
 #endif // _FFCC_REDSOUND_REDMIDICTRL_H

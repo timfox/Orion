@@ -1,8 +1,23 @@
 #include "ffcc/RedSound/RedMemory.h"
 #include "ffcc/RedSound/RedGlobals.h"
+#include "global.h"
 #include "PowerPC_EABI_Support/Msl/MSL_C/MSL_Common/file_io.h"
 #include "PowerPC_EABI_Support/Msl/MSL_C/MSL_Common/string.h"
 #include <dolphin/os.h>
+
+STATIC_ASSERT(offsetof(RedMemoryBlock, m_address) == REDSOUND_MEMORY_BLOCK_ADDRESS_OFFSET);
+STATIC_ASSERT(offsetof(RedMemoryBlock, m_size) == REDSOUND_MEMORY_BLOCK_SIZE_OFFSET);
+STATIC_ASSERT(sizeof(RedMemoryBlock) == REDSOUND_MEMORY_BLOCK_SIZE);
+STATIC_ASSERT(REDSOUND_MEMORY_BLOCK_SIZE == (1 << REDSOUND_MEMORY_BLOCK_INDEX_SHIFT));
+STATIC_ASSERT(REDSOUND_MEMORY_BANK_SIZE == REDSOUND_MEMORY_BANK_ALLOC_SIZE);
+STATIC_ASSERT(REDSOUND_MEMORY_BANK_SIZE == REDSOUND_MEMORY_BLOCK_SIZE * REDSOUND_MEMORY_BANK_BLOCK_COUNT);
+STATIC_ASSERT(REDSOUND_MEMORY_AUX_BANK_OFFSET == REDSOUND_MEMORY_BANK_ALLOC_SIZE);
+STATIC_ASSERT(REDSOUND_MEMORY_AUX_BANK_OFFSET == REDSOUND_MEMORY_MAIN_BANK_OFFSET + REDSOUND_MEMORY_BANK_SIZE);
+STATIC_ASSERT(REDSOUND_MEMORY_BANK_TABLE_SIZE == REDSOUND_MEMORY_BANK_TABLE_ALLOC_SIZE);
+STATIC_ASSERT(REDSOUND_MEMORY_BANK_TABLE_SIZE == REDSOUND_MEMORY_BANK_SIZE * REDSOUND_MEMORY_BANK_TABLE_COUNT);
+STATIC_ASSERT(REDSOUND_MEMORY_DATA_BUFFER_OFFSET == REDSOUND_MEMORY_BANK_TABLE_ALLOC_SIZE);
+STATIC_ASSERT(REDSOUND_MEMORY_AUX_BANK_OFFSET + REDSOUND_MEMORY_BANK_SIZE == REDSOUND_MEMORY_DATA_BUFFER_OFFSET);
+STATIC_ASSERT(REDSOUND_MEMORY_DATA_BUFFER_OFFSET == REDSOUND_MEMORY_BANK_TABLE_SIZE);
 
 static int m_DataBuffer;
 static int m_ADataBuffer;
@@ -17,6 +32,56 @@ const char sRedMemoryLogPrefix[] = "\x1b[7;34mSound\x1b[0m:";
 const char s_redMemoryAuxBankFullFmt[] = "%s%sA-Memory Bank Full !!%s\n";
 const char sRedMemoryLogSuffixA[] = "\x1b[7;31m";
 const char sRedMemoryLogSuffixB[] = "\x1b[0m";
+
+enum RedMemoryStringLayout {
+	REDSOUND_MEMORY_MAIN_BANK_FULL_FMT_SIZE = 0x1b,
+	REDSOUND_MEMORY_LOG_PREFIX_SIZE = 0x12,
+	REDSOUND_MEMORY_AUX_BANK_FULL_FMT_SIZE = 0x1d,
+	REDSOUND_MEMORY_LOG_SUFFIX_A_SIZE = 0x08,
+	REDSOUND_MEMORY_LOG_SUFFIX_B_SIZE = 0x05,
+	REDSOUND_MEMORY_RODATA_STRING_SIZE = 0x4a,
+	REDSOUND_MEMORY_SDATA2_STRING_SIZE = 0x0d,
+};
+
+enum RedMemorySmallDataLayout {
+	REDSOUND_MEMORY_SBSS_DATA_BUFFER_OFFSET = 0x00,
+	REDSOUND_MEMORY_SBSS_AUX_DATA_BUFFER_OFFSET = 0x04,
+	REDSOUND_MEMORY_SBSS_DATA_BUFFER_SIZE_OFFSET = 0x08,
+	REDSOUND_MEMORY_SBSS_AUX_DATA_BUFFER_SIZE_OFFSET = 0x0C,
+	REDSOUND_MEMORY_SBSS_BANK_TABLE_OFFSET = 0x10,
+	REDSOUND_MEMORY_SBSS_AUX_BANK_TABLE_OFFSET = 0x14,
+	REDSOUND_MEMORY_SBSS_SIZE = 0x18,
+};
+
+struct RedMemorySmallDataState {
+	int m_dataBuffer;
+	int m_auxDataBuffer;
+	int m_dataBufferSize;
+	int m_auxDataBufferSize;
+	RedMemoryBlock* m_memoryBank;
+	RedMemoryBlock* m_auxMemoryBank;
+};
+
+STATIC_ASSERT(sizeof(s_redMemoryMainBankFullFmt) == REDSOUND_MEMORY_MAIN_BANK_FULL_FMT_SIZE);
+STATIC_ASSERT(sizeof(sRedMemoryLogPrefix) == REDSOUND_MEMORY_LOG_PREFIX_SIZE);
+STATIC_ASSERT(sizeof(s_redMemoryAuxBankFullFmt) == REDSOUND_MEMORY_AUX_BANK_FULL_FMT_SIZE);
+STATIC_ASSERT(sizeof(sRedMemoryLogSuffixA) == REDSOUND_MEMORY_LOG_SUFFIX_A_SIZE);
+STATIC_ASSERT(sizeof(sRedMemoryLogSuffixB) == REDSOUND_MEMORY_LOG_SUFFIX_B_SIZE);
+STATIC_ASSERT(sizeof(s_redMemoryMainBankFullFmt) + sizeof(sRedMemoryLogPrefix) +
+                  sizeof(s_redMemoryAuxBankFullFmt) ==
+              REDSOUND_MEMORY_RODATA_STRING_SIZE);
+STATIC_ASSERT(sizeof(sRedMemoryLogSuffixA) + sizeof(sRedMemoryLogSuffixB) == REDSOUND_MEMORY_SDATA2_STRING_SIZE);
+STATIC_ASSERT(offsetof(RedMemorySmallDataState, m_dataBuffer) == REDSOUND_MEMORY_SBSS_DATA_BUFFER_OFFSET);
+STATIC_ASSERT(offsetof(RedMemorySmallDataState, m_auxDataBuffer) == REDSOUND_MEMORY_SBSS_AUX_DATA_BUFFER_OFFSET);
+STATIC_ASSERT(offsetof(RedMemorySmallDataState, m_dataBufferSize) == REDSOUND_MEMORY_SBSS_DATA_BUFFER_SIZE_OFFSET);
+STATIC_ASSERT(offsetof(RedMemorySmallDataState, m_auxDataBufferSize) ==
+              REDSOUND_MEMORY_SBSS_AUX_DATA_BUFFER_SIZE_OFFSET);
+STATIC_ASSERT(offsetof(RedMemorySmallDataState, m_memoryBank) == REDSOUND_MEMORY_SBSS_BANK_TABLE_OFFSET);
+STATIC_ASSERT(offsetof(RedMemorySmallDataState, m_auxMemoryBank) == REDSOUND_MEMORY_SBSS_AUX_BANK_TABLE_OFFSET);
+STATIC_ASSERT(sizeof(RedMemorySmallDataState) == REDSOUND_MEMORY_SBSS_SIZE);
+STATIC_ASSERT(sizeof(m_DataBuffer) + sizeof(m_ADataBuffer) + sizeof(m_DataBufferSize) + sizeof(m_ADataBufferSize) +
+                  sizeof(m_MemoryBank) + sizeof(m_AMemoryBank) ==
+              REDSOUND_MEMORY_SBSS_SIZE);
 
 /*
  * --INFO--
@@ -74,7 +139,7 @@ int RedNew(int size)
 	do {
 		if ((slot->m_size == 0) || ((address + size) <= slot->m_address)) {
 			if (m_MemoryBank[REDSOUND_MEMORY_BANK_LAST_INDEX].m_size > 0) {
-				if (m_ReportPrint != 0) {
+				if (m_ReportPrint != REDSOUND_REPORT_PRINT_OFF) {
 					OSReport(s_redMemoryMainBankFullFmt, sRedMemoryLogPrefix, sRedMemoryLogSuffixA,
 					         sRedMemoryLogSuffixB);
 					fflush(__files + 1);
@@ -182,7 +247,7 @@ int RedNewA(int size, int offset, int maxSize)
 		return 0;
 	}
 	if (m_AMemoryBank[REDSOUND_MEMORY_BANK_LAST_INDEX].m_size > 0) {
-		if (m_ReportPrint != 0) {
+		if (m_ReportPrint != REDSOUND_REPORT_PRINT_OFF) {
 			OSReport(s_redMemoryAuxBankFullFmt, sRedMemoryLogPrefix, sRedMemoryLogSuffixA, sRedMemoryLogSuffixB);
 			fflush(__files + 1);
 		}
@@ -195,7 +260,8 @@ int RedNewA(int size, int offset, int maxSize)
 		maxSize = m_ADataBufferSize;
 	}
 	maxSize -= offset;
-	size = (size + REDSOUND_MEMORY_BANK_ALIGN_MASK) & ~REDSOUND_MEMORY_BANK_ALIGN_MASK;
+	size += REDSOUND_MEMORY_BANK_ALIGN_MASK;
+	size &= ~REDSOUND_MEMORY_BANK_ALIGN_MASK;
 	currentAddress = rangeStart;
 	result = REDSOUND_MEMORY_ALLOC_FAILED;
 	maxGap = maxSize;
@@ -235,9 +301,9 @@ int RedNewA(int size, int offset, int maxSize)
 
 	if ((bestBlock != 0) && ((u32)(result + size) <= (u32)(rangeStart + maxSize))) {
 		if (bestBlock->m_size > 0) {
-			int moveCount = (m_AMemoryBank + REDSOUND_MEMORY_BANK_BLOCK_COUNT) - (bestBlock + 1);
-			if (moveCount > 0) {
-				memmove(bestBlock + 1, bestBlock, moveCount * REDSOUND_MEMORY_BLOCK_SIZE);
+			gap = (m_AMemoryBank + REDSOUND_MEMORY_BANK_BLOCK_COUNT) - (bestBlock + 1);
+			if (gap > 0) {
+				memmove(bestBlock + 1, bestBlock, gap * REDSOUND_MEMORY_BLOCK_SIZE);
 			}
 		}
 		bestBlock->m_address = result;

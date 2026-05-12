@@ -1,6 +1,8 @@
 #ifndef _FFCC_REDSOUND_REDCOMMAND_H
 #define _FFCC_REDSOUND_REDCOMMAND_H
 
+#include "ffcc/RedSound/RedExecute.h"
+
 struct RedMusicHEAD;
 struct RedSeINFO;
 struct RedTrackDATA;
@@ -8,6 +10,15 @@ struct RedWaveHeadWD;
 
 enum RedReverbModeLayout {
 	REDSOUND_REVERB_MODE_PARAM_COUNT = 6,
+	REDSOUND_REVERB_MODE_COUNT = 8,
+	REDSOUND_REVERB_MODE_INDEX_MASK = REDSOUND_REVERB_MODE_COUNT - 1,
+	REDSOUND_REVERB_MODE_KIND_OFFSET = 0x00,
+	REDSOUND_REVERB_MODE_PARAMS_OFFSET = 0x04,
+	REDSOUND_REVERB_MODE_PARAMS_SIZE = sizeof(int) * REDSOUND_REVERB_MODE_PARAM_COUNT,
+	REDSOUND_REVERB_MODE_PARAMS_ALLOC_SIZE = 0x18,
+	REDSOUND_REVERB_MODE_SIZE = 0x1C,
+	REDSOUND_REVERB_MODE_TABLE_SIZE = REDSOUND_REVERB_MODE_SIZE * REDSOUND_REVERB_MODE_COUNT,
+	REDSOUND_REVERB_MODE_TABLE_ALLOC_SIZE = 0xE0,
 };
 
 enum RedReverbParamIndex {
@@ -25,13 +36,24 @@ enum RedReverbParamIndex {
 	REDSOUND_REVERB_PARAM_CHORUS_PERIOD = 2,
 };
 
+enum RedMusicVolumeMode {
+	REDSOUND_MUSIC_VOLUME_MODE_NORMAL = 0,
+	REDSOUND_MUSIC_VOLUME_MODE_FADE_OUT = 1,
+};
+
+enum RedSeVolumeMode {
+	REDSOUND_SE_VOLUME_MODE_NORMAL = 0,
+	REDSOUND_SE_VOLUME_MODE_FADE_OUT = 1,
+};
+
 struct RedReverbModeData {
-	int m_kind;
+	RedReverbKind m_kind;
 	int m_params[REDSOUND_REVERB_MODE_PARAM_COUNT];
 };
 
 RedTrackDATA* SearchSeEmptyTrack(int trackCount, int eraseTrack, int attrMask);
 int SeStopID(int seId);
+int SeStopG(int group);
 int SeStopMG(int bank, int sep, int group, int kind);
 int SeBlockPlay(int seId, int bank, int no, int pan, int volume);
 int SeSepPlay(int seId, int sepId, int pan, int volume);
@@ -42,7 +64,10 @@ void SePause(int seId, int pause);
 int MusicStop(int musicId);
 int MusicPlay(int musicId, int volume, int mode);
 void SetMusicVolume(int musicId, int volume, int frameCount, int mode);
+void SetMusicTempo(int tempo, int frameCount);
+void SetMusicPitch(int pitch, int frameCount);
+void MusicPause(int musicId, int pause);
 
-extern RedReverbModeData t_ReverbModeData[];
+extern RedReverbModeData t_ReverbModeData[REDSOUND_REVERB_MODE_COUNT];
 
 #endif // _FFCC_REDSOUND_REDCOMMAND_H
