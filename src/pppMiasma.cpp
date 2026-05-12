@@ -34,6 +34,19 @@ union PackedMiasmaColor {
     u8 bytes[4];
 };
 
+static inline float CalcSphereRadius(Vec* vertices, u16 count)
+{
+    float radius = FLOAT_80331930;
+
+    for (u16 i = 0; i < count; i++) {
+        if (radius < vertices[i].x) {
+            radius = vertices[i].x;
+        }
+    }
+
+    return radius;
+}
+
 /*
  * --INFO--
  * PAL Address: 0x80109930
@@ -212,22 +225,10 @@ void pppRenderMiasma(pppMiasma* pppMiasma, pppMiasmaRenderStep* param_2, _pppCtr
 
     isCameraInside = 0;
     if ((s32)Game.m_currentSceneId == 7) {
-        float* radiusArray;
-        u16 meshCount;
-
         cameraPos.x = ppvCameraMatrix[0][3];
         cameraPos.y = ppvCameraMatrix[1][3];
         cameraPos.z = ppvCameraMatrix[2][3];
-        maxRadius = FLOAT_80331930;
-
-        meshCount = model->m_vertexCount;
-        radiusArray = (float*)model->m_vertices;
-        for (i = 0; i < meshCount; i++) {
-            radius = radiusArray[i * 3];
-            if (maxRadius < radius) {
-                maxRadius = radius;
-            }
-        }
+        maxRadius = CalcSphereRadius((Vec*)model->m_vertices, model->m_vertexCount);
     } else {
         cameraPos.x = CameraPcs._224_4_;
         cameraPos.y = CameraPcs._228_4_;
@@ -615,28 +616,6 @@ void pppRenderMiasma(pppMiasma* pppMiasma, pppMiasmaRenderStep* param_2, _pppCtr
     _GXSetTevSwapMode__F13_GXTevStageID13_GXTevSwapSel13_GXTevSwapSel(0, 0, 0);
     Graphic.SetViewport();
     gUtil.InitConstantRegister();
-}
-
-/*
- * --INFO--
- * PAL Address: UNUSED
- * PAL Size: 60b
- * EN Address: TODO
- * EN Size: TODO
- * JP Address: TODO
- * JP Size: TODO
- */
-static float CalcSphereRadius(Vec* vertices, u16 count)
-{
-    float radius = FLOAT_80331930;
-
-    for (u16 i = 0; i < count; i++) {
-        if (radius < vertices[i].x) {
-            radius = vertices[i].x;
-        }
-    }
-
-    return radius;
 }
 
 extern const float kQuadObjMaxBounds = 10000000.0f;
