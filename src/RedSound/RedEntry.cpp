@@ -642,10 +642,11 @@ int CRedEntry::SetWaveData(int waveBankNo, void* waveData, int waveDataSize)
 				return REDSOUND_WAVE_NO_NONE;
 			}
 
-			int waveHeadSize =
-			    ((((((RedWaveHeadWD*)waveData)->m_tableCount * REDSOUND_WAVE_TABLE_ENTRY_SIZE) + (REDSOUND_WAVE_TABLE_ALIGN - 1)) &
-			      REDSOUND_WAVE_TABLE_ALIGN_MASK) +
-			     ((RedWaveHeadWD*)waveData)->m_toneCount * REDSOUND_WAVE_TONE_ENTRY_SIZE) +
+			int waveHeadSize = ((RedWaveHeadWD*)waveData)->m_toneCount * REDSOUND_WAVE_TONE_ENTRY_SIZE;
+			waveHeadSize +=
+			    (((((RedWaveHeadWD*)waveData)->m_tableCount * REDSOUND_WAVE_TABLE_ENTRY_SIZE) +
+			      (REDSOUND_WAVE_TABLE_ALIGN - 1)) &
+			     REDSOUND_WAVE_TABLE_ALIGN_MASK) +
 			    REDSOUND_WAVE_HEADER_COPY_BASE_SIZE;
 			waveSize = ((RedWaveHeadWD*)waveData)->m_waveSize;
 			waveDataSize -= waveHeadSize;
