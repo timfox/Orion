@@ -1032,7 +1032,7 @@ static void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* ke
         slot++;
 
         scan++;
-        if ((scan - control->m_tracks) < control->m_trackCount) {
+        if (control->m_trackCount > scan - control->m_tracks) {
             for (; scan < control->m_tracks + control->m_trackCount; scan++) {
                 int currentDelta = deltaAdjust + (scan->m_deltaTime - loopBase);
 
