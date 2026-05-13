@@ -820,7 +820,7 @@ static int _SePlayStart(RedSeINFO* info, int seId, int sepId, int pan, int volum
 	}
 	seq = info->m_sequence;
 	attrMask = info->m_attrMask;
-	count = info->m_flagsAndCount & REDSOUND_SE_INFO_COUNT_MASK;
+	count = info->m_flagsAndCount & ~REDSOUND_SE_INFO_MULTI_FLAG;
 	current = reinterpret_cast<unsigned char*>(seq + count);
 	do {
 		remaining = count;
@@ -864,7 +864,7 @@ static int _SePlayStart(RedSeINFO* info, int seId, int sepId, int pan, int volum
 			}
 			track->m_playTime = state;
 
-			if (*track->m_command != '\0') {
+			if (*track->m_command != 0U) {
 				track->m_eraseTrack = info->m_eraseTrack;
 				track->m_attrMask = info->m_attrMask;
 				track->m_mixVolume = volume << REDSOUND_FIXED_SHIFT;
@@ -915,8 +915,8 @@ static int _SePlayStart(RedSeINFO* info, int seId, int sepId, int pan, int volum
 				voiceData->m_track = track;
 				voiceData->m_stateFlags = REDSOUND_VOICE_STATE_PLAYING | REDSOUND_VOICE_STATE_SE;
 				voiceData->m_flags = REDSOUND_VOICE_FLAGS_RELEASED;
-				voiceData->m_volumeModPhase = 0;
-				voiceData->m_pitchModPhase = 0;
+				voiceData->m_volumeModFrames = 0;
+				voiceData->m_pitchModFrames = 0;
 				voiceData->m_updateFlags = 0;
 			}
 
