@@ -1464,7 +1464,7 @@ void CGItemObj::ItemJump(int state, float jump)
 
 			if (CheckHitCylinderNear__7CMapMngFP12CMapCylinderP3VecUl(
 			        &MapMng, reinterpret_cast<CMapCylinder*>(&cylinder), &move, mapMask) != 0 &&
-			    g_hit_lpface_min->m_groupIndex == state) {
+			    g_hit_f->m_groupIndex == state) {
 				object->m_groundHitOffset.y += jump;
 			}
 		}
