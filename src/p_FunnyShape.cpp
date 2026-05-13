@@ -459,6 +459,9 @@ unsigned int m_table__14CFunnyShapePcs[0x15C / sizeof(unsigned int)] = {
 unsigned int lbl_801EA904[4] = {
     reinterpret_cast<unsigned int>(lbl_8032E660), 0, 0, reinterpret_cast<unsigned int>(lbl_8032E660)
 };
+unsigned int lbl_801EA914[4] = {
+    0, 0, 0, 0
+};
 u8 ARRAY_8026D728[0xC];
 u8 FunnyShapePcs[sizeof(CFunnyShapePcs)];
 
