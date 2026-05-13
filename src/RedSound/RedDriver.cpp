@@ -621,6 +621,7 @@ STATIC_ASSERT(REDSOUND_DRIVER_SBSS_BEFORE_RED_MEMORY_SIZE + sizeof(c_RedMemory) 
                   REDSOUND_DRIVER_SBSS_RED_MEMORY_PAD_SIZE + sizeof(m_DMAExecute) +
                   sizeof(m_DMAInThread) + REDSOUND_DRIVER_SBSS_TRAILING_PAD_SIZE ==
               REDSOUND_DRIVER_SBSS_SIZE);
+STATIC_ASSERT(sizeof(m_SilentWave) == sizeof(int));
 
 static inline RedDriverSyncState& RedDriverSync()
 {
