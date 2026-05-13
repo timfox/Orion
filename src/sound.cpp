@@ -355,7 +355,7 @@ extern "C" void CalcBound__9CLine2(CLine* line)
  * Address:	TODO
  * Size:	TODO
  */
-CSound::CSound()
+inline CSound::CSound()
 {
     unsigned char* sound = reinterpret_cast<unsigned char*>(this);
 
@@ -541,7 +541,7 @@ void CSound::SetSeMasterVolume(int volume)
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::create(int)
+inline void CSound::create(int)
 {
 	// TODO
 }
@@ -551,7 +551,7 @@ void CSound::create(int)
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::destroy()
+inline void CSound::destroy()
 {
 	// TODO
 }
@@ -1561,7 +1561,7 @@ void CSound::FadeOutSe(int seId, int fadeFrames)
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::ChangeSeVolume(int, int, int)
+inline void CSound::ChangeSeVolume(int, int, int)
 {
 	// TODO
 }
@@ -1571,7 +1571,7 @@ void CSound::ChangeSeVolume(int, int, int)
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::ChangeSePan(int, int, int)
+inline void CSound::ChangeSePan(int, int, int)
 {
 	// TODO
 }
@@ -1777,7 +1777,7 @@ int CSound::PlaySe3D(int soundId, Vec* pos, float nearDistance, float farDistanc
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::searchSe3D(int)
+inline void CSound::searchSe3D(int)
 {
 	// TODO
 }
@@ -2453,7 +2453,7 @@ void CSound::SetStreamVolume(int volume, int frames)
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::IsPlayStream()
+inline void CSound::IsPlayStream()
 {
 	// TODO
 }
@@ -2463,7 +2463,7 @@ void CSound::IsPlayStream()
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::IsDebugPrint(int)
+inline void CSound::IsDebugPrint(int)
 {
 	// TODO
 }
@@ -2541,7 +2541,7 @@ void CSound::AddNoFreeWave(int wave)
  * Address:	TODO
  * Size:	TODO
  */
-void CSound::WaitASync()
+inline void CSound::WaitASync()
 {
 	// TODO
 }
