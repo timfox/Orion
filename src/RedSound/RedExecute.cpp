@@ -730,8 +730,8 @@ static void _ClearReverb(int bank)
  * --INFO--
  * PAL Address: UNUSED
  * PAL Size: 8b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: UNUSED
+ * EN Size: 8b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -868,8 +868,8 @@ RedReverbSize* SetReverb(int bank, int kind, int* params)
  * --INFO--
  * PAL Address: UNUSED
  * PAL Size: 8b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: UNUSED
+ * EN Size: 8b
  * JP Address: TODO
  * JP Size: TODO
  */

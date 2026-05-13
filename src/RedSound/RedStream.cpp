@@ -799,8 +799,8 @@ static int _ArrangeStreamDataLoop(RedStreamDATA* stream, int bufferIndex, int by
  * --INFO--
  * PAL Address: UNUSED
  * PAL Size: 184b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: UNUSED
+ * EN Size: 184b
  * JP Address: TODO
  * JP Size: TODO
  */

@@ -732,8 +732,8 @@ static int _EraseTime(int eraseTrack)
  * --INFO--
  * PAL Address: UNUSED
  * PAL Size: 408b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: UNUSED
+ * EN Size: 408b
  * JP Address: TODO
  */
 int SeStopG(int group)

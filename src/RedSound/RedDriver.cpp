@@ -2254,8 +2254,8 @@ int CRedDriver::SetMusicData(void* musicData)
  * --INFO--
  * PAL Address: UNUSED
  * PAL Size: 72b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: UNUSED
+ * EN Size: 72b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2287,8 +2287,8 @@ int CRedDriver::ReentryMusicData(int musicID)
  * --INFO--
  * PAL Address: UNUSED
  * PAL Size: 372b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: UNUSED
+ * EN Size: 372b
  * JP Address: TODO
  */
 int CRedDriver::MusicPlayState(int musicID)
