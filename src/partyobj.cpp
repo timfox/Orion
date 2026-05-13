@@ -147,6 +147,7 @@ struct PartyObjOverlay {
 	};
 	union {
 		int unk6EC;
+		float unk6ECFloat;
 		int _legacy6EC;
 		float legacyTargetSearchDistance;
 	};
@@ -308,34 +309,32 @@ void CGPartyObj::onCreate()
 
 	PartyObjOverlay& party = PartyData(this);
 	party.unk6D0 = 0;
+	float targetDist = FLOAT_80331a78;
 	party.attackSel = 0;
 	party.unk6CC = 0;
 	party.unk6BC = 0;
 	party.target = 0;
 	party.targetOverride = 0;
-	party.legacyTargetSearchDistance = *(float*)__float_huge;
+	party.unk6ECFloat = INFINITY;
 	party.carryObject = 0;
-	party.unk6C0 = -1;
-	party.weaponItem = 0;
-	party.pendingWeaponItem = 0;
-	party.unk6D2 = 0;
 
 	party.flags.commandActive = 0;
 	party.flags.flag08 = 0;
+	party.weaponItem = 0;
+	party.pendingWeaponItem = 0;
 	party.flags.flag40 = 0;
 	party.flags.flag20 = 0;
 	party.flags.flag10 = 0;
 	party.flags.flag04 = 0;
 	party.flags.flag02 = 0;
 
-	m_targetDist = FLOAT_80331a78;
+	m_targetDist = targetDist;
+	party.unk6C0 = -1;
+	party.commandMode = 0;
 
-	if (lbl_8032EE74 == 0) {
-		DAT_8032EE70 = 0;
-		lbl_8032EE74 = 1;
-	}
-	if (DAT_8032EE70 == 0) {
-		DAT_8032EE70 = 1;
+	static int s_created;
+	if (s_created == 0) {
+		s_created = 1;
 	}
 }
 
