@@ -1438,7 +1438,7 @@ void CGItemObj::ItemJump(int state, float jump)
 		CGObject* object = reinterpret_cast<CGObject*>(itemObj);
 
 		if ((object->m_objectFlags & 0x10) == 0) {
-			unsigned int mapMask = *reinterpret_cast<unsigned int*>(&object->m_moveVec.x);
+			unsigned int mapMask = object->m_bgHitMask;
 			CMapCylinderRaw cylinder;
 			Vec move;
 
