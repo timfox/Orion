@@ -363,7 +363,7 @@ enum RedMidiSwingConst {
     REDSOUND_SWING_SAW_PHASE_SHIFT = 2,
     REDSOUND_SWING_PHASE_SHIFT = 8,
     REDSOUND_SWING_PHASE_MASK = 0xFF,
-    REDSOUND_SWING_PHASE_INVERT_MASK = 0xffffffffU,
+    REDSOUND_SWING_PHASE_INVERT_MASK = -1,
     REDSOUND_SWING_QUADRANT_MASK = 3,
     REDSOUND_SWING_LEVEL_FULL = 0x10000,
     REDSOUND_SWING_RANDOM_REVERSE_PHASE = 0x40,
@@ -578,7 +578,6 @@ int DataAddCompute(int* current, int target, int* delta)
 
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C74C8
@@ -598,7 +597,6 @@ void KeyOnReserveClear(RedKeyOnDATA* keyOnData, RedTrackDATA* track)
         slot++;
     } while (slot < keyOnData->m_normal + REDSOUND_KEY_ON_SLOT_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7504
@@ -646,7 +644,6 @@ void KeyOnReserve(RedKeyOnDATA* keyOnData, RedTrackDATA* track)
         } while (slot < keyOnData->m_normal + REDSOUND_KEY_ON_SLOT_COUNT);
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C75F4
@@ -684,7 +681,6 @@ void KeyOffSet(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, RedTrackDATA* 
         } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C76D0
@@ -704,7 +700,6 @@ static int SineSwing(int phase)
     }
     return value;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C770C
@@ -732,7 +727,6 @@ static int TriangleSwing(int phase)
 
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7768
@@ -748,7 +742,6 @@ static int SawSwing(int phase)
 
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C778C
@@ -771,7 +764,6 @@ static int DutySwing(int phase)
     result = value;
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C77C4
@@ -789,7 +781,6 @@ static int RandomSwing(int phase)
 
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C77FC
@@ -809,7 +800,6 @@ static int SineSwingR(int phase)
     }
     return value;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C783C
@@ -840,7 +830,6 @@ static int TriangleSwingR(int phase)
 
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C789C
@@ -865,7 +854,6 @@ static int DutySwingR(int phase)
     result = value;
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C78D8
@@ -877,12 +865,11 @@ static int DutySwingR(int phase)
  */
 static int SawSwingR(int phase)
 {
-    int result = (int)(char)((int)((u32)phase ^ REDSOUND_SWING_PHASE_INVERT_MASK) >> REDSOUND_SWING_SAW_PHASE_SHIFT)
+    int result = (int)(char)((phase ^ REDSOUND_SWING_PHASE_INVERT_MASK) >> REDSOUND_SWING_SAW_PHASE_SHIFT)
                  << REDSOUND_SWING_PHASE_SHIFT;
 
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7904
@@ -901,7 +888,6 @@ static int RandomSwingR(int phase)
 
     return result;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7940
@@ -915,7 +901,6 @@ static void __MidiCtrl_NoSupport(RedSoundCONTROL* control, RedKeyOnDATA* keyOnDa
 {
 	__MidiCtrl_Stop(control, keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801c7978
@@ -929,7 +914,6 @@ static void __MidiCtrl_Pass(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*)
 {
 	// TODO
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C797C
@@ -987,7 +971,6 @@ static void __MidiCtrl_Stop(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, R
         track->m_seId = REDSOUND_SE_ID_NONE;
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7B44
@@ -1009,7 +992,6 @@ static void __MidiCtrl_Sleep(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData, 
         } while (track < control->m_tracks + control->m_trackCount);
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7BCC
@@ -1047,28 +1029,29 @@ static void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* ke
         savedTrackData->m_delta[slot] = scan->m_deltaTime + delta + deltaAdjust;
         savedTrackData->m_flags[slot] = scan->m_flags;
         RedNoteCopy(&savedTrackData->m_note[slot], &scan->m_note);
+        slot++;
 
-        RedTrackDATA* nextTrack = scan + 1;
-        if ((nextTrack - control->m_tracks) < control->m_trackCount) {
-            for (; nextTrack < control->m_tracks + control->m_trackCount; nextTrack++) {
-                int currentDelta = deltaAdjust + (nextTrack->m_deltaTime - loopBase);
+        scan++;
+        if ((scan - control->m_tracks) < control->m_trackCount) {
+            for (; scan < control->m_tracks + control->m_trackCount; scan++) {
+                int currentDelta = deltaAdjust + (scan->m_deltaTime - loopBase);
 
-                while ((currentDelta < 1) && (nextTrack->m_command != 0)) {
-                    unsigned char* cmd = nextTrack->m_command;
-                    nextTrack->m_command = cmd + 1;
-                    p_MidiControl_Function[*cmd](control, keyOnData, nextTrack);
+                while ((currentDelta < 1) && (scan->m_command != 0)) {
+                    unsigned char* cmd = scan->m_command;
+                    scan->m_command = cmd + 1;
+                    p_MidiControl_Function[*cmd](control, keyOnData, scan);
 
-                    if (nextTrack->m_command != 0) {
-                        int step = DeltaTimeSumup((unsigned char**)&nextTrack->m_command);
-                        currentDelta += step;
-                        nextTrack->m_deltaTime += step;
+                    if (scan->m_command != 0) {
+                        delta = DeltaTimeSumup((unsigned char**)&scan->m_command);
+                        currentDelta += delta;
+                        scan->m_deltaTime += delta;
                     }
                 }
 
-                savedTrackData->m_command[slot + 1] = nextTrack->m_command;
-                savedTrackData->m_delta[slot + 1] = currentDelta;
-                savedTrackData->m_flags[slot + 1] = nextTrack->m_flags;
-                RedNoteCopy(&savedTrackData->m_note[slot + 1], &nextTrack->m_note);
+                savedTrackData->m_command[slot] = scan->m_command;
+                savedTrackData->m_delta[slot] = currentDelta;
+                savedTrackData->m_flags[slot] = scan->m_flags;
+                RedNoteCopy(&savedTrackData->m_note[slot], &scan->m_note);
                 slot++;
             }
         }
@@ -1087,7 +1070,6 @@ static void __MidiCtrl_WholeLoopStart(RedSoundCONTROL* control, RedKeyOnDATA* ke
             &control->m_tempo,
             REDSOUND_CONTROL_SAVED_TEMPO_SIZE);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7E40
@@ -1110,7 +1092,6 @@ static void __MidiCtrl_WholeLoopEnd(RedSoundCONTROL* control, RedKeyOnDATA* keyO
         } while (track < control->m_tracks + control->m_trackCount);
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7ED4
@@ -1128,7 +1109,6 @@ static void __MidiCtrl_LoopStart(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
     track->m_loopStep[track->m_loopDepth] = track->m_loopStepCurrent;
     track->m_loopCount[track->m_loopDepth] = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7F2C
@@ -1156,7 +1136,6 @@ static void __MidiCtrl_LoopEnd(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         track->m_loopDepth &= REDSOUND_TRACK_LOOP_STACK_COUNT - 1;
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7FD0
@@ -1171,7 +1150,6 @@ static void __MidiCtrl_LoopRepeat(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
     track->m_command = track->m_loopCommand[track->m_loopDepth];
     track->m_loopStepCurrent = track->m_loopStep[track->m_loopDepth];
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C7FFC
@@ -1187,7 +1165,6 @@ static void __MidiCtrl_TempoDirect(RedSoundCONTROL* control, RedKeyOnDATA*, RedT
     control->m_tempoAdd = 0;
     control->m_tempoDelta = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8028
@@ -1210,7 +1187,6 @@ static void __MidiCtrl_TempoChange(RedSoundCONTROL* control, RedKeyOnDATA*, RedT
     control->m_tempoDelta = delta;
     track->m_command += 2;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C80B4
@@ -1237,7 +1213,6 @@ static void __MidiCtrl_ReverbDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTra
     reverbDepth->m_count = 0;
     SetVoiceAccess(track, REDSOUND_VOICE_FLAGS_ADPCM_DIRTY);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8158
@@ -1266,7 +1241,6 @@ static void __MidiCtrl_ReverbDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTra
     reverbDepth->m_count = stepCount;
     track->m_command += 2;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C820C
@@ -1284,7 +1258,6 @@ static void __MidiCtrl_TimeSignature(RedSoundCONTROL* control, RedKeyOnDATA*, Re
         (REDSOUND_MIDI_TICKS_PER_WHOLE_NOTE / control->m_timeDenominator) * control->m_timeNumerator;
     track->m_command += 2;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C824C
@@ -1313,7 +1286,6 @@ static void __MidiCtrl_KeySignature(RedSoundCONTROL* control, RedKeyOnDATA*, Red
         } while (scan < control->m_tracks + control->m_trackCount);
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C82D8
@@ -1327,7 +1299,6 @@ static void __MidiCtrl_PhraseSignature(RedSoundCONTROL*, RedKeyOnDATA*, RedTrack
 {
     int command = *track->m_command++;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C82F8
@@ -1341,7 +1312,6 @@ static void __MidiCtrl_KeyOnSame(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedT
 {
     KeyOnReserve(keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8328
@@ -1358,7 +1328,6 @@ static void __MidiCtrl_KeyOnNoteVelocity(RedSoundCONTROL*, RedKeyOnDATA* keyOnDa
 
     KeyOnReserve(keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8390
@@ -1374,7 +1343,6 @@ static void __MidiCtrl_KeyOnNote(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedT
 
     KeyOnReserve(keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C83E0
@@ -1390,7 +1358,6 @@ static void __MidiCtrl_KeyOnVelocity(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, 
 
     KeyOnReserve(keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8430
@@ -1404,7 +1371,6 @@ static void __MidiCtrl_KeyOffSame(RedSoundCONTROL* control, RedKeyOnDATA* keyOnD
 {
     KeyOffSet(control, keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8468
@@ -1421,7 +1387,6 @@ static void __MidiCtrl_KeyOffNoteVelocity(RedSoundCONTROL* control, RedKeyOnDATA
 
     KeyOffSet(control, keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C84C8
@@ -1437,7 +1402,6 @@ static void __MidiCtrl_KeyOffNote(RedSoundCONTROL* control, RedKeyOnDATA* keyOnD
 
     KeyOffSet(control, keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C851C
@@ -1453,7 +1417,6 @@ static void __MidiCtrl_KeyOffVelocity(RedSoundCONTROL* control, RedKeyOnDATA* ke
 
     KeyOffSet(control, keyOnData, track);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8564
@@ -1480,7 +1443,6 @@ static void __MidiCtrl_Wave(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track
     track->m_waveBankNo = REDSOUND_MIDI_WAVE_BANK_DIRECT;
     track->m_waveNo = waveNo;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C861C
@@ -1513,7 +1475,6 @@ static void __MidiCtrl_WaveWithBank(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
 	track->m_waveBankNo = bankNo;
 	track->m_waveNo = waveNo;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C86C4
@@ -1540,7 +1501,6 @@ static void __MidiCtrl_VolumeDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
     track->m_volumeDelta = 0;
     m_ChangeStatus |= REDSOUND_VOICE_UPDATE_VOLUME;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8720
@@ -1570,7 +1530,6 @@ static void __MidiCtrl_VolumeChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
     track->m_volumeAdd = DataAddCompute(&track->m_volume, volume, delta);
     track->m_volumeDelta = delta[0];
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C87B4
@@ -1589,7 +1548,6 @@ static void __MidiCtrl_ExpressionDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrac
     track->m_expressionDelta = 0;
     m_ChangeStatus |= REDSOUND_VOICE_UPDATE_VOLUME;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8800
@@ -1613,7 +1571,6 @@ static void __MidiCtrl_ExpressionChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrac
     track->m_expressionAdd = DataAddCompute(&track->m_expression, expression, delta);
     track->m_expressionDelta = delta[0];
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8884
@@ -1636,7 +1593,6 @@ static void __MidiCtrl_PanDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
     }
     m_ChangeStatus |= REDSOUND_VOICE_UPDATE_VOLUME;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C88E0
@@ -1663,7 +1619,6 @@ static void __MidiCtrl_PanChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
 	track->m_panAdd = DataAddCompute(&track->m_pan, pan, delta);
 	track->m_panDelta = delta[0];
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8984
@@ -1677,7 +1632,6 @@ static void __MidiCtrl_PortamentOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA
 {
 	track->m_portamentTime = DeltaTimeSumup((unsigned char**)&track->m_command);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C89B8
@@ -1692,7 +1646,6 @@ static void __MidiCtrl_PortamentOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
     track->m_portamentTime = 0;
     track->m_portamentPitch = REDSOUND_TRACK_PORTAMENT_PITCH_NONE;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C89CC
@@ -1707,7 +1660,6 @@ static void __MidiCtrl_SlurOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tra
     track->m_flags |= REDSOUND_TRACK_FLAG_SLUR;
     track->m_flags &= ~REDSOUND_TRACK_FLAG_SLUR_RELEASE;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C89E8
@@ -1721,7 +1673,6 @@ static void __MidiCtrl_SlurOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
 {
     track->m_flags &= ~REDSOUND_TRACK_FLAG_SLUR;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C89F8
@@ -1758,7 +1709,6 @@ static void __MidiCtrl_Sweep(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* trac
         voiceData++;
     } while (voiceData < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801c8acc
@@ -1772,7 +1722,6 @@ static void __MidiCtrl_TenutoOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* t
 {
     track->m_flags |= REDSOUND_TRACK_FLAG_TENUTO;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801c8adc
@@ -1786,7 +1735,6 @@ static void __MidiCtrl_TenutoOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
 {
     track->m_flags &= ~REDSOUND_TRACK_FLAG_TENUTO;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8AEC
@@ -1813,7 +1761,6 @@ static void __MidiCtrl_ADSR_Default(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8B8C
@@ -1840,7 +1787,6 @@ static void __MidiCtrl_ADSR_AL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8BF4
@@ -1867,7 +1813,6 @@ static void __MidiCtrl_ADSR_AR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8C70
@@ -1894,7 +1839,6 @@ static void __MidiCtrl_ADSR_DL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8CD8
@@ -1921,7 +1865,6 @@ static void __MidiCtrl_ADSR_DR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8D54
@@ -1948,7 +1891,6 @@ static void __MidiCtrl_ADSR_SL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8DBC
@@ -1975,7 +1917,6 @@ static void __MidiCtrl_ADSR_SR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8E38
@@ -2002,7 +1943,6 @@ static void __MidiCtrl_ADSR_RL(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         voice++;
     } while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8EA0
@@ -2029,7 +1969,6 @@ static void __MidiCtrl_ADSR_RR(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
 		voice++;
 	} while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8F1C
@@ -2066,7 +2005,6 @@ static void __MidiCtrl_SustainPedal(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
     track->m_command += 1;
     SetVoiceSwitch(track, track->m_voiceSwitch);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C8FF0
@@ -2080,7 +2018,6 @@ static void __MidiCtrl_ChannelAlloc(RedSoundCONTROL* control, RedKeyOnDATA*, Red
 {
     control->m_channelAlloc = (int)*track->m_command++;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9008
@@ -2101,7 +2038,6 @@ static void __MidiCtrl_ChannelPriority(RedSoundCONTROL*, RedKeyOnDATA*, RedTrack
         track->m_note.m_allocFlags &= ~REDSOUND_NOTE_ALLOC_PRIORITY;
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9050
@@ -2122,7 +2058,6 @@ static void __MidiCtrl_ChannelFix(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
         track->m_note.m_allocFlags &= ~REDSOUND_NOTE_ALLOC_RESERVED;
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801c9098
@@ -2172,7 +2107,6 @@ static void __MidiCtrl_VibrateOn(RedSoundCONTROL* control, RedKeyOnDATA* keyOn, 
         entry++;
     } while (entry < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801c91b8
@@ -2186,7 +2120,6 @@ static void __MidiCtrl_VibrateOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
 {
     track->m_vibrateFunc = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C91C4
@@ -2201,7 +2134,6 @@ static void __MidiCtrl_VibrateDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTr
 	track->m_vibrateDepth = (unsigned int)*track->m_command++ << REDSOUND_FIXED_SHIFT;
 	track->m_vibrateDepthDelta = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C91E8
@@ -2223,7 +2155,6 @@ static void __MidiCtrl_VibrateDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTr
 	track->m_vibrateDepthDelta = (short)delta[0];
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9260
@@ -2247,7 +2178,6 @@ static void __MidiCtrl_VibrateRateDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTra
 	track->m_vibrateRateDelta = 0;
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C92C0
@@ -2280,7 +2210,6 @@ static void __MidiCtrl_VibrateRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTra
     track->m_vibrateRateDelta = (short)trackDelta[0];
     track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9370
@@ -2296,7 +2225,6 @@ static void __MidiCtrl_VibrateType(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA
 
 	track->m_vibrateFunc = SwingEntryFunction[type & REDSOUND_MIDI_SWING_FUNC_MASK];
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C93B0
@@ -2312,7 +2240,6 @@ static void __MidiCtrl_VibrateDelay(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
 	track->m_vibrateDelayDepth = (short)track->m_command[REDSOUND_MIDI_MOD_DELAY_DEPTH];
 	track->m_command += 2;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801c93d8
@@ -2361,7 +2288,6 @@ static void __MidiCtrl_TremoloOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
 		voice++;
 	} while (voice < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C94F8
@@ -2375,7 +2301,6 @@ static void __MidiCtrl_TremoloOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA*
 {
 	track->m_tremoloFunc = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9504
@@ -2390,7 +2315,6 @@ static void __MidiCtrl_TremoloDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTr
 	track->m_tremoloDepth = *track->m_command++ << REDSOUND_FIXED_SHIFT;
 	track->m_tremoloDepthDelta = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9528
@@ -2412,7 +2336,6 @@ static void __MidiCtrl_TremoloDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTr
 	track->m_tremoloDepthDelta = (short)delta[0];
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C95A0
@@ -2436,7 +2359,6 @@ static void __MidiCtrl_TremoloRateDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTra
 	track->m_tremoloRateDelta = 0;
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9600
@@ -2467,7 +2389,6 @@ static void __MidiCtrl_TremoloRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTra
 	track->m_tremoloRateDelta = (short)delta[0];
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C96B0
@@ -2483,7 +2404,6 @@ static void __MidiCtrl_TremoloType(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA
 
 	track->m_tremoloFunc = SwingEntryFunction[type & REDSOUND_MIDI_SWING_FUNC_MASK];
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C96F0
@@ -2499,7 +2419,6 @@ static void __MidiCtrl_TremoloDelay(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
 	track->m_tremoloDelayDepth = (s16)track->m_command[REDSOUND_MIDI_MOD_DELAY_DEPTH];
 	track->m_command += 2;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9718
@@ -2528,7 +2447,6 @@ static void __MidiCtrl_ShakeOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
 	track->m_shakePan = 0;
 	track->m_command += 3;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801c97bc
@@ -2542,7 +2460,6 @@ static void __MidiCtrl_ShakeOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* t
 {
     track->m_shakeFunc = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C97C8
@@ -2557,7 +2474,6 @@ static void __MidiCtrl_ShakeDepthDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrac
     track->m_shakeDepth = (unsigned int)*track->m_command++ << REDSOUND_FIXED_SHIFT;
     track->m_shakeDepthDelta = 0;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C97EC
@@ -2579,7 +2495,6 @@ static void __MidiCtrl_ShakeDepthChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrac
 	track->m_shakeDepthDelta = (short)delta[0];
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9864
@@ -2603,7 +2518,6 @@ static void __MidiCtrl_ShakeRateDirect(RedSoundCONTROL*, RedKeyOnDATA*, RedTrack
 	track->m_shakeRateDelta = 0;
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C98C4
@@ -2634,7 +2548,6 @@ static void __MidiCtrl_ShakeRateChange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrack
 	track->m_shakeRateDelta = (short)delta[0];
 	track->m_command += 1;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9974
@@ -2650,7 +2563,6 @@ static void __MidiCtrl_ShakeType(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
 
 	track->m_shakeFunc = SwingEntryFunction[type & REDSOUND_MIDI_SWING_FUNC_MASK];
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C99B4
@@ -2665,7 +2577,6 @@ static void __MidiCtrl_FineTuneAbsolute(RedSoundCONTROL*, RedKeyOnDATA*, RedTrac
 	track->m_fineTune = (int)*track->m_command++;
 	m_ChangeStatus |= REDSOUND_VOICE_UPDATE_PITCH;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C99D8
@@ -2680,7 +2591,6 @@ static void __MidiCtrl_FineTuneRelative(RedSoundCONTROL*, RedKeyOnDATA*, RedTrac
 	track->m_fineTune = track->m_fineTune + *(s8*)track->m_command++;
 	m_ChangeStatus |= REDSOUND_VOICE_UPDATE_PITCH;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9A04
@@ -2695,7 +2605,6 @@ static void __MidiCtrl_KeyTransposeAbsolute(RedSoundCONTROL*, RedKeyOnDATA*, Red
 	track->m_keyTranspose = (short)(*(s8*)track->m_command++ << REDSOUND_MIDI_KEY_TRANSPOSE_SHIFT);
 	m_ChangeStatus |= REDSOUND_VOICE_UPDATE_PITCH;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9A30
@@ -2710,7 +2619,6 @@ static void __MidiCtrl_KeyTransposeRelative(RedSoundCONTROL*, RedKeyOnDATA*, Red
 	track->m_keyTranspose += *(s8*)track->m_command++ << REDSOUND_MIDI_KEY_TRANSPOSE_SHIFT;
 	m_ChangeStatus |= REDSOUND_VOICE_UPDATE_PITCH;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9A64
@@ -2743,7 +2651,6 @@ static void _PitchBendCompute(RedTrackDATA* track, int bend)
         voiceData++;
     } while (voiceData < p_VoiceData + REDSOUND_VOICE_COUNT);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9B3C
@@ -2766,7 +2673,6 @@ static void __MidiCtrl_PitchBend(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
     track->m_command += 2;
     _PitchBendCompute(track, track->m_pitchBend);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9BC0
@@ -2786,7 +2692,6 @@ static void __MidiCtrl_PitchBendRange(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackD
     track->m_pitchBend = bend;
     _PitchBendCompute(track, track->m_pitchBend);
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9C30
@@ -2802,7 +2707,6 @@ static void __MidiCtrl_ReverbOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* t
     SetVoiceSwitch(track, track->m_voiceSwitch);
     m_ChangeStatus |= REDSOUND_VOICE_UPDATE_VOLUME;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9C7C
@@ -2819,7 +2723,6 @@ static void __MidiCtrl_ReverbOff(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
     SetVoiceSwitch(track, track->m_voiceSwitch);
     m_ChangeStatus |= REDSOUND_VOICE_UPDATE_VOLUME;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9CD4
@@ -2858,7 +2761,6 @@ static void __MidiCtrl_ReverbMix(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* 
     SetVoiceSwitch(track, track->m_voiceSwitch);
     m_ChangeStatus |= REDSOUND_VOICE_UPDATE_VOLUME;
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9DBC
@@ -2888,7 +2790,6 @@ static void __MidiCtrl_StepRelative(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDAT
         track->m_step = 9999;
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9E3C
@@ -2919,7 +2820,6 @@ static void __MidiCtrl_StepRelative2(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDA
         track->m_step2 = 9999;
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9EBC
@@ -2967,7 +2867,6 @@ static void __MidiCtrl_FuzzyOn(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* tr
         return;
     }
 }
-
 /*
  * --INFO--
  * PAL Address: 0x801C9FA0
