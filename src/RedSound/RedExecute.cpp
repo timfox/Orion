@@ -2158,8 +2158,8 @@ static void _KeyOnControl()
  * --INFO--
  * PAL Address: 0x801c5a3c
  * PAL Size: 688b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80207960
+ * EN Size: 688b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2251,8 +2251,8 @@ static void _ExecuteExtraData()
  * --INFO--
  * PAL Address: 0x801c5cec
  * PAL Size: 1200b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80207c10
+ * EN Size: 1200b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2440,8 +2440,8 @@ static void _MusicTrackDataExecute(RedTrackDATA* track, int frames)
  * --INFO--
  * PAL Address: 0x801c619c
  * PAL Size: 552b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x802080c0
+ * EN Size: 552b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2521,8 +2521,8 @@ static void _MidiTrackExecute(RedSoundCONTROL* control, RedKeyOnDATA* keyOnData,
  * --INFO--
  * PAL Address: 0x801c63c4
  * PAL Size: 236b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x802082e8
+ * EN Size: 236b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2561,8 +2561,8 @@ static int _MusicMidiNoteExecute(RedSoundCONTROL* control, RedKeyOnDATA* keyOnDa
  * --INFO--
  * PAL Address: 0x801c64b0
  * PAL Size: 340b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x802083d4
+ * EN Size: 340b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2608,8 +2608,8 @@ static void _MusicNoteExecute()
  * --INFO--
  * PAL Address: 0x801c6604
  * PAL Size: 304b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80208528
+ * EN Size: 304b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2658,8 +2658,8 @@ static int _MusicMidiNoteSkipExecute(RedSoundCONTROL* control, RedKeyOnDATA* key
  * --INFO--
  * PAL Address: 0x801c6734
  * PAL Size: 588b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80208658
+ * EN Size: 588b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2748,8 +2748,8 @@ static void _SkipMusicEntry()
  * --INFO--
  * PAL Address: 0x801c6980
  * PAL Size: 308b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x802088a4
+ * EN Size: 308b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -2799,8 +2799,8 @@ void MusicSkipFunction()
  * --INFO--
  * PAL Address: 0x801c6ab4
  * PAL Size: 1416b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x802089d8
+ * EN Size: 1416b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -3007,8 +3007,8 @@ static void _SeTrackDataExecute(RedTrackDATA* track, int frames)
  * --INFO--
  * PAL Address: 0x801c703c
  * PAL Size: 572b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80208f60
+ * EN Size: 572b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -3084,8 +3084,8 @@ static int _SeMidiNoteExecute(
  * --INFO--
  * PAL Address: 0x801c7278
  * PAL Size: 512b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020919c
+ * EN Size: 512b
  * JP Address: TODO
  * JP Size: TODO
  */
