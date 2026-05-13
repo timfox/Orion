@@ -666,7 +666,6 @@ static void _EraseAttribute(int eraseTrack, int attrMask)
 static int _EraseTime(int eraseTrack)
 {
 	int minEraseTrack = REDSOUND_ERASE_TRACK_SENTINEL;
-	int maxPlayTime;
 	RedTrackDATA** trackBasePtr = &p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks;
 	RedTrackDATA* track = *trackBasePtr;
 	int sepId;
@@ -684,12 +683,12 @@ static int _EraseTime(int eraseTrack)
 	}
 
 	track = *trackBasePtr;
-	maxPlayTime = 0;
+	minEraseTrack = 0;
 	sepId = 0;
 	do {
 		if ((track->m_command != 0) && (track->m_attrMask == 0) && (track->m_eraseTrack <= eraseTrack) &&
-		    (track->m_playTime > maxPlayTime)) {
-			maxPlayTime = track->m_playTime;
+		    (track->m_playTime > minEraseTrack)) {
+			minEraseTrack = track->m_playTime;
 			sepId = track->m_seSepId;
 		}
 		track++;
@@ -699,7 +698,7 @@ static int _EraseTime(int eraseTrack)
 	erasedCount = 0;
 	do {
 		if ((track->m_command != 0) && (track->m_attrMask == 0) && (track->m_eraseTrack <= eraseTrack) &&
-		    (track->m_playTime == maxPlayTime)) {
+		    (track->m_playTime == minEraseTrack)) {
 			int trackNo;
 
 			KeyOnReserveClear(p_KeyOnData, track);
