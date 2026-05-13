@@ -1303,8 +1303,8 @@ static void __MidiCtrl_PhraseSignature(RedSoundCONTROL*, RedKeyOnDATA*, RedTrack
  * --INFO--
  * PAL Address: 0x801C82F8
  * PAL Size: 48b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a21c
+ * EN Size: 48b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1316,8 +1316,8 @@ static void __MidiCtrl_KeyOnSame(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedT
  * --INFO--
  * PAL Address: 0x801C8328
  * PAL Size: 104b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a24c
+ * EN Size: 104b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1332,8 +1332,8 @@ static void __MidiCtrl_KeyOnNoteVelocity(RedSoundCONTROL*, RedKeyOnDATA* keyOnDa
  * --INFO--
  * PAL Address: 0x801C8390
  * PAL Size: 80b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a2b4
+ * EN Size: 80b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1347,8 +1347,8 @@ static void __MidiCtrl_KeyOnNote(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, RedT
  * --INFO--
  * PAL Address: 0x801C83E0
  * PAL Size: 80b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a304
+ * EN Size: 80b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1362,8 +1362,8 @@ static void __MidiCtrl_KeyOnVelocity(RedSoundCONTROL*, RedKeyOnDATA* keyOnData, 
  * --INFO--
  * PAL Address: 0x801C8430
  * PAL Size: 56b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a354
+ * EN Size: 56b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1375,8 +1375,8 @@ static void __MidiCtrl_KeyOffSame(RedSoundCONTROL* control, RedKeyOnDATA* keyOnD
  * --INFO--
  * PAL Address: 0x801C8468
  * PAL Size: 96b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a38c
+ * EN Size: 96b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1391,8 +1391,8 @@ static void __MidiCtrl_KeyOffNoteVelocity(RedSoundCONTROL* control, RedKeyOnDATA
  * --INFO--
  * PAL Address: 0x801C84C8
  * PAL Size: 84b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a3ec
+ * EN Size: 84b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1406,8 +1406,8 @@ static void __MidiCtrl_KeyOffNote(RedSoundCONTROL* control, RedKeyOnDATA* keyOnD
  * --INFO--
  * PAL Address: 0x801C851C
  * PAL Size: 72b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a440
+ * EN Size: 72b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1421,8 +1421,8 @@ static void __MidiCtrl_KeyOffVelocity(RedSoundCONTROL* control, RedKeyOnDATA* ke
  * --INFO--
  * PAL Address: 0x801C8564
  * PAL Size: 184b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a488
+ * EN Size: 184b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1447,8 +1447,8 @@ static void __MidiCtrl_Wave(RedSoundCONTROL*, RedKeyOnDATA*, RedTrackDATA* track
  * --INFO--
  * PAL Address: 0x801C861C
  * PAL Size: 168b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x8020a540
+ * EN Size: 168b
  * JP Address: TODO
  * JP Size: TODO
  */
