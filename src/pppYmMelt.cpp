@@ -10,7 +10,7 @@
 #include "dolphin/os/OSCache.h"
 extern "C" {
 extern const float kPppYmMeltZero;
-u32 g_ymMelt;
+__declspec(section ".sdata2") u32 g_ymMelt;
 extern int gPppCalcDisabled;
 }
 extern const float FLOAT_80330af4;
