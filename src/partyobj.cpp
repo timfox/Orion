@@ -104,7 +104,13 @@ struct BossGhostPartyCounters {
 
 struct PartyObjFlags {
 	unsigned char commandActive : 1;
-	unsigned char reserved : 7;
+	unsigned char flag40 : 1;
+	unsigned char flag20 : 1;
+	unsigned char flag10 : 1;
+	unsigned char flag08 : 1;
+	unsigned char flag04 : 1;
+	unsigned char flag02 : 1;
+	unsigned char flag01 : 1;
 };
 
 struct PartyObjOverlay {
@@ -138,6 +144,7 @@ struct PartyObjOverlay {
 	};
 	union {
 		int unk6EC;
+		float unk6ECFloat;
 		int _legacy6EC;
 	};
 	CGObject* carryObject;
@@ -298,21 +305,33 @@ void CGPartyObj::onCreate()
 
 	PartyObjOverlay& party = PartyData(this);
 	party.unk6D0 = 0;
+	float targetDist = FLOAT_80331a78;
 	party.attackSel = 0;
 	party.unk6CC = 0;
 	party.unk6BC = 0;
+	party.target = 0;
+	party.targetOverride = 0;
+	party.unk6ECFloat = INFINITY;
+	party.carryObject = 0;
+
+	party.flags.commandActive = 0;
+	party.flags.flag08 = 0;
+	party.weaponItem = 0;
+	party.pendingWeaponItem = 0;
+	party.flags.flag40 = 0;
+	party.flags.flag20 = 0;
+	party.flags.flag10 = 0;
+	party.flags.flag04 = 0;
+	party.flags.flag02 = 0;
+
+	m_targetDist = targetDist;
 	party.unk6C0 = -1;
-	party.unk6D2 = 0;
+	party.commandMode = 0;
 
-	party.partyFlags &= 0x7F;
-	party.partyFlags &= 0xF7;
-	party.partyFlags &= 0xBF;
-	party.partyFlags &= 0xDF;
-	party.partyFlags &= 0xEF;
-	party.partyFlags &= 0xFB;
-	party.partyFlags &= 0xFD;
-
-	m_targetDist = FLOAT_80331a78;
+	static int s_created;
+	if (s_created == 0) {
+		s_created = 1;
+	}
 }
 
 /*
