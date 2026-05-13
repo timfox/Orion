@@ -393,8 +393,8 @@ void pppFrameYmMegaBirthShpTail3(pppYmMegaBirthShpTail3* object, PYmMegaBirthShp
         }
 
         particleData = (u8*)work->m_particles;
-        worldMat = work->m_wmats;
         particleColor = work->m_colors;
+        worldMat = work->m_wmats;
         int spawnCount = 0;
 
         if ((gPppCalcDisabled == 0) && (*(s32*)(paramPayload + 4) != 0xffff)) {
