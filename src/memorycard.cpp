@@ -331,111 +331,99 @@ void CMemoryCardMan::Quit()
  */
 void CMemoryCardMan::DebugReadWrite(int isWrite, char* filename, void* buffer, int length)
 {
-    bool success = false;
-    bool abort   = false;
-    int  result;
+    int success = 0;
+    int result;
+    unsigned long sectorSize;
+    CARDFileInfo fileInfo;
+    CARDStat stat;
 
-    // Mount card
     result = CARDMount(1, m_mountWorkArea, 0);
-
-    bool canUseCard = false;
-	
-    if (result != 0 && result != -6)
+    if (((result != 0) && (result != -6)) || (result = CARDCheckAsync(1, 0), result >= 0))
     {
-        canUseCard = true;
-    }
-    else if (CARDCheckAsync(1, 0) >= 0)
-    {
-        canUseCard = true;
-    }
-
-    if (canUseCard)
-    {
-        // Wait until card is ready; optionally format if needed.
-        while (true)
+checkResult:
+        result = CARDGetResultCode(1);
+        if (result != 0)
         {
-            result = CARDGetResultCode(1);
-			
-            if (result == 0)
-                break; // card ready
-
-            if ((result == -6 || result == -13) && isWrite == 0)
+            if (((result != -6) && (result != -13)) || (isWrite != 0))
             {
-                System.Printf("%s", const_cast<char*>(DAT_801db044));
+                goto done;
+            }
 
-                if (CARDFormat(1) < 0)
+            System.Printf(const_cast<char*>(DAT_801db044));
+            result = CARDFormat(1);
+            if (result < 0)
+            {
+                goto done;
+            }
+
+            goto checkResult;
+        }
+
+        result = CARDGetSectorSize(1, &sectorSize);
+        if (result >= 0)
+        {
+            if (isWrite != 0)
+            {
+                result = CARDOpen(1, filename, &fileInfo);
+                if (result >= 0)
                 {
-                    abort = true;
-                    break;
+                    goto readFile;
+                }
+
+                result = 0;
+                while (result < 0x7F)
+                {
+                    if (CARDGetStatus(1, result, &stat) < 0)
+                    {
+                        goto nextFile;
+                    }
+                    if (strcmp(filename, reinterpret_cast<char*>(&stat)) != 0)
+                    {
+                        goto nextFile;
+                    }
+                    goto foundFile;
+
+nextFile:
+                    result++;
+                }
+
+                result = -1;
+
+foundFile:
+                if ((result >= 0) && (CARDFastOpen(1, result, &fileInfo) >= 0))
+                {
+readFile:
+                    if (CARDRead(&fileInfo, buffer, length, 0) >= 0)
+                    {
+                        success = 1;
+                    }
+                    CARDClose(&fileInfo);
                 }
             }
             else
             {
-                abort = true;
-                break;
-            }
-        }
-
-        if (!abort)
-        {
-            unsigned long sectorSizeTmp;
-            if (CARDGetSectorSize(1, &sectorSizeTmp) >= 0)
-            {
-                if (isWrite != 0)
+                CARDDelete(1, filename);
+                result = CARDCreate(1, filename, length, &fileInfo);
+                if (result >= 0)
                 {
-                    CARDFileInfo fileInfo;
-                    result = CARDOpen(1, filename, &fileInfo);
-
-                    if (result < 0)
+                    result = CARDWrite(&fileInfo, buffer, length, 0);
+                    if (result >= 0)
                     {
-                        int      fileNo;
-                        CARDStat stat;
-
-                        for (fileNo = 0; fileNo < 0x7F; ++fileNo)
-                        {
-                            if (CARDGetStatus(1, fileNo, &stat) >= 0 &&
-                                strcmp(filename, (char*)&stat) == 0)
-                            {
-                                break;
-                            }
-                        }
-
-                        if (fileNo >= 0x7F ||
-                            CARDFastOpen(1, fileNo, &fileInfo) < 0)
-                        {
-                            abort = true;
-                        }
+                        success = 1;
                     }
-
-                    if (!abort)
-                    {
-                        if (CARDRead(&fileInfo, buffer, length, 0) >= 0)
-                            success = true;
-
-                        CARDClose(&fileInfo);
-                    }
-                }
-                else
-                {
-                    CARDDelete(1, filename);
-
-                    CARDFileInfo fileInfo;
-                    if (CARDCreate(1, filename, length, &fileInfo) >= 0)
-                    {
-                        if (CARDWrite(&fileInfo, buffer, length, 0) >= 0)
-                            success = true;
-
-                        CARDClose(&fileInfo);
-                    }
+                    CARDClose(&fileInfo);
                 }
             }
         }
     }
 
+done:
     CARDUnmount(1);
 
-    if (!success)
-        System.Printf("%s", const_cast<char*>(DAT_801db07c));
+    if (success == 0)
+    {
+        System.Printf(const_cast<char*>(DAT_801db07c));
+    }
 }
 
 
@@ -1044,7 +1032,6 @@ void CMemoryCardMan::MakeSaveData()
     {
         u8* dst = save + 0x14D0 + c * 0x9C0;
         CCaravanWork* caravanWork = &Game.m_caravanWorkArr[c];
-        u8* cv = reinterpret_cast<u8*>(caravanWork);
 
         if (caravanWork->m_shopState == 0)
         {
@@ -1077,18 +1064,18 @@ void CMemoryCardMan::MakeSaveData()
         *reinterpret_cast<u16*>(dst + 0x2E) = caravanWork->m_genderFlag;
         *reinterpret_cast<u16*>(dst + 0x30) = caravanWork->m_appearanceVariant;
         *reinterpret_cast<u16*>(dst + 0x32) = caravanWork->unk_0x3e6;
-        *reinterpret_cast<int*>(dst + 0x34) = caravanWork->unk_0x3ac;
-        *reinterpret_cast<u32*>(dst + 0x38) = caravanWork->m_equipEffectFlags;
+        *reinterpret_cast<s16*>(dst + 0x34) = caravanWork->m_equipment[0];
+        *reinterpret_cast<s16*>(dst + 0x36) = caravanWork->m_equipment[1];
+        *reinterpret_cast<s16*>(dst + 0x38) = caravanWork->m_equipment[2];
+        *reinterpret_cast<s16*>(dst + 0x3A) = caravanWork->m_equipment[3];
         for (int i = 0; i < 64; i++)
         {
             *reinterpret_cast<s16*>(dst + 0x3C + i * 2) = caravanWork->m_inventoryItems[i];
         }
-        *reinterpret_cast<u32*>(dst + 0xB8) = caravanWork->m_joybusCaravanId;
-        *reinterpret_cast<u32*>(dst + 0xBC) = 0;
-        *reinterpret_cast<u32*>(dst + 0xC0) = 0;
-        *reinterpret_cast<u32*>(dst + 0xC4) = 0;
-        memcpy(dst + 0xC8, caravanWork->unk_0x3ca_0x3dd, 0x10);
-        *reinterpret_cast<u32*>(dst + 0xD8) = caravanWork->m_letterCount;
+        *reinterpret_cast<u32*>(dst + 0xE8) = caravanWork->m_joybusCaravanId;
+        *reinterpret_cast<u32*>(dst + 0xEC) = caravanWork->m_gil;
+        memcpy(dst + 0xF0, caravanWork->unk_0x3ca_0x3dd, 0x10);
+        *reinterpret_cast<u32*>(dst + 0x100) = caravanWork->m_letterCount;
         for (int i = 0; i < 100; i++)
         {
             u8* dstLetter = dst + 0x104 + i * 0x0C;
@@ -1134,27 +1121,25 @@ void CMemoryCardMan::MakeSaveData()
             }
         }
 
-        memcpy(dst + 0x0C8 + 0x100, cv + 0x4CA, 0x2B0);
-
         for (int i = 0; i < 8; i++)
         {
-            *reinterpret_cast<s16*>(dst + 0x598 + i * 2) = caravanWork->m_commandListInventorySlotRef[i];
-            *reinterpret_cast<s16*>(dst + 0x5A8 + i * 2) = caravanWork->m_commandListExtra[i];
+            *reinterpret_cast<s16*>(dst + 0xC8 + i * 2) = caravanWork->m_commandListInventorySlotRef[i];
+            *reinterpret_cast<s16*>(dst + 0xD8 + i * 2) = caravanWork->m_commandListExtra[i];
         }
 
-        *reinterpret_cast<int*>(dst + 0x1A84) = caravanWork->m_shopState;
-        memcpy(dst + 0x1A88, caravanWork->m_evtWorkArr, 0x100);
-        memcpy(dst + 0x1B88, caravanWork->m_evtWordArr, 0x200);
-        *reinterpret_cast<int*>(dst + 0x1D88) = caravanWork->unk_0x3a8;
-        *reinterpret_cast<int*>(dst + 0x1D8C) = caravanWork->unk_0x3ac;
-        dst[0x1D90] = caravanWork->m_shopBusyFlag;
-        dst[0x1D91] = caravanWork->m_caravanLocalFlags;
-        dst[0x1D92] = caravanWork->unk_0xc1e;
-        *reinterpret_cast<int*>(dst + 0x1D94) = caravanWork->m_shopRandSeed;
-        *reinterpret_cast<int*>(dst + 0x1DA0) = caravanWork->m_shopData0;
-        *reinterpret_cast<int*>(dst + 0x1D9C) = caravanWork->m_shopData2;
-        *reinterpret_cast<int*>(dst + 0x1D98) = caravanWork->m_shopData1;
-        *reinterpret_cast<int*>(dst + 0x1DA4) = caravanWork->m_baseDataIndex;
+        *reinterpret_cast<int*>(dst + 0x5B4) = caravanWork->m_shopState;
+        memcpy(dst + 0x5B8, caravanWork->m_evtWorkArr, 0x100);
+        memcpy(dst + 0x6B8, caravanWork->m_evtWordArr, 0x200);
+        *reinterpret_cast<int*>(dst + 0x8B8) = caravanWork->unk_0x3a8;
+        *reinterpret_cast<int*>(dst + 0x8BC) = caravanWork->unk_0x3ac;
+        dst[0x8C0] = caravanWork->m_shopBusyFlag;
+        dst[0x8C1] = caravanWork->m_caravanLocalFlags;
+        dst[0x8C2] = caravanWork->unk_0xc1e;
+        *reinterpret_cast<int*>(dst + 0x8C4) = caravanWork->m_shopRandSeed;
+        *reinterpret_cast<int*>(dst + 0x8D0) = caravanWork->m_shopData0;
+        *reinterpret_cast<int*>(dst + 0x8CC) = caravanWork->m_shopData2;
+        *reinterpret_cast<int*>(dst + 0x8C8) = caravanWork->m_shopData1;
+        *reinterpret_cast<int*>(dst + 0x8D4) = caravanWork->m_baseDataIndex;
     }
 
     Game.SaveScript(reinterpret_cast<char*>(save + 0x62D0));
@@ -1251,7 +1236,6 @@ void CMemoryCardMan::SetLoadData()
     {
         u8* src = save + 0x14D0 + c * 0x9C0;
         CCaravanWork* caravanWork = &Game.m_caravanWorkArr[c];
-        u8* cv = reinterpret_cast<u8*>(caravanWork);
 
         int itemCount = 0;
         int inventoryCount = 64;
@@ -1294,16 +1278,18 @@ void CMemoryCardMan::SetLoadData()
         caravanWork->m_genderFlag = *reinterpret_cast<u16*>(src + 0x2E);
         caravanWork->m_appearanceVariant = *reinterpret_cast<u16*>(src + 0x30);
         caravanWork->unk_0x3e6 = *reinterpret_cast<u16*>(src + 0x32);
-        caravanWork->unk_0x3ac = *reinterpret_cast<int*>(src + 0x34);
-        caravanWork->m_equipEffectFlags = *reinterpret_cast<u32*>(src + 0x38);
+        caravanWork->m_equipment[0] = *reinterpret_cast<s16*>(src + 0x34);
+        caravanWork->m_equipment[1] = *reinterpret_cast<s16*>(src + 0x36);
+        caravanWork->m_equipment[2] = *reinterpret_cast<s16*>(src + 0x38);
+        caravanWork->m_equipment[3] = *reinterpret_cast<s16*>(src + 0x3A);
         for (int i = 0; i < 64; i++)
         {
             caravanWork->m_inventoryItems[i] = *reinterpret_cast<s16*>(src + 0x3C + i * 2);
         }
-        caravanWork->m_joybusCaravanId = *reinterpret_cast<int*>(src + 0xB8);
-        caravanWork->m_gil = *reinterpret_cast<int*>(src + 0xBC);
-        memcpy(caravanWork->unk_0x3ca_0x3dd, src + 0xC8, 0x10);
-        caravanWork->m_letterCount = *reinterpret_cast<int*>(src + 0xD8);
+        caravanWork->m_joybusCaravanId = *reinterpret_cast<int*>(src + 0xE8);
+        caravanWork->m_gil = *reinterpret_cast<int*>(src + 0xEC);
+        memcpy(caravanWork->unk_0x3ca_0x3dd, src + 0xF0, 0x10);
+        caravanWork->m_letterCount = *reinterpret_cast<int*>(src + 0x100);
         for (int i = 0; i < 100; i++)
         {
             u8* dstLetter = caravanWork->m_letter0 + i * 0x0C;
@@ -1351,23 +1337,23 @@ void CMemoryCardMan::SetLoadData()
 
         for (int i = 0; i < 8; i++)
         {
-            caravanWork->m_commandListInventorySlotRef[i] = *reinterpret_cast<s16*>(src + 0x598 + i * 2);
-            caravanWork->m_commandListExtra[i] = *reinterpret_cast<s16*>(src + 0x5A8 + i * 2);
+            caravanWork->m_commandListInventorySlotRef[i] = *reinterpret_cast<s16*>(src + 0xC8 + i * 2);
+            caravanWork->m_commandListExtra[i] = *reinterpret_cast<s16*>(src + 0xD8 + i * 2);
         }
 
-        caravanWork->m_shopState = *reinterpret_cast<int*>(src + 0x1A84);
-        memcpy(caravanWork->m_evtWorkArr, src + 0x1A88, 0x100);
-        memcpy(caravanWork->m_evtWordArr, src + 0x1B88, 0x200);
-        caravanWork->unk_0x3a8 = *reinterpret_cast<int*>(src + 0x1D88);
-        caravanWork->unk_0x3ac = *reinterpret_cast<int*>(src + 0x1D8C);
-        caravanWork->m_shopBusyFlag = src[0x1D90];
-        caravanWork->m_caravanLocalFlags = src[0x1D91];
-        caravanWork->unk_0xc1e = src[0x1D92];
-        caravanWork->m_shopRandSeed = *reinterpret_cast<int*>(src + 0x1D94);
-        caravanWork->m_shopData0 = *reinterpret_cast<int*>(src + 0x1DA0);
-        caravanWork->m_shopData2 = *reinterpret_cast<int*>(src + 0x1D9C);
-        caravanWork->m_shopData1 = *reinterpret_cast<int*>(src + 0x1D98);
-        caravanWork->m_baseDataIndex = *reinterpret_cast<int*>(src + 0x1DA4);
+        caravanWork->m_shopState = *reinterpret_cast<int*>(src + 0x5B4);
+        memcpy(caravanWork->m_evtWorkArr, src + 0x5B8, 0x100);
+        memcpy(caravanWork->m_evtWordArr, src + 0x6B8, 0x200);
+        caravanWork->unk_0x3a8 = *reinterpret_cast<int*>(src + 0x8B8);
+        caravanWork->unk_0x3ac = *reinterpret_cast<int*>(src + 0x8BC);
+        caravanWork->m_shopBusyFlag = src[0x8C0];
+        caravanWork->m_caravanLocalFlags = src[0x8C1];
+        caravanWork->unk_0xc1e = src[0x8C2];
+        caravanWork->m_shopRandSeed = *reinterpret_cast<int*>(src + 0x8C4);
+        caravanWork->m_shopData0 = *reinterpret_cast<int*>(src + 0x8D0);
+        caravanWork->m_shopData2 = *reinterpret_cast<int*>(src + 0x8CC);
+        caravanWork->m_shopData1 = *reinterpret_cast<int*>(src + 0x8C8);
+        caravanWork->m_baseDataIndex = *reinterpret_cast<int*>(src + 0x8D4);
         caravanWork->m_maxHp = caravanWork->GetArtifactIncludeHpMax();
 
     }
