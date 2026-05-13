@@ -954,8 +954,8 @@ RedVoiceDATA* EntryVoiceSearch(RedTrackDATA* track)
  * --INFO--
  * PAL Address: 0x801c3db4
  * PAL Size: 68b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80205cd8
+ * EN Size: 68b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -974,8 +974,8 @@ static void _VoiceEnvelopeCheck()
  * --INFO--
  * PAL Address: 0x801c3df8
  * PAL Size: 720b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80205d1c
+ * EN Size: 720b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1083,8 +1083,8 @@ void SetVoiceVolumeMix(RedVoiceDATA* voice, int pan, int volume)
  * --INFO--
  * PAL Address: 0x801c40c8
  * PAL Size: 664b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80205fec
+ * EN Size: 664b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1201,8 +1201,8 @@ static void _VolumeExecute(RedVoiceDATA* voice, int volume)
  * --INFO--
  * PAL Address: 0x801c4360
  * PAL Size: 428b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206284
+ * EN Size: 428b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1260,8 +1260,8 @@ static void _PitchExecute(RedVoiceDATA* voice)
  * --INFO--
  * PAL Address: 0x801c450c
  * PAL Size: 180b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206430
+ * EN Size: 180b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1307,8 +1307,8 @@ static RedWaveDATA* _WaveSplitSelect(RedWaveDATA* wave, RedNoteDATA* note)
  * --INFO--
  * PAL Address: 0x801c45c0
  * PAL Size: 1568b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x802064e4
+ * EN Size: 1568b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1525,8 +1525,8 @@ skipModSetup:
  * --INFO--
  * PAL Address: 0x801c4be0
  * PAL Size: 296b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206b04
+ * EN Size: 296b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1595,8 +1595,8 @@ void SetAllVoiceAccess(RedSoundCONTROL* control, int mask)
  * --INFO--
  * PAL Address: 0x801c4d08
  * PAL Size: 80b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206c2c
+ * EN Size: 80b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1615,8 +1615,8 @@ void SetVoiceAccess(RedTrackDATA* track, int mask)
  * --INFO--
  * PAL Address: 0x801c4d58
  * PAL Size: 72b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206c7c
+ * EN Size: 72b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1635,8 +1635,8 @@ void SetVoiceSwitch(RedTrackDATA* track, int voiceSwitch)
  * --INFO--
  * PAL Address: 0x801c4da0
  * PAL Size: 188b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206cc4
+ * EN Size: 188b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1687,8 +1687,8 @@ static void _AdsrStart(RedVoiceDATA* voice)
  * --INFO--
  * PAL Address: 0x801c4e5c
  * PAL Size: 164b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206d80
+ * EN Size: 164b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1732,8 +1732,8 @@ static void _AdsrDataCompute(RedVoiceDATA* voice)
  * --INFO--
  * PAL Address: 0x801C4F00
  * PAL Size: 212b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206e24
+ * EN Size: 212b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1768,8 +1768,8 @@ static u32 _AdsrDataExecute(RedVoiceDATA* voice)
  * --INFO--
  * PAL Address: 0x801c4fd4
  * PAL Size: 92b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206ef8
+ * EN Size: 92b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1792,8 +1792,8 @@ static void _VoiceDropedCallback(void* dropped)
  * --INFO--
  * PAL Address: 0x801c5030
  * PAL Size: 1268b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80206f54
+ * EN Size: 1268b
  * JP Address: TODO
  * JP Size: TODO
  */
@@ -1979,8 +1979,8 @@ void EnvelopeKeyExecute()
  * --INFO--
  * PAL Address: 0x801c5524
  * PAL Size: 1304b
- * EN Address: TODO
- * EN Size: TODO
+ * EN Address: 0x80207448
+ * EN Size: 1304b
  * JP Address: TODO
  * JP Size: TODO
  */
