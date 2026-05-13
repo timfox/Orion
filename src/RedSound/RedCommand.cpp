@@ -1010,7 +1010,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 	RedMusicTrackBlock* current = reinterpret_cast<RedMusicTrackBlock*>(musicHead + 1);
 	int count = musicHead->m_trackCount;
 	char trackNo = 0;
-	while (count != 0) {
+	do {
 		unsigned int blockSize = ((unsigned int)current->m_sizeHi2 << 24) |
 		                         ((unsigned int)current->m_sizeHi1 << 16) |
 		                         ((unsigned int)current->m_sizeHi0 << 8) |
@@ -1022,11 +1022,13 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 		current = (RedMusicTrackBlock*)((unsigned char*)current + blockSize);
 		track->m_deltaTime = DeltaTimeSumup((unsigned char**)&track->m_command) + 1;
 		track->m_seSepId = 0;
+		signed char* keySignatureData;
 		if (m_MusicKeySignature != 0) {
-			track->m_keySignatureData = t_KeySignatureData + REDSOUND_KEY_SIGNATURE_DEFAULT_OFFSET;
+			keySignatureData = t_KeySignatureData + REDSOUND_KEY_SIGNATURE_DEFAULT_OFFSET;
 		} else {
-			track->m_keySignatureData = 0;
+			keySignatureData = 0;
 		}
+		track->m_keySignatureData = keySignatureData;
 		track->m_mixVolume = REDSOUND_VOLUME_DEFAULT;
 		track->m_mixVolumeDelta = 0;
 		track->m_volume = REDSOUND_VOLUME_FULL;
@@ -1055,7 +1057,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 		track->m_tremoloDelayDepth = 0;
 		track->m_vibrateDelayDepth = 0;
 		track->m_waveData = 0;
-		track->m_flags = ((musicHead->m_playFlags & REDSOUND_MUSIC_PLAY_FLAG_RELEASE_NOTES) == 0) ? REDSOUND_TRACK_FLAG_TENUTO : 0;
+		track->m_flags = ((musicHead->m_playFlags & REDSOUND_MUSIC_PLAY_FLAG_RELEASE_NOTES) != 0) ? 0 : REDSOUND_TRACK_FLAG_TENUTO;
 		track->m_step2 = 0;
 		track->m_step = 0;
 		track->m_fuzzyAdsrDepth = 0;
@@ -1073,7 +1075,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 		if (count != 0) {
 			track++;
 		}
-	}
+	} while (count != 0);
 
 	music->m_skipFrames = 1;
 	music->m_channelAlloc = 0;
