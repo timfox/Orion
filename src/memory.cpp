@@ -201,7 +201,7 @@ static void stageDestroyInternal(CMemory::CStage* stage)
  */
 void* operator new(unsigned long size, CMemory::CStage* stage, char* file, int line)
 {
-    return stage->alloc(size, file == (char*)nullptr ? DAT_8032f7d4 : file, line, 0);
+    return stage->alloc(size, file != (char*)nullptr ? file : DAT_8032f7d4, line, 0);
 }
 
 /*
@@ -215,7 +215,7 @@ void* operator new(unsigned long size, CMemory::CStage* stage, char* file, int l
  */
 void* operator new[](unsigned long size, CMemory::CStage* stage, char* file, int line)
 {
-    return stage->alloc(size, file == (char*)nullptr ? DAT_8032f7d4 : file, line, 0);
+    return stage->alloc(size, file != (char*)nullptr ? file : DAT_8032f7d4, line, 0);
 }
 
 /*
@@ -843,7 +843,7 @@ void CMemory::DestroyStage(CMemory::CStage* stage)
  */
 void* CMemory::_Alloc(unsigned long size, CMemory::CStage* stage, char* source, int line, int noError)
 {
-    return stage->alloc(size, source == (char*)nullptr ? DAT_8032f7d4 : source, line, noError);
+    return stage->alloc(size, source != (char*)nullptr ? source : DAT_8032f7d4, line, noError);
 }
 
 /*
