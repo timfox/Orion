@@ -2498,8 +2498,7 @@ void CGMonObj::initFinishedFuncDuct()
 	CGObject* object = reinterpret_cast<CGObject*>(this);
 	initFinishedFuncDefault__8CGMonObjFv(this);
 	const int slot = static_cast<int>(reinterpret_cast<long>(object->m_scriptHandle[4])) - 0x8E;
-	unsigned char* bossWork = reinterpret_cast<unsigned char*>(SoundBuffer_1260_);
-	reinterpret_cast<CGMonObj**>(bossWork + 0x38)[slot] = this;
+	reinterpret_cast<CGMonObj**>(SoundBuffer_1260_ + 0x38)[slot] = this;
 }
 
 /*
