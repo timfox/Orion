@@ -490,9 +490,9 @@ STATIC_ASSERT(offsetof(AXVPB, pb) + offsetof(AXPB, type) == REDSOUND_AX_VOICE_TY
  */
 u8 GetRandomData()
 {
-	u8 value = t_RandomData[m_RandomIndex];
+	s8* random = &t_RandomData[m_RandomIndex];
 	m_RandomIndex++;
-	return value;
+	return *random;
 }
 
 /*
@@ -507,7 +507,7 @@ u8 GetRandomData()
 int PitchCompute(int basePitch, int pitchOffset, int wavePitch, int fineTune)
 {
     int value;
-    u32 pitch;
+    int pitch;
     int octaveAdjust;
     int noteBand;
 
@@ -515,7 +515,7 @@ int PitchCompute(int basePitch, int pitchOffset, int wavePitch, int fineTune)
     basePitch >>= REDSOUND_FIXED_SHIFT;
     pitch = pitchOffset + (wavePitch >> 16);
     pitch = basePitch + pitch;
-    while ((int)pitch < 0) {
+    while (pitch < 0) {
         pitch += REDSOUND_PITCH_OCTAVE_UNITS;
         octaveAdjust -= 1;
     }
@@ -889,19 +889,18 @@ RedReverbSize* GetReverbInfo()
  */
 RedVoiceDATA* EntryVoiceSearch(RedTrackDATA* track)
 {
-    RedVoiceDATA* bestVoice = 0;
     RedVoiceDATA* voice;
     int bestEnvelope;
     RedVoiceDATA* voiceEnd;
+    RedVoiceDATA* bestVoice = 0;
 
     if ((static_cast<s8>(track->m_note.m_allocFlags) & REDSOUND_NOTE_ALLOC_DIRECT_MASK) != 0) {
-        if (((track->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_DIRECT) == 0) &&
-            ((p_VoiceData + track->m_trackNo)->m_track != 0) &&
-            ((p_VoiceData + track->m_trackNo)->m_track != track)) {
-            voice = 0;
-        }
-        else {
+        if (((track->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_DIRECT) != 0) ||
+            ((p_VoiceData + track->m_trackNo)->m_track == 0) ||
+            ((p_VoiceData + track->m_trackNo)->m_track == track)) {
             voice = p_VoiceData + track->m_trackNo;
+        } else {
+            voice = 0;
         }
     } else {
         if ((track->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_PRIORITY) != 0) {
@@ -931,8 +930,7 @@ RedVoiceDATA* EntryVoiceSearch(RedTrackDATA* track)
 
         if (voice == voiceEnd) {
             RedVoiceDATA* selectedVoice;
-            RedSoundCONTROL* soundControl = p_SoundControl;
-            soundControl->m_updateFlags = soundControl->m_updateFlags | 2;
+            p_SoundControl->m_updateFlags |= 2;
             if (bestEnvelope == REDSOUND_ENVELOPE_LEVEL_FULL) {
                 selectedVoice = 0;
             } else {
@@ -1508,7 +1506,7 @@ skipModSetup:
         memset(&voice->m_adsr, 0, REDSOUND_TRACK_ADSR_SIZE);
     }
 
-    workValue = ((int)voice - (int)p_VoiceData) / REDSOUND_VOICE_SIZE;
+    workValue = voice - p_VoiceData;
     if (REDSOUND_VOICE_INDEX_MASK < workValue) {
         voiceMask += 1;
     }
@@ -2230,8 +2228,8 @@ static void _ExecuteExtraData()
             } else {
                 track = soundControl->m_tracks;
                 do {
-                    voice = p_VoiceData;
                     if (track->m_command != 0) {
+                        voice = p_VoiceData;
                         do {
                             if (voice->m_track == track) {
                                 voice->m_updateFlags |= REDSOUND_VOICE_UPDATE_VOLUME;

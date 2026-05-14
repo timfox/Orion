@@ -109,6 +109,12 @@ enum RedDriverSmallDataLayout {
     REDSOUND_DRIVER_SBSS_DMA_IN_THREAD_OFFSET = 0xD0,
     REDSOUND_DRIVER_SBSS_UNUSED_SILENT_WAVE_OFFSET = 0xD4,
     REDSOUND_DRIVER_SBSS_UNUSED_SILENT_WAVE_SIZE = 0x04,
+    REDSOUND_DRIVER_SOURCE_SBSS_SILENT_WAVE_OFFSET = 0xC8,
+    REDSOUND_DRIVER_SOURCE_SBSS_RED_MEMORY_OFFSET = 0xCC,
+    REDSOUND_DRIVER_SOURCE_SBSS_RED_MEMORY_PAD_OFFSET = 0xCD,
+    REDSOUND_DRIVER_SOURCE_SBSS_RED_MEMORY_PAD_SIZE = 0x03,
+    REDSOUND_DRIVER_SOURCE_SBSS_DMA_EXECUTE_OFFSET = 0xD0,
+    REDSOUND_DRIVER_SOURCE_SBSS_DMA_IN_THREAD_OFFSET = 0xD4,
 };
 
 enum RedDriverStringLayout {
@@ -198,6 +204,15 @@ struct RedDriverSmallDataTailState {
     volatile int m_dmaExecute;
     volatile int m_dmaInThread;
     int m_unusedSilentWave;
+};
+
+struct RedDriverSourceSmallDataTailState {
+    u8 m_beforeSilentWave[REDSOUND_DRIVER_SOURCE_SBSS_SILENT_WAVE_OFFSET];
+    int m_silentWave;
+    CRedMemory m_redMemory;
+    u8 m_redMemoryAlignPadding[REDSOUND_DRIVER_SOURCE_SBSS_RED_MEMORY_PAD_SIZE];
+    volatile int m_dmaExecute;
+    volatile int m_dmaInThread;
 };
 
 STATIC_ASSERT(offsetof(RedDmaRequest, m_id) == REDSOUND_DMA_REQUEST_ID_OFFSET);
@@ -472,6 +487,19 @@ STATIC_ASSERT(offsetof(RedDriverSmallDataTailState, m_unusedSilentWave) ==
 STATIC_ASSERT(sizeof(((RedDriverSmallDataTailState*)0)->m_unusedSilentWave) ==
               REDSOUND_DRIVER_SBSS_UNUSED_SILENT_WAVE_SIZE);
 STATIC_ASSERT(sizeof(RedDriverSmallDataTailState) == REDSOUND_DRIVER_SBSS_SIZE);
+STATIC_ASSERT(offsetof(RedDriverSourceSmallDataTailState, m_silentWave) ==
+              REDSOUND_DRIVER_SOURCE_SBSS_SILENT_WAVE_OFFSET);
+STATIC_ASSERT(offsetof(RedDriverSourceSmallDataTailState, m_redMemory) ==
+              REDSOUND_DRIVER_SOURCE_SBSS_RED_MEMORY_OFFSET);
+STATIC_ASSERT(offsetof(RedDriverSourceSmallDataTailState, m_redMemoryAlignPadding) ==
+              REDSOUND_DRIVER_SOURCE_SBSS_RED_MEMORY_PAD_OFFSET);
+STATIC_ASSERT(sizeof(((RedDriverSourceSmallDataTailState*)0)->m_redMemoryAlignPadding) ==
+              REDSOUND_DRIVER_SOURCE_SBSS_RED_MEMORY_PAD_SIZE);
+STATIC_ASSERT(offsetof(RedDriverSourceSmallDataTailState, m_dmaExecute) ==
+              REDSOUND_DRIVER_SOURCE_SBSS_DMA_EXECUTE_OFFSET);
+STATIC_ASSERT(offsetof(RedDriverSourceSmallDataTailState, m_dmaInThread) ==
+              REDSOUND_DRIVER_SOURCE_SBSS_DMA_IN_THREAD_OFFSET);
+STATIC_ASSERT(sizeof(RedDriverSourceSmallDataTailState) == REDSOUND_DRIVER_SBSS_SIZE);
 
 enum RedDriverBufferSize {
     REDSOUND_ZERO_BUFFER_SIZE = 0x1000,
@@ -1045,7 +1073,7 @@ static void _SetMusicPhraseStop(int* command)
 static void _SetSeBlockData(int* command)
 {
     u32 index = (u32)command[REDSOUND_SE_BLOCK_DATA_COMMAND_BANK] & REDSOUND_SE_BLOCK_BANK_MASK;
-    char* seBlockData;
+    RedSeBlockHEAD* seBlockData;
 
     if (p_SeBlockData[index] != 0) {
         RedDelete(p_SeBlockData[index]);
@@ -1053,12 +1081,15 @@ static void _SetSeBlockData(int* command)
     }
 
     if (command[REDSOUND_SE_BLOCK_DATA_COMMAND_BUFFER] != 0) {
-        seBlockData = (char*)command[REDSOUND_SE_BLOCK_DATA_COMMAND_BUFFER];
-        if ((*seBlockData = REDSOUND_SE_BLOCK_SIGNATURE_0) && (seBlockData[1] = REDSOUND_SE_BLOCK_SIGNATURE_1) &&
-            (seBlockData[2] = REDSOUND_SE_BLOCK_SIGNATURE_2) && (seBlockData[3] = REDSOUND_SE_BLOCK_SIGNATURE_3) &&
-            (seBlockData[4] = REDSOUND_SE_BLOCK_SIGNATURE_4) && (seBlockData[5] = REDSOUND_SE_BLOCK_SIGNATURE_5) &&
-            (seBlockData[6] = REDSOUND_SE_BLOCK_SIGNATURE_6)) {
-            p_SeBlockData[index] = (RedSeBlockHEAD*)seBlockData;
+        seBlockData = (RedSeBlockHEAD*)command[REDSOUND_SE_BLOCK_DATA_COMMAND_BUFFER];
+        if ((seBlockData->m_signature[0] = REDSOUND_SE_BLOCK_SIGNATURE_0) &&
+            (seBlockData->m_signature[1] = REDSOUND_SE_BLOCK_SIGNATURE_1) &&
+            (seBlockData->m_signature[2] = REDSOUND_SE_BLOCK_SIGNATURE_2) &&
+            (seBlockData->m_signature[3] = REDSOUND_SE_BLOCK_SIGNATURE_3) &&
+            (seBlockData->m_signature[4] = REDSOUND_SE_BLOCK_SIGNATURE_4) &&
+            (seBlockData->m_signature[5] = REDSOUND_SE_BLOCK_SIGNATURE_5) &&
+            (seBlockData->m_signature[6] = REDSOUND_SE_BLOCK_SIGNATURE_6)) {
+            p_SeBlockData[index] = seBlockData;
         } else {
             RedDelete(seBlockData);
         }
@@ -1990,6 +2021,10 @@ CRedDriver::~CRedDriver()
 void CRedDriver::Init()
 {
     RedTrackDATA* seTrackArena;
+    RedDmaRequest* dmaControl;
+    unsigned int* mute;
+    int* editorVoice;
+    int allocSize;
     int nextIndex;
     int index;
     int fullVolume;
@@ -2000,10 +2035,13 @@ void CRedDriver::Init()
     m_ReportPrint = REDSOUND_REPORT_PRINT_ON;
     m_SoundMode = REDSOUND_SOUND_MODE_STEREO;
     GetSoundMode();
-    if (m_SoundPlayMode != REDSOUND_SOUND_MODE_SURROUND) {
-        AXSetMode(REDSOUND_SOUND_MODE_STEREO);
-    } else {
+    switch (m_SoundPlayMode) {
+    case REDSOUND_SOUND_MODE_SURROUND:
         AXSetMode(REDSOUND_SOUND_MODE_SURROUND);
+        break;
+    default:
+        AXSetMode(REDSOUND_SOUND_MODE_STEREO);
+        break;
     }
     p_Tick = (RedTickHistory*)RedNew(REDSOUND_TICK_HISTORY_SIZE);
     memset(p_Tick, 0, REDSOUND_TICK_HISTORY_SIZE);
@@ -2030,13 +2068,15 @@ void CRedDriver::Init()
     memset(p_MusicTempoControl, 0, REDSOUND_CONTROL_RAMP_SIZE);
     p_MusicPitchControl = (RedControlRamp*)RedNew(REDSOUND_CONTROL_RAMP_SIZE);
     memset(p_MusicPitchControl, 0, REDSOUND_CONTROL_RAMP_SIZE);
-    p_ExecCommand = (RedExecCommand*)RedNew(REDSOUND_EXEC_COMMAND_BUFFER_SIZE);
+    allocSize = REDSOUND_EXEC_COMMAND_BUFFER_SIZE;
+    p_ExecCommand = (RedExecCommand*)RedNew(allocSize);
     p_ExecCommandNow = p_ExecCommand;
     p_ExecCommandOld = p_ExecCommand;
-    memset(p_ExecCommand, 0, REDSOUND_EXEC_COMMAND_BUFFER_SIZE);
-    p_SoundControlBuffer = (RedSoundCONTROL*)RedNew(REDSOUND_SOUND_CONTROL_ALLOC_SIZE);
+    memset(p_ExecCommand, 0, allocSize);
+    allocSize = REDSOUND_SOUND_CONTROL_ALLOC_SIZE;
+    p_SoundControlBuffer = (RedSoundCONTROL*)RedNew(allocSize);
     p_SoundControl = p_SoundControlBuffer;
-    memset(p_SoundControlBuffer, 0, REDSOUND_SOUND_CONTROL_ALLOC_SIZE);
+    memset(p_SoundControlBuffer, 0, allocSize);
     fullVolume = REDSOUND_MASTER_VOLUME_FULL_FIXED;
     noMusicId = REDSOUND_MUSIC_ID_NONE;
     p_SoundControl[REDSOUND_CONTROL_SE].m_volume = fullVolume;
@@ -2060,8 +2100,9 @@ void CRedDriver::Init()
         p_VoiceData[index].m_voiceIndex = nextIndex;
         index = index + 1;
     } while (index < REDSOUND_VOICE_COUNT);
-    p_EditorVoice[REDSOUND_EDITOR_VOICE_RIGHT] = 0;
-    p_EditorVoice[REDSOUND_EDITOR_VOICE_LEFT] = 0;
+    editorVoice = p_EditorVoice;
+    editorVoice[REDSOUND_EDITOR_VOICE_RIGHT] = 0;
+    editorVoice[REDSOUND_EDITOR_VOICE_LEFT] = 0;
     seTrackArena = (RedTrackDATA*)RedNew(REDSOUND_SE_TRACK_ARENA_SIZE);
     p_SoundControlBuffer[REDSOUND_CONTROL_SE].m_tracks = seTrackArena;
     memset(seTrackArena, 0, REDSOUND_SE_TRACK_ARENA_SIZE);
@@ -2074,19 +2115,21 @@ void CRedDriver::Init()
     memset(p_EditorTrack, 0, REDSOUND_TRACK_SIZE);
     p_ReverbDepth = (RedReverbDepth*)RedNew(REDSOUND_REVERB_DEPTH_BUFFER_SIZE);
     memset(p_ReverbDepth, 0, REDSOUND_REVERB_DEPTH_BUFFER_SIZE);
-    m_Mute[REDSOUND_MUTE_HIGH_WORD] = 0;
-    m_Mute[REDSOUND_MUTE_LOW_WORD] = 0;
+    mute = m_Mute;
+    mute[REDSOUND_MUTE_HIGH_WORD] = 0;
+    mute[REDSOUND_MUTE_LOW_WORD] = 0;
     p_MusicNextPlay = (RedMusicPlayCommand*)RedNew(REDSOUND_MUSIC_NEXT_PLAY_BUFFER_SIZE);
     p_MusicNextPlay->m_musicId = REDSOUND_MUSIC_ID_NONE;
     m_MusicPhraseStop = REDSOUND_MUSIC_PHRASE_STOP_OFF;
     p_Stream = (RedStreamDATA*)RedNew(REDSOUND_STREAM_BUFFER_SIZE);
     memset(p_Stream, 0, REDSOUND_STREAM_BUFFER_SIZE);
     m_DMAMode = 0;
-    memset(m_DmaControl, 0, REDSOUND_DMA_CONTROL_SIZE);
-    p_DmaControlNow[REDSOUND_DMA_MAIN_QUEUE_INDEX] = RedDriverMainDmaQueue();
-    p_DmaControlOld[REDSOUND_DMA_MAIN_QUEUE_INDEX] = RedDriverMainDmaQueue();
-    p_DmaControlNow[REDSOUND_DMA_STREAM_QUEUE_INDEX] = RedDriverStreamDmaQueue();
-    p_DmaControlOld[REDSOUND_DMA_STREAM_QUEUE_INDEX] = RedDriverStreamDmaQueue();
+    dmaControl = RedDriverMainDmaQueue();
+    memset(dmaControl, 0, REDSOUND_DMA_CONTROL_SIZE);
+    p_DmaControlNow[REDSOUND_DMA_MAIN_QUEUE_INDEX] = dmaControl;
+    p_DmaControlOld[REDSOUND_DMA_MAIN_QUEUE_INDEX] = dmaControl;
+    p_DmaControlNow[REDSOUND_DMA_STREAM_QUEUE_INDEX] = dmaControl + REDSOUND_DMA_QUEUE_ENTRY_COUNT;
+    p_DmaControlOld[REDSOUND_DMA_STREAM_QUEUE_INDEX] = dmaControl + REDSOUND_DMA_QUEUE_ENTRY_COUNT;
     m_RedMasterTime = 0;
     AXRegisterCallback(_RedAXCallback);
     AXFXSetHooks(ReverbAreaAlloc, ReverbAreaFree);
@@ -2225,23 +2268,22 @@ int CRedDriver::GetSoundMode()
  */
 int CRedDriver::SetMusicData(void* musicData)
 {
-    int result;
-    RedMusicHEAD localHeader;
-    RedMusicHEAD* const header = (RedMusicHEAD*)musicData;
-    RedMusicHEAD* copiedHeader;
     int headerSize;
+    int result;
+    RedMusicHEAD* header = (RedMusicHEAD*)musicData;
+    RedMusicHEAD localHeader;
 
     result = REDSOUND_MUSIC_ID_NONE;
     if (((header->m_signature[0] == REDSOUND_MUSIC_SIGNATURE_0) &&
          (header->m_signature[1] == REDSOUND_MUSIC_SIGNATURE_1)) &&
         (header->m_signature[2] == REDSOUND_MUSIC_SIGNATURE_2)) {
-        memcpy(&localHeader, header, REDSOUND_MUSIC_HEADER_SIZE);
+        memcpy(&localHeader, musicData, REDSOUND_MUSIC_HEADER_SIZE);
         headerSize = localHeader.m_size;
-        copiedHeader = (RedMusicHEAD*)RedNew(headerSize);
-        if (copiedHeader != 0) {
-            memcpy(copiedHeader, header, headerSize);
+        header = (RedMusicHEAD*)RedNew(headerSize);
+        if (header != 0) {
+            memcpy(header, musicData, headerSize);
             result = localHeader.m_musicNo;
-            _EntryExecCommand(_SetMusicData, (int)copiedHeader, 0, 0, 0, 0, 0, 0);
+            _EntryExecCommand(_SetMusicData, (int)header, 0, 0, 0, 0, 0, 0);
         }
     } else if (m_ReportPrint != REDSOUND_REPORT_PRINT_OFF) {
         OSReport(sRedDriverMusicHeaderErrorFmt, sRedDriverLogPrefix, sRedDriverLogWarnColor, sRedDriverLogReset);
@@ -2696,22 +2738,22 @@ void* CRedDriver::SetSeBlockData(int blockIndex, void* seBlockData)
  */
 int CRedDriver::SetSeSepData(void* seSepData)
 {
-    int result = REDSOUND_SESEP_ID_NONE;
-    RedSeSepHEAD* const header = (RedSeSepHEAD*)seSepData;
-    RedSeSepHEAD* copiedHeader;
     int headerSize;
+    int result = REDSOUND_SESEP_ID_NONE;
+    RedSeSepHEAD* header = (RedSeSepHEAD*)seSepData;
 
     if (((((header->m_signature[0] == REDSOUND_SESEP_SIGNATURE_0) &&
            (header->m_signature[1] == REDSOUND_SESEP_SIGNATURE_1)) &&
           (header->m_signature[2] == REDSOUND_SESEP_SIGNATURE_2)) &&
          ((header->m_signature[3] == REDSOUND_SESEP_SIGNATURE_3 &&
            (header->m_signature[4] == REDSOUND_SESEP_SIGNATURE_4))))) {
-        headerSize = header->m_sizeAndFlags & REDSOUND_SESEP_SIZE_MASK;
-        copiedHeader = (RedSeSepHEAD*)RedNew(headerSize);
-        if (copiedHeader != 0) {
-            memcpy(copiedHeader, header, headerSize);
-            result = copiedHeader->m_seNo;
-            _EntryExecCommand(_SetSeSepData, (int)copiedHeader, 0, 0, 0, 0, 0, 0);
+        headerSize = ((RedSeSepHEAD*)seSepData)->m_sizeAndFlags;
+        headerSize &= REDSOUND_SESEP_SIZE_MASK;
+        header = (RedSeSepHEAD*)RedNew(headerSize);
+        if (header != 0) {
+            memcpy(header, seSepData, headerSize);
+            result = header->m_seNo;
+            _EntryExecCommand(_SetSeSepData, (int)header, 0, 0, 0, 0, 0, 0);
         }
     } else if (m_ReportPrint != REDSOUND_REPORT_PRINT_OFF) {
         OSReport(sRedDriverSeSepHeaderErrorFmt, sRedDriverLogPrefix,
