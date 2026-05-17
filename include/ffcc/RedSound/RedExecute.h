@@ -24,11 +24,17 @@ struct RedReverbDATA {
 	RedReverbKind m_kind;
 };
 
+#define REDSOUND_REVERB_CONTEXT_NONE ((void*)0)
+
+enum RedReverbCallbackValue {
+	REDSOUND_REVERB_CALLBACK_NONE = 0,
+};
+
 enum RedReverbLayoutOffset {
-	REDSOUND_REVERB_CALLBACK_OFFSET = 0x00,
-	REDSOUND_REVERB_CONTEXT_OFFSET = 0x04,
-	REDSOUND_REVERB_KIND_OFFSET = 0x08,
-	REDSOUND_REVERB_SIZE = 0x0C,
+	REDSOUND_REVERB_CALLBACK_OFFSET = (unsigned int)&(((RedReverbDATA*)0)->m_callback),
+	REDSOUND_REVERB_CONTEXT_OFFSET = (unsigned int)&(((RedReverbDATA*)0)->m_context),
+	REDSOUND_REVERB_KIND_OFFSET = (unsigned int)&(((RedReverbDATA*)0)->m_kind),
+	REDSOUND_REVERB_SIZE = sizeof(RedReverbDATA),
 };
 
 struct RedReverbSize {
@@ -37,9 +43,9 @@ struct RedReverbSize {
 };
 
 enum RedReverbSizeLayoutOffset {
-	REDSOUND_REVERB_SIZE_REQUESTED_OFFSET = 0x00,
-	REDSOUND_REVERB_SIZE_ALIGNED_OFFSET = 0x04,
-	REDSOUND_REVERB_SIZE_SIZE = 0x08,
+	REDSOUND_REVERB_SIZE_REQUESTED_OFFSET = (unsigned int)&(((RedReverbSize*)0)->m_requested),
+	REDSOUND_REVERB_SIZE_ALIGNED_OFFSET = (unsigned int)&(((RedReverbSize*)0)->m_aligned),
+	REDSOUND_REVERB_SIZE_SIZE = sizeof(RedReverbSize),
 };
 
 struct RedNoteDATA {
@@ -54,12 +60,14 @@ inline void RedNoteCopy(RedNoteDATA* dst, const RedNoteDATA* src)
 	*(int*)&dst->m_key = *(int*)&src->m_key;
 }
 
+#define RedNoteGetKey(note) (*(char*)&(note)->m_key)
+
 enum RedNoteLayoutOffset {
-	REDSOUND_NOTE_KEY_OFFSET = 0x00,
-	REDSOUND_NOTE_VELOCITY_OFFSET = 0x01,
-	REDSOUND_NOTE_ALLOC_FLAGS_OFFSET = 0x02,
-	REDSOUND_NOTE_RESERVED03_OFFSET = 0x03,
-	REDSOUND_NOTE_SIZE = 0x04,
+	REDSOUND_NOTE_KEY_OFFSET = (unsigned int)&(((RedNoteDATA*)0)->m_key),
+	REDSOUND_NOTE_VELOCITY_OFFSET = (unsigned int)&(((RedNoteDATA*)0)->m_velocity),
+	REDSOUND_NOTE_ALLOC_FLAGS_OFFSET = (unsigned int)&(((RedNoteDATA*)0)->m_allocFlags),
+	REDSOUND_NOTE_RESERVED03_OFFSET = (unsigned int)&(((RedNoteDATA*)0)->m_reserved03),
+	REDSOUND_NOTE_SIZE = sizeof(RedNoteDATA),
 };
 
 enum RedNoteLayoutSize {
@@ -67,6 +75,7 @@ enum RedNoteLayoutSize {
 };
 
 enum RedNoteAllocFlag {
+	REDSOUND_NOTE_ALLOC_NONE = 0,
 	REDSOUND_NOTE_ALLOC_DIRECT = 1,
 	REDSOUND_NOTE_ALLOC_STREAM = 2,
 	REDSOUND_NOTE_ALLOC_RESERVED = 4,
@@ -80,9 +89,9 @@ struct RedWaveADPCMInfo {
 };
 
 enum RedWaveAdpcmLayoutOffset {
-	REDSOUND_WAVE_ADPCM_DATA_OFFSET = 0x00,
-	REDSOUND_WAVE_ADPCM_LOOP_OFFSET = 0x28,
-	REDSOUND_WAVE_ADPCM_INFO_SIZE = 0x2E,
+	REDSOUND_WAVE_ADPCM_DATA_OFFSET = (unsigned int)&(((RedWaveADPCMInfo*)0)->m_data),
+	REDSOUND_WAVE_ADPCM_LOOP_OFFSET = (unsigned int)&(((RedWaveADPCMInfo*)0)->m_loop),
+	REDSOUND_WAVE_ADPCM_INFO_SIZE = sizeof(RedWaveADPCMInfo),
 	REDSOUND_WAVE_ADPCM_DATA_SIZE = REDSOUND_WAVE_ADPCM_LOOP_OFFSET - REDSOUND_WAVE_ADPCM_DATA_OFFSET,
 	REDSOUND_WAVE_ADPCM_LOOP_SIZE = REDSOUND_WAVE_ADPCM_INFO_SIZE - REDSOUND_WAVE_ADPCM_LOOP_OFFSET,
 };
@@ -112,6 +121,8 @@ struct RedWaveDATA {
 	unsigned char m_reserved5C[REDSOUND_WAVE_RESERVED5C_SIZE];
 };
 
+#define REDSOUND_WAVE_DATA_NONE ((RedWaveDATA*)0)
+
 enum RedWaveLayoutSize {
 	REDSOUND_WAVE_DATA_SIZE = sizeof(RedWaveDATA),
 };
@@ -124,21 +135,21 @@ enum RedWaveFlag {
 };
 
 enum RedWaveLayoutOffset {
-	REDSOUND_WAVE_FLAGS_OFFSET = 0x00,
-	REDSOUND_WAVE_SAMPLE_START_OFFSET = 0x04,
-	REDSOUND_WAVE_LOOP_START_OFFSET = 0x08,
-	REDSOUND_WAVE_LOOP_END_OFFSET = 0x0C,
-	REDSOUND_WAVE_RESERVED10_OFFSET = 0x10,
-	REDSOUND_WAVE_PITCH_OFFSET = 0x14,
-	REDSOUND_WAVE_SPLIT_KEY_OFFSET = 0x18,
-	REDSOUND_WAVE_SPLIT_VELOCITY_OFFSET = 0x19,
-	REDSOUND_WAVE_VOLUME_OFFSET = 0x1A,
-	REDSOUND_WAVE_PAN_OFFSET = 0x1B,
-	REDSOUND_WAVE_REVERB_MIX_OFFSET = 0x1C,
-	REDSOUND_WAVE_RESERVED1D_OFFSET = 0x1D,
-	REDSOUND_WAVE_ADPCM_OFFSET = 0x22,
-	REDSOUND_WAVE_ADSR_OFFSET = 0x50,
-	REDSOUND_WAVE_RESERVED5C_OFFSET = 0x5C,
+	REDSOUND_WAVE_FLAGS_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_flags),
+	REDSOUND_WAVE_SAMPLE_START_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_sampleStart),
+	REDSOUND_WAVE_LOOP_START_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_loopStart),
+	REDSOUND_WAVE_LOOP_END_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_loopEnd),
+	REDSOUND_WAVE_RESERVED10_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_reserved10),
+	REDSOUND_WAVE_PITCH_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_pitch),
+	REDSOUND_WAVE_SPLIT_KEY_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_splitKey),
+	REDSOUND_WAVE_SPLIT_VELOCITY_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_splitVelocity),
+	REDSOUND_WAVE_VOLUME_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_volume),
+	REDSOUND_WAVE_PAN_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_pan),
+	REDSOUND_WAVE_REVERB_MIX_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_reverbMix),
+	REDSOUND_WAVE_RESERVED1D_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_reserved1D),
+	REDSOUND_WAVE_ADPCM_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_adpcm),
+	REDSOUND_WAVE_ADSR_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_adsr),
+	REDSOUND_WAVE_RESERVED5C_OFFSET = (unsigned int)&(((RedWaveDATA*)0)->m_reserved5C),
 };
 
 enum RedWaveLayoutWord {
@@ -159,15 +170,15 @@ enum RedVoiceLayoutCount {
 	REDSOUND_TERMINATE_NOTE_WORD_COUNT = 1,
 };
 
-enum RedAdsrDataLayout {
-	REDSOUND_ADSR_TIME_OFFSET = 0x00,
-	REDSOUND_ADSR_LEVEL_OFFSET = REDSOUND_VOICE_ADSR_TIME_COUNT * sizeof(unsigned short),
-	REDSOUND_ADSR_DATA_SIZE = REDSOUND_ADSR_LEVEL_OFFSET + REDSOUND_VOICE_ADSR_LEVEL_COUNT,
-};
-
 struct RedAdsrDATA {
 	unsigned short m_time[REDSOUND_VOICE_ADSR_TIME_COUNT];
 	unsigned char m_level[REDSOUND_VOICE_ADSR_LEVEL_COUNT];
+};
+
+enum RedAdsrDataLayout {
+	REDSOUND_ADSR_TIME_OFFSET = (unsigned int)&(((RedAdsrDATA*)0)->m_time),
+	REDSOUND_ADSR_LEVEL_OFFSET = (unsigned int)&(((RedAdsrDATA*)0)->m_level),
+	REDSOUND_ADSR_DATA_SIZE = sizeof(RedAdsrDATA),
 };
 
 struct RedVoiceDATA {
@@ -215,6 +226,10 @@ struct RedVoiceDATA {
 	unsigned char m_reservedBC[REDSOUND_VOICE_RESERVEDBC_SIZE];
 };
 
+#define REDSOUND_VOICE_TRACK_NONE 0
+#define REDSOUND_VOICE_DATA_NONE 0
+#define REDSOUND_AX_VOICE_NONE 0
+
 enum RedVoiceAdsrIndex {
 	REDSOUND_VOICE_ADSR_ATTACK = 0,
 	REDSOUND_VOICE_ADSR_DECAY = 1,
@@ -223,68 +238,80 @@ enum RedVoiceAdsrIndex {
 	REDSOUND_VOICE_ADSR_DONE = 4,
 };
 
+enum RedVoiceLayoutOffset {
+	REDSOUND_VOICE_TRACK_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_track),
+	REDSOUND_VOICE_KEY_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_key),
+	REDSOUND_VOICE_VELOCITY_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_velocity),
+	REDSOUND_VOICE_STATE_FLAGS_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_stateFlags),
+	REDSOUND_VOICE_RESERVED1B_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_reserved1B),
+	REDSOUND_VOICE_RESERVED2A_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_reserved2A),
+	REDSOUND_VOICE_RESERVED3A_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_reserved3A),
+	REDSOUND_VOICE_RESERVED48_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_reserved48),
+	REDSOUND_VOICE_ADSR_TIME_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_time),
+	REDSOUND_VOICE_ADSR_LEVEL_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_level),
+	REDSOUND_VOICE_ADSR_STAGE_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_adsrStage),
+	REDSOUND_VOICE_ACTIVE_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_active),
+	REDSOUND_VOICE_FLAGS_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_flags),
+	REDSOUND_VOICE_SWITCH_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_voiceSwitch),
+	REDSOUND_VOICE_RESERVEDA4_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_reservedA4),
+	REDSOUND_VOICE_INDEX_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_voiceIndex),
+	REDSOUND_VOICE_RESERVEDB4_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_reservedB4),
+	REDSOUND_VOICE_UPDATE_FLAGS_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_updateFlags),
+	REDSOUND_VOICE_RESERVEDBC_OFFSET = (unsigned int)&(((RedVoiceDATA*)0)->m_reservedBC),
+};
+
 enum RedVoiceAdsrLayout {
-	REDSOUND_VOICE_ADSR_TIME_OFFSET = 0x50,
-	REDSOUND_VOICE_ADSR_LEVEL_OFFSET = 0x58,
-	REDSOUND_VOICE_ADSR_STAGE_OFFSET = 0x5C,
 	REDSOUND_VOICE_ADSR_TIME_HALFWORD = REDSOUND_VOICE_ADSR_TIME_OFFSET / sizeof(u16),
 	REDSOUND_VOICE_ADSR_LEVEL_ATTACK_OFFSET = REDSOUND_VOICE_ADSR_LEVEL_OFFSET,
-	REDSOUND_VOICE_ADSR_LEVEL_DECAY_OFFSET = REDSOUND_VOICE_ADSR_LEVEL_OFFSET + 1,
-	REDSOUND_VOICE_ADSR_LEVEL_SUSTAIN_OFFSET = REDSOUND_VOICE_ADSR_LEVEL_OFFSET + 2,
-	REDSOUND_VOICE_ADSR_LEVEL_RELEASE_OFFSET = REDSOUND_VOICE_ADSR_LEVEL_OFFSET + 3,
+	REDSOUND_VOICE_ADSR_LEVEL_DECAY_OFFSET =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_level[REDSOUND_VOICE_ADSR_DECAY]),
+	REDSOUND_VOICE_ADSR_LEVEL_SUSTAIN_OFFSET =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_level[REDSOUND_VOICE_ADSR_SUSTAIN]),
+	REDSOUND_VOICE_ADSR_LEVEL_RELEASE_OFFSET =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_level[REDSOUND_VOICE_ADSR_RELEASE]),
 	REDSOUND_VOICE_ADSR_TIME_ATTACK_HALFWORD = REDSOUND_VOICE_ADSR_TIME_OFFSET / sizeof(u16),
-	REDSOUND_VOICE_ADSR_TIME_DECAY_HALFWORD = REDSOUND_VOICE_ADSR_TIME_ATTACK_HALFWORD + 1,
-	REDSOUND_VOICE_ADSR_TIME_SUSTAIN_HALFWORD = REDSOUND_VOICE_ADSR_TIME_ATTACK_HALFWORD + 2,
-	REDSOUND_VOICE_ADSR_TIME_RELEASE_HALFWORD = REDSOUND_VOICE_ADSR_TIME_ATTACK_HALFWORD + 3,
+	REDSOUND_VOICE_ADSR_TIME_DECAY_HALFWORD =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_time[REDSOUND_VOICE_ADSR_DECAY]) / sizeof(u16),
+	REDSOUND_VOICE_ADSR_TIME_SUSTAIN_HALFWORD =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_time[REDSOUND_VOICE_ADSR_SUSTAIN]) / sizeof(u16),
+	REDSOUND_VOICE_ADSR_TIME_RELEASE_HALFWORD =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_adsr.m_time[REDSOUND_VOICE_ADSR_RELEASE]) / sizeof(u16),
 	REDSOUND_VOICE_ADSR_TIME_RELEASE_BYTE =
 	    REDSOUND_VOICE_ADSR_RELEASE * REDSOUND_VOICE_ADSR_TIME_BYTE_STRIDE,
 	REDSOUND_VOICE_ADSR_TIME_RELEASE_BYTE_OFFSET = REDSOUND_VOICE_ADSR_TIME_RELEASE_HALFWORD * sizeof(u16),
 	REDSOUND_VOICE_ADSR_LEVEL_BASE = 9,
+	REDSOUND_VOICE_ADSR_NEXT_LEVEL_OFFSET = REDSOUND_VOICE_ADSR_DECAY - REDSOUND_VOICE_ADSR_ATTACK,
 	REDSOUND_VOICE_ADSR_STAGE_COUNT = 3,
+	REDSOUND_ADSR_STATE_STAGE = 0,
+	REDSOUND_ADSR_STATE_STEP_FRAMES = 1,
+	REDSOUND_ADSR_STATE_STEP_ADD = 2,
+	REDSOUND_ADSR_LEVEL_BYTE_SHIFT = 8,
 };
 
-#define RedAdsrGetStageLevel(adsrData, stage)                                                       \
-	(*reinterpret_cast<unsigned char*>(reinterpret_cast<unsigned char*>(adsrData) + (stage) +     \
-	                                   REDSOUND_VOICE_ADSR_LEVEL_BASE))
-
-enum RedVoiceLayoutOffset {
-	REDSOUND_VOICE_TRACK_OFFSET = 0x00,
-	REDSOUND_VOICE_KEY_OFFSET = 0x18,
-	REDSOUND_VOICE_VELOCITY_OFFSET = 0x19,
-	REDSOUND_VOICE_STATE_FLAGS_OFFSET = 0x1A,
-	REDSOUND_VOICE_RESERVED1B_OFFSET = 0x1B,
-	REDSOUND_VOICE_RESERVED2A_OFFSET = 0x2A,
-	REDSOUND_VOICE_RESERVED3A_OFFSET = 0x3A,
-	REDSOUND_VOICE_RESERVED48_OFFSET = 0x48,
-	REDSOUND_VOICE_ACTIVE_OFFSET = 0x8C,
-	REDSOUND_VOICE_FLAGS_OFFSET = 0x90,
-	REDSOUND_VOICE_SWITCH_OFFSET = 0x94,
-	REDSOUND_VOICE_RESERVEDA4_OFFSET = 0xA4,
-	REDSOUND_VOICE_INDEX_OFFSET = 0xA8,
-	REDSOUND_VOICE_RESERVEDB4_OFFSET = 0xB4,
-	REDSOUND_VOICE_UPDATE_FLAGS_OFFSET = 0xB8,
-	REDSOUND_VOICE_RESERVEDBC_OFFSET = 0xBC,
-};
+#define RedAdsrGetStageLevel(adsrData, stage)                                                      \
+	(&(adsrData)->m_level[REDSOUND_VOICE_ADSR_NEXT_LEVEL_OFFSET])[(stage)]
 
 enum RedVoiceLayoutWord {
 	REDSOUND_VOICE_TRACK_WORD = REDSOUND_VOICE_TRACK_OFFSET / sizeof(u32),
-	REDSOUND_VOICE_WAVE_DATA_WORD = 1,
-	REDSOUND_VOICE_TRACK_VOLUME_WORD = 2,
-	REDSOUND_VOICE_TRACK_EXPRESSION_WORD = 3,
-	REDSOUND_VOICE_TRACK_PAN_WORD = 4,
-	REDSOUND_VOICE_AX_VOICE_WORD = 5,
-	REDSOUND_VOICE_NOTE_WORD = 6,
-	REDSOUND_VOICE_PITCH_MOD_PHASE_WORD = 7,
-	REDSOUND_VOICE_PITCH_MOD_FRAMES_WORD = 8,
-	REDSOUND_VOICE_PITCH_MOD_FRAME_WORD = 9,
-	REDSOUND_VOICE_PITCH_MOD_DELAY_HALFWORD = 0x14,
-	REDSOUND_VOICE_VOLUME_MOD_PHASE_WORD = 0x0B,
-	REDSOUND_VOICE_VOLUME_MOD_FRAMES_WORD = 0x0C,
-	REDSOUND_VOICE_VOLUME_MOD_FRAME_WORD = 0x0D,
-	REDSOUND_VOICE_VOLUME_MOD_DELAY_HALFWORD = 0x1C,
-	REDSOUND_VOICE_RANDOM_PITCH_WORD = 0x0F,
-	REDSOUND_VOICE_RANDOM_VOLUME_WORD = 0x10,
-	REDSOUND_VOICE_RANDOM_PAN_WORD = 0x11,
+	REDSOUND_VOICE_WAVE_DATA_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_waveData) / sizeof(u32),
+	REDSOUND_VOICE_TRACK_VOLUME_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_trackVolume) / sizeof(u32),
+	REDSOUND_VOICE_TRACK_EXPRESSION_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_trackExpression) / sizeof(u32),
+	REDSOUND_VOICE_TRACK_PAN_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_trackPan) / sizeof(u32),
+	REDSOUND_VOICE_AX_VOICE_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_axVoice) / sizeof(u32),
+	REDSOUND_VOICE_NOTE_WORD = REDSOUND_VOICE_KEY_OFFSET / sizeof(u32),
+	REDSOUND_VOICE_PITCH_MOD_PHASE_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_pitchModPhase) / sizeof(u32),
+	REDSOUND_VOICE_PITCH_MOD_FRAMES_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_pitchModFrames) / sizeof(u32),
+	REDSOUND_VOICE_PITCH_MOD_FRAME_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_pitchModFrame) / sizeof(u32),
+	REDSOUND_VOICE_PITCH_MOD_DELAY_HALFWORD =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_pitchModDelay) / sizeof(unsigned short),
+	REDSOUND_VOICE_VOLUME_MOD_PHASE_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_volumeModPhase) / sizeof(u32),
+	REDSOUND_VOICE_VOLUME_MOD_FRAMES_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_volumeModFrames) / sizeof(u32),
+	REDSOUND_VOICE_VOLUME_MOD_FRAME_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_volumeModFrame) / sizeof(u32),
+	REDSOUND_VOICE_VOLUME_MOD_DELAY_HALFWORD =
+	    (unsigned int)&(((RedVoiceDATA*)0)->m_volumeModDelay) / sizeof(unsigned short),
+	REDSOUND_VOICE_RANDOM_PITCH_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_randomPitch) / sizeof(u32),
+	REDSOUND_VOICE_RANDOM_VOLUME_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_randomVolume) / sizeof(u32),
+	REDSOUND_VOICE_RANDOM_PAN_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_randomPan) / sizeof(u32),
 	REDSOUND_VOICE_ACTIVE_WORD = REDSOUND_VOICE_ACTIVE_OFFSET / sizeof(u32),
 	REDSOUND_VOICE_FLAGS_WORD = REDSOUND_VOICE_FLAGS_OFFSET / sizeof(u32),
 	REDSOUND_VOICE_SWITCH_WORD = REDSOUND_VOICE_SWITCH_OFFSET / sizeof(u32),
@@ -292,14 +319,14 @@ enum RedVoiceLayoutWord {
 	REDSOUND_VOICE_INDEX_MASK = 0x1F,
 	REDSOUND_VOICE_ADSR_TIME_WORD = REDSOUND_VOICE_ADSR_TIME_OFFSET / sizeof(u32),
 	REDSOUND_VOICE_ADSR_STAGE_WORD = REDSOUND_VOICE_ADSR_STAGE_OFFSET / sizeof(u32),
-	REDSOUND_VOICE_ADSR_STEP_FRAMES_WORD = REDSOUND_VOICE_ADSR_STAGE_WORD + 1,
-	REDSOUND_VOICE_ADSR_STEP_ADD_WORD = REDSOUND_VOICE_ADSR_STAGE_WORD + 2,
-	REDSOUND_VOICE_PITCH_WORD = 0x26,
-	REDSOUND_VOICE_TARGET_PITCH_WORD = 0x27,
-	REDSOUND_VOICE_BASE_PITCH_WORD = 0x28,
-	REDSOUND_VOICE_ADSR_CURRENT_WORD = 0x2B,
-	REDSOUND_VOICE_ENVELOPE_WORD = 0x2C,
-	REDSOUND_VOICE_UPDATE_FLAGS_WORD = 0x2E,
+	REDSOUND_VOICE_ADSR_STEP_FRAMES_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_adsrStepFrames) / sizeof(u32),
+	REDSOUND_VOICE_ADSR_STEP_ADD_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_adsrStepAdd) / sizeof(u32),
+	REDSOUND_VOICE_PITCH_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_pitch) / sizeof(u32),
+	REDSOUND_VOICE_TARGET_PITCH_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_targetPitch) / sizeof(u32),
+	REDSOUND_VOICE_BASE_PITCH_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_basePitch) / sizeof(u32),
+	REDSOUND_VOICE_ADSR_CURRENT_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_adsrCurrentLevel) / sizeof(u32),
+	REDSOUND_VOICE_ENVELOPE_WORD = (unsigned int)&(((RedVoiceDATA*)0)->m_envelopeLevel) / sizeof(u32),
+	REDSOUND_VOICE_UPDATE_FLAGS_WORD = REDSOUND_VOICE_UPDATE_FLAGS_OFFSET / sizeof(u32),
 };
 
 enum RedVoiceActiveState {
@@ -308,7 +335,9 @@ enum RedVoiceActiveState {
 };
 
 enum RedVoiceBufferWordOffset {
-	REDSOUND_VOICE_SECOND_MASK_WORD_OFFSET = 0x600,
+	REDSOUND_VOICE_MASK_WORD_BIT_COUNT = 32,
+	REDSOUND_VOICE_SECOND_MASK_WORD_OFFSET =
+	    (sizeof(RedVoiceDATA) * REDSOUND_VOICE_MASK_WORD_BIT_COUNT) / sizeof(u32),
 };
 
 enum RedRandomByteLayout {
@@ -377,13 +406,24 @@ enum RedVoiceUpdateFlag {
 	REDSOUND_VOICE_UPDATE_ALL = REDSOUND_VOICE_UPDATE_PITCH | REDSOUND_VOICE_UPDATE_VOLUME,
 };
 
+enum RedAxVoicePlayback {
+	REDSOUND_AX_VOICE_STOP = 0,
+	REDSOUND_AX_VOICE_PLAY = 1,
+	REDSOUND_AX_VOICE_LOOP_OFF = 0,
+	REDSOUND_AX_VOICE_LOOP_ON = 1,
+	REDSOUND_AX_VOICE_TYPE_ONE_SHOT = 0,
+	REDSOUND_AX_VOICE_TYPE_LOOP = 1,
+	REDSOUND_AX_SRC_SELECT_ADPCM = 1,
+	REDSOUND_AX_ADDR_FORMAT_ADPCM = 0,
+};
+
 u8 GetRandomData();
 int PitchCompute(int basePitch, int pitchOffset, int wavePitch, int fineTune);
 void* ReverbAreaAlloc(unsigned long size);
 void ReverbAreaFree(void* area);
 void InitReverb();
 RedReverbSize* GetReverbInfo();
-RedReverbSize* SetReverb(int bank, int kind, int* params);
+RedReverbSize* SetReverb(int bank, int kind, int* reverbParams);
 
 RedVoiceDATA* EntryVoiceSearch(RedTrackDATA* track);
 void SetVoiceVolumeMix(RedVoiceDATA* voice, int pan, int volume);

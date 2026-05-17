@@ -19,10 +19,10 @@ struct RedControlRamp {
 };
 
 enum RedControlRampLayout {
-	REDSOUND_CONTROL_RAMP_VALUE_OFFSET = 0x00,
-	REDSOUND_CONTROL_RAMP_STEP_OFFSET = 0x04,
-	REDSOUND_CONTROL_RAMP_COUNT_OFFSET = 0x08,
-	REDSOUND_CONTROL_RAMP_SIZE = 0x0C,
+	REDSOUND_CONTROL_RAMP_VALUE_OFFSET = (unsigned int)&(((RedControlRamp*)0)->m_value),
+	REDSOUND_CONTROL_RAMP_STEP_OFFSET = (unsigned int)&(((RedControlRamp*)0)->m_step),
+	REDSOUND_CONTROL_RAMP_COUNT_OFFSET = (unsigned int)&(((RedControlRamp*)0)->m_count),
+	REDSOUND_CONTROL_RAMP_SIZE = sizeof(RedControlRamp),
 };
 
 struct RedReverbDepth {
@@ -32,10 +32,10 @@ struct RedReverbDepth {
 };
 
 enum RedReverbDepthLayout {
-	REDSOUND_REVERB_DEPTH_DEPTH_OFFSET = 0x00,
-	REDSOUND_REVERB_DEPTH_STEP_OFFSET = 0x04,
-	REDSOUND_REVERB_DEPTH_COUNT_OFFSET = 0x08,
-	REDSOUND_REVERB_DEPTH_SIZE = 0x0C,
+	REDSOUND_REVERB_DEPTH_DEPTH_OFFSET = (unsigned int)&(((RedReverbDepth*)0)->m_depth),
+	REDSOUND_REVERB_DEPTH_STEP_OFFSET = (unsigned int)&(((RedReverbDepth*)0)->m_step),
+	REDSOUND_REVERB_DEPTH_COUNT_OFFSET = (unsigned int)&(((RedReverbDepth*)0)->m_count),
+	REDSOUND_REVERB_DEPTH_SIZE = sizeof(RedReverbDepth),
 };
 
 enum RedSoundMode {
@@ -49,6 +49,8 @@ enum RedSoundControlIndex {
 	REDSOUND_CONTROL_MUSIC_SECONDARY = 1,
 	REDSOUND_CONTROL_MUSIC_SKIP = 2,
 	REDSOUND_CONTROL_SE = 3,
+	REDSOUND_CONTROL_MUSIC_PLAY_END = REDSOUND_CONTROL_MUSIC_SKIP,
+	REDSOUND_CONTROL_MUSIC_ALL_END = REDSOUND_CONTROL_SE,
 };
 
 enum RedSoundLayoutSize {
@@ -58,10 +60,10 @@ enum RedSoundLayoutSize {
 	REDSOUND_CONTROL_BUFFER_SIZE = REDSOUND_CONTROL_SIZE * REDSOUND_CONTROL_COUNT,
 	REDSOUND_CONTROL_SECONDARY_OFFSET = REDSOUND_CONTROL_SIZE * REDSOUND_CONTROL_MUSIC_SECONDARY,
 	REDSOUND_CONTROL_SKIP_OFFSET = REDSOUND_CONTROL_SIZE * REDSOUND_CONTROL_MUSIC_SKIP,
-	REDSOUND_CONTROL_MASTER_VOLUME_OFFSET = 0x454,
-	REDSOUND_CONTROL_MASTER_VOLUME_ADD_OFFSET = 0x458,
-	REDSOUND_CONTROL_MASTER_VOLUME_DELTA_OFFSET = 0x45C,
-	REDSOUND_CONTROL_MUSIC_ID_OFFSET = 0x470,
+	REDSOUND_CONTROL_MASTER_VOLUME_OFFSET = (unsigned int)&(((RedSoundCONTROL*)0)->m_masterVolume),
+	REDSOUND_CONTROL_MASTER_VOLUME_ADD_OFFSET = (unsigned int)&(((RedSoundCONTROL*)0)->m_masterVolumeAdd),
+	REDSOUND_CONTROL_MASTER_VOLUME_DELTA_OFFSET = (unsigned int)&(((RedSoundCONTROL*)0)->m_masterVolumeDelta),
+	REDSOUND_CONTROL_MUSIC_ID_OFFSET = (unsigned int)&(((RedSoundCONTROL*)0)->m_musicId),
 	REDSOUND_SE_TRACK_COUNT = 0x20,
 	REDSOUND_SE_TRACK_LAST_INDEX = REDSOUND_SE_TRACK_COUNT - 1,
 	REDSOUND_SE_TRACK_ARENA_SIZE = REDSOUND_TRACK_SIZE * REDSOUND_SE_TRACK_COUNT,
@@ -83,6 +85,7 @@ enum RedSoundLayoutSize {
 enum RedReverbDepthIndex {
 	REDSOUND_REVERB_DEPTH_MUSIC = 0,
 	REDSOUND_REVERB_DEPTH_SE = 1,
+	REDSOUND_REVERB_BANK_MASK = REDSOUND_REVERB_DEPTH_SE,
 };
 
 enum RedMuteWordIndex {
@@ -125,6 +128,7 @@ enum RedSoundFixedPoint {
 	REDSOUND_PITCH_NOTE_SHIFT = 8,
 	REDSOUND_PITCH_NOTE_UNIT = 0x100,
 	REDSOUND_PITCH_BASE_NOTE_SHIFT = 0x14,
+	REDSOUND_PITCH_WAVE_SHIFT = 0x10,
 	REDSOUND_PITCH_KEY_SIGNATURE_UNIT = 0x100000,
 	REDSOUND_PITCH_NOTE_MASK = 0x7F,
 	REDSOUND_PITCH_FINE_MASK = 0xFF,
@@ -173,79 +177,196 @@ enum RedSeVolumeQueryMode {
 };
 
 enum RedSoundTableLayout {
-	REDSOUND_TONE_PITCH_TABLE_OFFSET = 0x00,
+	REDSOUND_TONE_PITCH_TABLE_OFFSET = 0,
 	REDSOUND_TONE_PITCH_TABLE_SIZE = sizeof(u32) * REDSOUND_NOTES_PER_OCTAVE,
-	REDSOUND_TONE_PITCH_TABLE_ALLOC_SIZE = 0x30,
+	REDSOUND_TONE_PITCH_TABLE_ALLOC_SIZE = REDSOUND_TONE_PITCH_TABLE_SIZE,
 	REDSOUND_FINE_PITCH_TABLE_OFFSET = REDSOUND_TONE_PITCH_TABLE_OFFSET + REDSOUND_TONE_PITCH_TABLE_SIZE,
 	REDSOUND_FINE_PITCH_TABLE_SIZE = sizeof(int) * REDSOUND_PITCH_FINE_COUNT,
-	REDSOUND_FINE_PITCH_TABLE_ALLOC_SIZE = 0x400,
+	REDSOUND_FINE_PITCH_TABLE_ALLOC_SIZE = REDSOUND_FINE_PITCH_TABLE_SIZE,
 	REDSOUND_KEY_SIGNATURE_INDEX_TABLE_OFFSET = REDSOUND_FINE_PITCH_TABLE_OFFSET + REDSOUND_FINE_PITCH_TABLE_SIZE,
 	REDSOUND_KEY_SIGNATURE_INDEX_TABLE_SIZE = sizeof(int) * REDSOUND_KEY_SIGNATURE_INDEX_COUNT,
-	REDSOUND_KEY_SIGNATURE_INDEX_TABLE_ALLOC_SIZE = 0x80,
+	REDSOUND_KEY_SIGNATURE_INDEX_TABLE_ALLOC_SIZE = REDSOUND_KEY_SIGNATURE_INDEX_TABLE_SIZE,
 	REDSOUND_KEY_SIGNATURE_DATA_TABLE_OFFSET =
 	    REDSOUND_KEY_SIGNATURE_INDEX_TABLE_OFFSET + REDSOUND_KEY_SIGNATURE_INDEX_TABLE_SIZE,
 	REDSOUND_KEY_SIGNATURE_DATA_TABLE_SIZE = sizeof(signed char) * REDSOUND_KEY_SIGNATURE_DATA_COUNT,
-	REDSOUND_KEY_SIGNATURE_DATA_TABLE_ALLOC_SIZE = 0x2E,
+	REDSOUND_KEY_SIGNATURE_DATA_TABLE_ALLOC_SIZE = REDSOUND_KEY_SIGNATURE_DATA_TABLE_SIZE,
 	REDSOUND_RANDOM_DATA_TABLE_OFFSET =
 	    REDSOUND_KEY_SIGNATURE_DATA_TABLE_OFFSET + REDSOUND_KEY_SIGNATURE_DATA_TABLE_SIZE,
 	REDSOUND_RANDOM_DATA_TABLE_SIZE = sizeof(signed char) * REDSOUND_RANDOM_DATA_COUNT,
-	REDSOUND_RANDOM_DATA_TABLE_ALLOC_SIZE = 0x100,
+	REDSOUND_RANDOM_DATA_TABLE_ALLOC_SIZE = REDSOUND_RANDOM_DATA_TABLE_SIZE,
 	REDSOUND_PAN_TABLE_OFFSET = REDSOUND_RANDOM_DATA_TABLE_OFFSET + REDSOUND_RANDOM_DATA_TABLE_SIZE,
 	REDSOUND_PAN_TABLE_SIZE = sizeof(s16) * REDSOUND_PAN_TABLE_COUNT,
-	REDSOUND_PAN_TABLE_ALLOC_SIZE = 0x200,
+	REDSOUND_PAN_TABLE_ALLOC_SIZE = REDSOUND_PAN_TABLE_SIZE,
 	REDSOUND_PAN_TABLE_R_OFFSET = REDSOUND_PAN_TABLE_OFFSET + REDSOUND_PAN_TABLE_SIZE,
 	REDSOUND_PAN_TABLE_PAIR_SIZE = REDSOUND_PAN_TABLE_SIZE * 2,
-	REDSOUND_PAN_TABLE_PAIR_ALLOC_SIZE = 0x400,
+	REDSOUND_PAN_TABLE_PAIR_ALLOC_SIZE = REDSOUND_PAN_TABLE_PAIR_SIZE,
 	REDSOUND_EXECUTE_DATA_TABLE_END_OFFSET = REDSOUND_PAN_TABLE_R_OFFSET + REDSOUND_PAN_TABLE_SIZE,
 	REDSOUND_EXECUTE_DATA_TABLE_SIZE =
 	    REDSOUND_TONE_PITCH_TABLE_SIZE + REDSOUND_FINE_PITCH_TABLE_SIZE +
 	    REDSOUND_KEY_SIGNATURE_INDEX_TABLE_SIZE + REDSOUND_KEY_SIGNATURE_DATA_TABLE_SIZE +
 	    REDSOUND_RANDOM_DATA_TABLE_SIZE + REDSOUND_PAN_TABLE_PAIR_SIZE,
-	REDSOUND_EXECUTE_DATA_TABLE_ALLOC_SIZE = 0x9DE,
+	REDSOUND_EXECUTE_DATA_TABLE_ALLOC_SIZE = REDSOUND_EXECUTE_DATA_TABLE_SIZE,
 };
 
 struct RedSeBlockHEAD;
 
 extern RedMidiControlFunc p_MidiControl_Function[REDSOUND_MIDI_CONTROL_FUNCTION_COUNT];
 extern u32 t_TonePitch[REDSOUND_NOTES_PER_OCTAVE];
+#define RedTonePitchGet(index) (t_TonePitch[(index)])
 extern int t_FinePitch[REDSOUND_PITCH_FINE_COUNT];
+#define RedFinePitchGet(index) (t_FinePitch[(index)])
 extern int t_KeySignatureIndex[REDSOUND_KEY_SIGNATURE_INDEX_COUNT];
+#define RedKeySignatureIndexGet(index) (t_KeySignatureIndex[(index)])
 extern signed char t_KeySignatureData[REDSOUND_KEY_SIGNATURE_DATA_COUNT];
+#define RedKeySignatureDataGet(offset) (t_KeySignatureData + (offset))
+#define RedKeySignatureGetDefaultData() (t_KeySignatureData + REDSOUND_KEY_SIGNATURE_DEFAULT_DATA_OFFSET)
 extern signed char t_RandomData[REDSOUND_RANDOM_DATA_COUNT];
+#define RedRandomDataGetAddress(index) (t_RandomData + (index))
+#define RedRandomDataGet(index) (t_RandomData[(index)])
 extern s16 t_PanningData[REDSOUND_PAN_TABLE_COUNT];
+#define RedPanningDataGet(index) (t_PanningData[(index)])
 extern s16 t_PanningDataR[REDSOUND_PAN_TABLE_COUNT];
+#define RedPanningDataRGet(index) (t_PanningDataR[(index)])
+extern u32 m_TerminateNote[];
+#define RedTerminateNoteGet() (m_TerminateNote)
+extern volatile unsigned int m_AutoID;
 extern CRedEntry c_RedEntry;
 extern OSSemaphore m_MusicSkipSemaphore;
+#define RedMusicSkipSemaphoreGet() (&m_MusicSkipSemaphore)
 extern RedSeBlockHEAD* volatile p_SeBlockData[REDSOUND_SE_BLOCK_BANK_COUNT];
+#define RedSeBlockDataGetBegin() (p_SeBlockData)
+#define RedSeBlockDataGet(index) (p_SeBlockData[(index)])
+#define RedSeBlockDataSet(index, data) (p_SeBlockData[(index)] = (data))
 extern u8* volatile p_ZeroData;
+#define RedZeroDataGet() (p_ZeroData)
+#define RedZeroDataSet(data) (p_ZeroData = (data))
 extern RedSoundCONTROL* volatile p_SoundControlBuffer;
+#define RedSoundControlGetBegin() (p_SoundControlBuffer)
+#define RedSoundControlSetBegin(control) (p_SoundControlBuffer = (control))
+#define RedSoundControlGet(index) (p_SoundControlBuffer + (index))
+#define RedSoundControlGetMusicPlayEnd() RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PLAY_END)
+#define RedSoundControlGetMusicAllEnd() RedSoundControlGet(REDSOUND_CONTROL_MUSIC_ALL_END)
 extern RedSoundCONTROL* volatile p_SoundControl;
+#define RedCurrentSoundControlGet() (p_SoundControl)
+#define RedCurrentSoundControlSet(control) (p_SoundControl = (control))
 extern volatile int m_KeyOnEntry;
+#define RedKeyOnEntryGet() (m_KeyOnEntry)
+#define RedKeyOnEntrySet(count) (m_KeyOnEntry = (count))
+#define RedKeyOnEntryInc() (m_KeyOnEntry++)
 extern RedKeyOnDATA* volatile p_KeyOnData;
+#define RedKeyOnDataGet() (p_KeyOnData)
+#define RedKeyOnDataSet(data) (p_KeyOnData = (data))
 extern int m_SoundPlayMode;
+#define RedSoundPlayModeGet() (m_SoundPlayMode)
+#define RedSoundPlayModeSet(mode) (m_SoundPlayMode = (mode))
 extern int m_SoundMasterControl;
+#define RedSoundMasterControlGet() (m_SoundMasterControl)
+#define RedSoundMasterControlSet(control) (m_SoundMasterControl = (control))
 extern volatile int m_ReportPrint;
+#define RedReportPrintGet() (m_ReportPrint)
+#define RedReportPrintSet(value) (m_ReportPrint = (value))
+#define RedReportPrintIsEnabled() (RedReportPrintGet() != REDSOUND_REPORT_PRINT_OFF)
+#define RedReportPrintIsDisabled() (RedReportPrintGet() == REDSOUND_REPORT_PRINT_OFF)
 extern int m_MusicFastSpeed;
+#define RedMusicFastSpeedGet() (m_MusicFastSpeed)
+#define RedMusicFastSpeedSet(speed) (m_MusicFastSpeed = (speed))
 extern volatile int m_MusicSkipLine;
+#define RedMusicSkipLineGet() (m_MusicSkipLine)
+#define RedMusicSkipLineSet(line) (m_MusicSkipLine = (line))
+#define RedMusicSkipLineDec() (m_MusicSkipLine--)
+#define RedMusicSkipLineIsActive() (RedMusicSkipLineGet() != 0)
+#define RedMusicSkipLineIsComplete() (RedMusicSkipLineGet() <= 0)
 extern int m_MusicKeySignature;
+#define RedMusicKeySignatureGet() (m_MusicKeySignature)
+#define RedMusicKeySignatureSet(enabled) (m_MusicKeySignature = (enabled))
+#define RedMusicKeySignatureIsEnabled() (RedMusicKeySignatureGet() != 0)
 extern int* volatile p_MusicReplayPoint;
+#define RedMusicReplayPointGetBegin() (p_MusicReplayPoint)
+#define RedMusicReplayPointSetBegin(point) (p_MusicReplayPoint = (point))
+#define RedMusicReplayPointGet(index) (p_MusicReplayPoint + (index))
+#define RedMusicReplayPointSet(index, point) (p_MusicReplayPoint[(index)] = (point))
 extern RedControlRamp* volatile p_MusicTempoControl;
+#define RedMusicTempoControlGet() (p_MusicTempoControl)
+#define RedMusicTempoControlSet(control) (p_MusicTempoControl = (control))
+#define RedMusicTempoControlGetValue() (RedMusicTempoControlGet()->m_value)
+#define RedMusicTempoControlAddStep() (RedMusicTempoControlGet()->m_value += RedMusicTempoControlGet()->m_step)
+#define RedMusicTempoControlSetStep(step) (RedMusicTempoControlGet()->m_step = (step))
+#define RedMusicTempoControlGetCount() (RedMusicTempoControlGet()->m_count)
+#define RedMusicTempoControlSetCount(count) (RedMusicTempoControlGet()->m_count = (count))
+#define RedMusicTempoControlDecCount() (RedMusicTempoControlGet()->m_count--)
 extern RedControlRamp* volatile p_MusicPitchControl;
+#define RedMusicPitchControlGet() (p_MusicPitchControl)
+#define RedMusicPitchControlSet(control) (p_MusicPitchControl = (control))
+#define RedMusicPitchControlGetValue() (RedMusicPitchControlGet()->m_value)
+#define RedMusicPitchControlAddStep() (RedMusicPitchControlGet()->m_value += RedMusicPitchControlGet()->m_step)
+#define RedMusicPitchControlSetStep(step) (RedMusicPitchControlGet()->m_step = (step))
+#define RedMusicPitchControlGetCount() (RedMusicPitchControlGet()->m_count)
+#define RedMusicPitchControlSetCount(count) (RedMusicPitchControlGet()->m_count = (count))
+#define RedMusicPitchControlDecCount() (RedMusicPitchControlGet()->m_count--)
 extern int m_MusicPhraseStop;
+#define RedMusicPhraseStopGet() (m_MusicPhraseStop)
+#define RedMusicPhraseStopSet(status) (m_MusicPhraseStop = (status))
+#define RedMusicPhraseStopClear() RedMusicPhraseStopSet(REDSOUND_MUSIC_PHRASE_STOP_OFF)
+#define RedMusicPhraseStopIsOn() (RedMusicPhraseStopGet() == REDSOUND_MUSIC_PHRASE_STOP_ON)
+#define RedMusicPhraseStopIsOff() (RedMusicPhraseStopGet() == REDSOUND_MUSIC_PHRASE_STOP_OFF)
 extern int m_CrossTime;
+#define RedCrossTimeGet() (m_CrossTime)
+#define RedCrossTimeSet(time) (m_CrossTime = (time))
+#define RedCrossTimeClear() RedCrossTimeSet(0)
+#define RedCrossTimeIsActive() (RedCrossTimeGet() != 0)
 extern volatile int m_MasterMusicVolume;
+#define RedMasterMusicVolumeGet() (m_MasterMusicVolume)
+#define RedMasterMusicVolumeSet(volume) (m_MasterMusicVolume = (volume))
 extern volatile int m_MasterSEVolume;
+#define RedMasterSEVolumeGet() (m_MasterSEVolume)
+#define RedMasterSEVolumeSet(volume) (m_MasterSEVolume = (volume))
 extern RedStreamDATA* volatile p_Stream;
+#define RedStreamDataGetBegin() (p_Stream)
+#define RedStreamDataSetBegin(stream) (p_Stream = (stream))
+#define RedStreamDataGetEnd() (p_Stream + REDSOUND_STREAM_COUNT)
 extern volatile int m_SeSkipStep;
+#define RedSeSkipStepGet() (m_SeSkipStep)
+#define RedSeSkipStepSet(step) (m_SeSkipStep = (step))
+#define RedSeSkipStepIsActive() (RedSeSkipStepGet() != 0)
 extern RedVoiceDATA* volatile p_VoiceData;
+#define RedVoiceDataGetBegin() (p_VoiceData)
+#define RedVoiceDataSetBegin(voice) (p_VoiceData = (voice))
+#define RedVoiceDataGet(index) (p_VoiceData + (index))
+#define RedVoiceDataGetEnd() (p_VoiceData + REDSOUND_VOICE_COUNT)
+#define RedVoiceDataGetIndex(voice) ((voice) - p_VoiceData)
 extern int p_EditorVoice[REDSOUND_EDITOR_VOICE_COUNT];
+#define RedEditorVoiceGetBegin() (p_EditorVoice)
+#define RedEditorVoiceGet(index) (p_EditorVoice + (index))
+#define RedEditorVoiceSet(index, voice) (p_EditorVoice[(index)] = (voice))
+#define RedEditorVoiceGetEnd() (p_EditorVoice + REDSOUND_EDITOR_VOICE_COUNT)
 extern RedTrackDATA* p_EditorTrack;
+#define RedEditorTrackGet() (p_EditorTrack)
+#define RedEditorTrackSet(track) (p_EditorTrack = (track))
+extern OSThread m_MusicSkipThread;
 extern u8* volatile p_MusicSkipThreadStack;
 extern volatile int m_MusicSkipComplete;
+#define RedMusicSkipCompleteGet() (m_MusicSkipComplete)
+#define RedMusicSkipCompleteSet(status) (m_MusicSkipComplete = (status))
+#define RedMusicSkipIsComplete() (RedMusicSkipCompleteGet() != REDSOUND_MUSIC_SKIP_NOT_COMPLETE)
 extern RedReverbDepth* volatile p_ReverbDepth;
+#define RedReverbDepthGetBegin() (p_ReverbDepth)
+#define RedReverbDepthSetBegin(depth) (p_ReverbDepth = (depth))
+#define RedReverbDepthGet(index) (p_ReverbDepth + (index))
+#define RedReverbDepthGetDepth(index) (RedReverbDepthGet(index)->m_depth)
+#define RedReverbDepthSetDepth(index, depth) (RedReverbDepthGet(index)->m_depth = (depth))
+#define RedReverbDepthSetStep(index, step) (RedReverbDepthGet(index)->m_step = (step))
+#define RedReverbDepthSetCount(index, count) (RedReverbDepthGet(index)->m_count = (count))
 extern unsigned int m_Mute[REDSOUND_MUTE_WORD_COUNT];
+#define RedMuteGetBegin() (m_Mute)
+#define RedMuteGetWord(voiceNo) (m_Mute[(voiceNo) / REDSOUND_MUTE_BITS_PER_WORD])
+#define RedMuteGetMask(voiceNo) (1U << ((voiceNo) % REDSOUND_MUTE_BITS_PER_WORD))
+#define RedMuteSet(voiceNo) (RedMuteGetWord(voiceNo) |= RedMuteGetMask(voiceNo))
+#define RedMuteClear(voiceNo) (RedMuteGetWord(voiceNo) &= ~RedMuteGetMask(voiceNo))
 extern CRedMemory c_RedMemory;
 extern volatile u32 m_ChangeStatus;
+#define RedChangeStatusGet() (m_ChangeStatus)
+#define RedChangeStatusSet(status) (m_ChangeStatus = (status))
+#define RedChangeStatusAdd(status) (m_ChangeStatus |= (status))
 extern CRedDriver c_Driver;
 
 #endif

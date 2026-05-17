@@ -6,6 +6,9 @@
 typedef void (*RedDmaCallback)(void* callbackData);
 #endif
 
+#define REDSOUND_DMA_CALLBACK_NONE ((RedDmaCallback)0)
+#define REDSOUND_DMA_CALLBACK_DATA_NONE ((void*)0)
+
 struct RedReverbDepth;
 struct RedReverbModeData;
 struct RedReverbSize;
@@ -20,6 +23,58 @@ enum RedDmaEntryFlag {
 	REDSOUND_DMA_FLAG_QUEUE_MASK = 0xffff7fff,
 	REDSOUND_DMA_FLAGS_WAVE_LOAD = REDSOUND_DMA_FLAG_CHUNKED_TRANSFER,
 	REDSOUND_DMA_FLAGS_STREAM_LOAD = REDSOUND_DMA_FLAG_CHUNKED_TRANSFER | REDSOUND_DMA_FLAG_MAIN_QUEUE,
+};
+
+enum RedDmaDirection {
+	REDSOUND_DMA_DIRECTION_TO_ARAM = 0,
+	REDSOUND_DMA_DIRECTION_FROM_ARAM = 1,
+};
+
+enum RedDmaId {
+	REDSOUND_DMA_ID_NONE = 0,
+};
+
+enum RedDmaSearchResult {
+	REDSOUND_DMA_SEARCH_NOT_FOUND = 0,
+	REDSOUND_DMA_SEARCH_FOUND = 1,
+};
+
+struct RedDmaRequest {
+	int m_id;
+	int m_direction;
+	int m_mainMemory;
+	int m_aramMemory;
+	int m_size;
+	RedDmaCallback m_callback;
+	void* m_callbackData;
+};
+
+enum RedDmaRequestLayout {
+	REDSOUND_DMA_REQUEST_ID_OFFSET = (unsigned int)&(((RedDmaRequest*)0)->m_id),
+	REDSOUND_DMA_REQUEST_DIRECTION_OFFSET = (unsigned int)&(((RedDmaRequest*)0)->m_direction),
+	REDSOUND_DMA_REQUEST_MAIN_MEMORY_OFFSET = (unsigned int)&(((RedDmaRequest*)0)->m_mainMemory),
+	REDSOUND_DMA_REQUEST_ARAM_MEMORY_OFFSET = (unsigned int)&(((RedDmaRequest*)0)->m_aramMemory),
+	REDSOUND_DMA_REQUEST_SIZE_OFFSET = (unsigned int)&(((RedDmaRequest*)0)->m_size),
+	REDSOUND_DMA_REQUEST_CALLBACK_OFFSET = (unsigned int)&(((RedDmaRequest*)0)->m_callback),
+	REDSOUND_DMA_REQUEST_CALLBACK_DATA_OFFSET = (unsigned int)&(((RedDmaRequest*)0)->m_callbackData),
+	REDSOUND_DMA_MAIN_QUEUE_INDEX = 0,
+	REDSOUND_DMA_STREAM_QUEUE_INDEX = 1,
+	REDSOUND_DMA_QUEUE_COUNT = 2,
+	REDSOUND_DMA_REQUEST_SIZE = sizeof(RedDmaRequest),
+	REDSOUND_DMA_QUEUE_ENTRY_SHIFT = 7,
+	REDSOUND_DMA_QUEUE_ENTRY_COUNT = 1 << REDSOUND_DMA_QUEUE_ENTRY_SHIFT,
+	REDSOUND_DMA_QUEUE_WORD_COUNT = REDSOUND_DMA_REQUEST_SIZE * REDSOUND_DMA_QUEUE_ENTRY_COUNT / sizeof(int),
+	REDSOUND_DMA_CONTROL_WORD_COUNT = REDSOUND_DMA_QUEUE_WORD_COUNT * REDSOUND_DMA_QUEUE_COUNT,
+	REDSOUND_DMA_CONTROL_ENTRY_COUNT = REDSOUND_DMA_QUEUE_ENTRY_COUNT * 2,
+	REDSOUND_DMA_QUEUE_SIZE = REDSOUND_DMA_REQUEST_SIZE * REDSOUND_DMA_QUEUE_ENTRY_COUNT,
+	REDSOUND_DMA_CONTROL_SIZE = REDSOUND_DMA_QUEUE_SIZE * REDSOUND_DMA_QUEUE_COUNT,
+	REDSOUND_DMA_TRANSFER_ALIGN_SHIFT = 5,
+	REDSOUND_DMA_TRANSFER_ALIGN = 1 << REDSOUND_DMA_TRANSFER_ALIGN_SHIFT,
+	REDSOUND_DMA_TRANSFER_ALIGN_MASK = ~(REDSOUND_DMA_TRANSFER_ALIGN - 1),
+	REDSOUND_DMA_MAX_CHUNK_SHIFT = 18,
+	REDSOUND_DMA_MAX_CHUNK_SIZE = 1 << REDSOUND_DMA_MAX_CHUNK_SHIFT,
+	REDSOUND_DMA_ARQ_OWNER_ID = 0x469,
+	REDSOUND_DMA_ARQ_PRIORITY = 1,
 };
 
 unsigned int DeltaTimeSumup(unsigned char** buffer);
@@ -112,7 +167,7 @@ public:
 	void DisplayMMemoryInfo();
 
 	void SetReverb(int kind, int mode);
-	void SetReverb(int kind, int mode, int* params);
+	void SetReverb(int kind, int mode, int* reverbParams);
 	RedReverbSize* GetReverbInfo();
 	RedReverbDepth* GetReverbDepth();
 	void SetReverbDepth(int bank, int depth, int frameCount);
