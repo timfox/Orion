@@ -451,14 +451,14 @@ void CMaterialEditorPcs::calcViewer()
         m_usbStream.SetUSBStreamDataDone();
     }
 
-    rotationValue = 0.0f;
-    srt.transZ = 0.0f;
-    srt.transY = 0.0f;
-    srt.transX = 0.0f;
+    one = LoadFloat(FLOAT_8032FCC8);
+    rotationValue = LoadFloat(FLOAT_8032FCD8);
+    srt.transZ = rotationValue;
+    srt.transY = rotationValue;
+    srt.transX = rotationValue;
     srt.rotZ = rotationValue;
     srt.rotY = rotationValue;
     srt.rotX = rotationValue;
-    one = LoadFloat(FLOAT_8032FCC8);
     srt.scaleZ = one;
     srt.scaleY = one;
     srt.scaleX = one;
