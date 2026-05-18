@@ -295,14 +295,14 @@ found_fallback:
 	posX += advance;
 
 	if (glyphInfo[0] == 0) {
-		u0 += 1.0f;
+		u0 += FLOAT_803306C8;
 	}
 	if (m_glyphWidth == glyphInfo[0] + glyphInfo[1]) {
-		u1 -= 1.0f;
+		u1 -= FLOAT_803306C8;
 	}
 
-	v0 += 1.0f;
-	v1 -= 1.0f;
+	v0 += FLOAT_803306C8;
+	v1 -= FLOAT_803306C8;
 
 	GXBegin(GX_QUADS, GX_VTXFMT0, 4);
 	GXPosition3f32(x0, y0, posZ);
