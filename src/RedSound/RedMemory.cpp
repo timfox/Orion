@@ -29,8 +29,8 @@ static int m_ADataBuffer;
 static int m_DataBufferSize;
 static int m_ADataBufferSize;
 
-static RedMemoryBlock* m_MemoryBank;
-static RedMemoryBlock* m_AMemoryBank;
+static RedMemoryBlock* volatile m_MemoryBank;
+static RedMemoryBlock* volatile m_AMemoryBank;
 
 const char s_redMemoryMainBankFullFmt[] = "%s%sMemory Bank Full !!%s\n";
 const char sRedMemoryLogPrefix[] = "\x1b[7;34mSound\x1b[0m:";
@@ -495,8 +495,8 @@ void CRedMemory::Init(int mainBuffer, int mainBufferSize, int auxBuffer, int aux
 
 	m_MemoryBank = (RedMemoryBlock*)mainBuffer;
 	m_AMemoryBank = (RedMemoryBlock*)((u8*)m_MemoryBank + bankSize);
-	m_DataBuffer = (int)((u8*)m_AMemoryBank + bankSize);
-	m_DataBufferSize = mainBufferSize - bankSize * REDSOUND_MEMORY_BANK_TABLE_COUNT;
+	*(volatile int*)&m_DataBuffer = (int)((u8*)m_AMemoryBank + bankSize);
+	*(volatile int*)&m_DataBufferSize = mainBufferSize - bankSize * REDSOUND_MEMORY_BANK_TABLE_COUNT;
 	memset(m_MemoryBank, 0, bankSize);
 	memset(m_AMemoryBank, 0, bankSize);
 	m_ADataBuffer = auxBuffer;

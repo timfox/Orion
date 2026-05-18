@@ -214,7 +214,6 @@ static int _EraseTime(int eraseTrack)
 	RedTrackDATA* track = *trackBasePtr;
 	int sepId;
 	int erasedCount;
-	int trackNo;
 
 	do {
 		if ((track->m_command != REDSOUND_TRACK_COMMAND_NONE) && (track->m_attrMask == REDSOUND_TRACK_ATTR_NONE) &&
@@ -247,6 +246,8 @@ static int _EraseTime(int eraseTrack)
 		if ((track->m_command != REDSOUND_TRACK_COMMAND_NONE) && (track->m_attrMask == REDSOUND_TRACK_ATTR_NONE) &&
 		    (track->m_eraseTrack <= eraseTrack) &&
 		    (track->m_playTime == minEraseTrack)) {
+			int trackNo;
+
 			KeyOnReserveClear(RedKeyOnDataGet(), track);
 			track->m_seId = REDSOUND_SE_ID_NONE;
 			track->m_flags = REDSOUND_TRACK_FLAGS_NONE;
@@ -434,7 +435,6 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 	unsigned char seFlagsAndSequenceCount;
 	RedWaveHeadWD* waveHead;
 	RedTrackDATA* seTrack;
-	int initialPlayTime;
 	int eraseAttrMask;
 	RedSeInfoSequence* sequence;
 	int waveNo;
@@ -499,12 +499,7 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 			seTrack->m_seSepId = sepId;
 			seTrack->m_seId = seId;
 			seTrack->m_loopStepCurrent = 0;
-			if (RedSeSkipStepIsActive()) {
-				initialPlayTime = 0;
-			} else {
-				initialPlayTime = REDSOUND_TRACK_PLAY_TIME_SENTINEL;
-			}
-			seTrack->m_playTime = initialPlayTime;
+			seTrack->m_playTime = RedSeSkipStepIsActive() ? 0 : REDSOUND_TRACK_PLAY_TIME_SENTINEL;
 
 			if (*seTrack->m_command != REDSOUND_SE_COMMAND_NONE) {
 				seTrack->m_eraseTrack = seInfo->m_eraseTrack;
@@ -591,21 +586,27 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
  */
 int SeBlockPlay(int seId, int bank, int sequenceNo, int pan, int volume)
 {
+	RedSeBlockHEAD* seBlock;
+	int blockSequence;
+	int* entries;
+	RedSeINFO* seInfo;
+	RedSeINFO* playInfo;
+
 	bank = bank & REDSOUND_SE_BLOCK_BANK_MASK;
 	sequenceNo = sequenceNo & REDSOUND_SE_BLOCK_SEQUENCE_MASK;
 
 	if (RedSeBlockDataGet(bank) != REDSOUND_SE_BLOCK_DATA_NONE) {
-		RedSeBlockHEAD* seBlock = RedSeBlockDataGet(bank);
-		int blockSequence = sequenceNo;
+		seBlock = RedSeBlockDataGet(bank);
+		blockSequence = sequenceNo;
 
 		sequenceNo += bank << REDSOUND_SE_BLOCK_BANK_SHIFT;
 		sequenceNo |= REDSOUND_SE_BLOCK_DATA_FLAG;
 		if (blockSequence < seBlock->m_seCount) {
-			int* entries = seBlock->m_entries;
+			entries = seBlock->m_entries;
 
 			if (entries[blockSequence] != REDSOUND_SE_BLOCK_ENTRY_EMPTY) {
-				RedSeINFO* seInfo = RedSeBlockGetInfoFromEntry(seBlock, entries, blockSequence);
-				RedSeINFO* playInfo = seInfo;
+				seInfo = RedSeBlockGetInfoFromEntry(seBlock, entries, blockSequence);
+				playInfo = seInfo;
 
 				if (((unsigned int)entries[blockSequence] & REDSOUND_SE_BLOCK_DATA_FLAG) != 0) {
 					playInfo->m_flagsAndCount |= REDSOUND_SE_INFO_MULTI_FLAG;
