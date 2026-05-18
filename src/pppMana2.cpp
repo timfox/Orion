@@ -954,9 +954,9 @@ void CalcReflectionVector2(
     Mtx nodeMtx;
     Mtx nodeRotMtx;
     Mtx cameraMtx;
+    Mtx cameraModelMtx;
     u16* dl = (u16*)displayList;
     u16* dlEnd;
-    const double half = (double)LoadFloat(FLOAT_803318a4);
 
     cameraPos.x = CameraWorldX();
     cameraPos.y = CameraWorldY();
@@ -983,7 +983,9 @@ void CalcReflectionVector2(
     nodeRotMtx[2][3] = LoadFloat(FLOAT_80331898);
 
     PSMTXCopy(CameraMatrix(), cameraMtx);
-    PSMTXConcat(cameraMtx, matrix, cameraMtx);
+    PSMTXConcat(cameraMtx, matrix, cameraModelMtx);
+
+    const double half = (double)LoadFloat(FLOAT_803318a4);
 
     dlEnd = (u16*)((u8*)displayList + displayListSize);
     while (dl < dlEnd) {
@@ -1020,12 +1022,17 @@ void CalcReflectionVector2(
             outVec = &reflectionVec[posIndex];
             C_VECReflect(&cameraVector, &objSpaceNormal, outVec);
 
-            maxAxis = fabsf(outVec->x);
-            if (maxAxis < fabsf(outVec->y)) {
+            float absY = fabsf(outVec->y);
+            float absX = fabsf(outVec->x);
+            float absZ = fabsf(outVec->z);
+
+            axis = absX < absY;
+            maxAxis = absX;
+            if (axis != 0) {
                 axis = 1;
-                maxAxis = fabsf(outVec->y);
+                maxAxis = absY;
             }
-            if (maxAxis < fabsf(outVec->z)) {
+            if (maxAxis < absZ) {
                 axis = 2;
             }
             CVector reflected(outVec->x, outVec->y, outVec->z);
