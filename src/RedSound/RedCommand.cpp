@@ -36,6 +36,15 @@ enum RedCommandStringLayout {
 	REDSOUND_COMMAND_SDATA2_STRING_SIZE = 0x15,
 };
 
+enum RedCommandMapLayout {
+	REDSOUND_COMMAND_MAP_RODATA_STRING_OFFSET = 0x00,
+	REDSOUND_COMMAND_MAP_RODATA_STRING_SIZE = 0x103,
+	REDSOUND_COMMAND_MAP_SDATA2_STRING_OFFSET = 0x00,
+	REDSOUND_COMMAND_MAP_SDATA2_STRING_SIZE = 0x15,
+	REDSOUND_COMMAND_MAP_DATA_REVERB_MODE_TABLE_OFFSET = 0x00,
+	REDSOUND_COMMAND_MAP_DATA_SIZE = 0xE0,
+};
+
 struct RedCommandDataTable {
 	RedReverbModeData t_ReverbModeData[REDSOUND_REVERB_MODE_COUNT];
 };
@@ -95,10 +104,13 @@ STATIC_ASSERT(REDSOUND_REVERB_MODE_PARAMS_OFFSET + REDSOUND_REVERB_MODE_PARAMS_S
 STATIC_ASSERT(sizeof(RedReverbModeData) == REDSOUND_REVERB_MODE_SIZE);
 STATIC_ASSERT(REDSOUND_REVERB_MODE_TABLE_SIZE == REDSOUND_REVERB_MODE_TABLE_ALLOC_SIZE);
 STATIC_ASSERT(sizeof(t_ReverbModeData) == REDSOUND_REVERB_MODE_TABLE_SIZE);
+STATIC_ASSERT(REDSOUND_COMMAND_REVERB_MODE_TABLE_OFFSET ==
+              REDSOUND_COMMAND_MAP_DATA_REVERB_MODE_TABLE_OFFSET);
 STATIC_ASSERT(sizeof(((RedCommandDataTable*)0)->t_ReverbModeData) == REDSOUND_REVERB_MODE_TABLE_SIZE);
 STATIC_ASSERT(REDSOUND_COMMAND_REVERB_MODE_TABLE_OFFSET + sizeof(t_ReverbModeData) ==
               REDSOUND_COMMAND_DATA_TABLE_SIZE);
 STATIC_ASSERT(REDSOUND_COMMAND_DATA_TABLE_SIZE == REDSOUND_REVERB_MODE_TABLE_ALLOC_SIZE);
+STATIC_ASSERT(REDSOUND_COMMAND_DATA_TABLE_SIZE == REDSOUND_COMMAND_MAP_DATA_SIZE);
 STATIC_ASSERT(REDSOUND_MUSIC_TRACK_BLOCK_SIZE_FIELD_SIZE == REDSOUND_MUSIC_TRACK_BLOCK_COMMAND_OFFSET);
 STATIC_ASSERT(sizeof(sRedCommandLogWarnColor) == REDSOUND_COMMAND_WARN_COLOR_SIZE);
 STATIC_ASSERT(sizeof(sRedCommandLogReset) == REDSOUND_COMMAND_RESET_SIZE);
@@ -116,9 +128,13 @@ STATIC_ASSERT(sizeof(sRedCommandWaveNotEntryFmt) + sizeof(sRedCommandLogPrefix) 
                   sizeof(sRedCommandMusicTrackCreateErrorFmt) + sizeof(sRedCommandMusicNeedMemoryFmt) +
                   sizeof(sRedCommandMusicPauseOnFmt) + sizeof(sRedCommandMusicPauseOffFmt) ==
               REDSOUND_COMMAND_RODATA_STRING_SIZE);
+STATIC_ASSERT(REDSOUND_COMMAND_MAP_RODATA_STRING_OFFSET == 0);
+STATIC_ASSERT(REDSOUND_COMMAND_RODATA_STRING_SIZE == REDSOUND_COMMAND_MAP_RODATA_STRING_SIZE);
 STATIC_ASSERT(sizeof(sRedCommandLogWarnColor) + sizeof(sRedCommandLogReset) +
                   sizeof(sRedCommandLogErrorColor) ==
               REDSOUND_COMMAND_SDATA2_STRING_SIZE);
+STATIC_ASSERT(REDSOUND_COMMAND_MAP_SDATA2_STRING_OFFSET == 0);
+STATIC_ASSERT(REDSOUND_COMMAND_SDATA2_STRING_SIZE == REDSOUND_COMMAND_MAP_SDATA2_STRING_SIZE);
 
 RedReverbModeData t_ReverbModeData[REDSOUND_REVERB_MODE_COUNT] = {
     {REDSOUND_REVERB_KIND_HI, {REDSOUND_REVERB_PRE_DELAY_10MS, REDSOUND_REVERB_TIME_1400MS,
@@ -639,7 +655,7 @@ int SeSepPlay(int seId, int sepId, int pan, int volume)
 	if (sepBank != 0) {
 		sepHead = sepBank->m_seSepHead;
 		sepInfo = RedSeSepGetInfo(sepHead);
-		if ((sepHead->m_sizeAndFlags & REDSOUND_SESEP_FLAGS_MASK) != 0) {
+		if (RedSeSepHasFlags(sepHead)) {
 			sepInfo->m_flagsAndCount |= REDSOUND_SE_INFO_MULTI_FLAG;
 		}
 		if (_SePlayStart(sepInfo, seId, sepId, pan, volume) != 0) {
@@ -940,8 +956,8 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 	music->m_keySignature = REDSOUND_CONTROL_KEY_SIGNATURE_NONE;
 	music->m_keySignatureData = RedKeySignatureGetDefaultData();
 	music->m_trackCount = musicHead->m_trackCount;
-	music->m_activeTrackCount = (short)musicHead->m_trackCount;
-	music->m_volumeScale = (unsigned char)(musicHead->m_flags & REDSOUND_MUSIC_HEADER_VOLUME_SCALE_MASK);
+	music->m_activeTrackCount = musicHead->m_trackCount;
+	music->m_volumeScale = musicHead->m_flags & REDSOUND_MUSIC_HEADER_VOLUME_SCALE_MASK;
 	music->m_tickCounter = REDSOUND_CONTROL_INITIAL_TICK_COUNTER;
 	music->m_tempo = REDSOUND_FIXED_ONE;
 	music->m_ticksPerMeasure = REDSOUND_CONTROL_DEFAULT_TICKS_PER_MEASURE;
@@ -1111,7 +1127,7 @@ void SetMusicVolume(int musicId, int volume, int duration, int mode)
  * EN Size: 408b
  * JP Address: TODO
  */
-inline int SeStopG(int group)
+int SeStopG(int group)
 {
 	RedSoundCONTROL* soundControl;
 	RedTrackDATA* track;
@@ -1157,7 +1173,7 @@ inline int SeStopG(int group)
  * EN Size: 104b
  * JP Address: TODO
  */
-inline void SetMusicTempo(int tempo, int frameCount)
+void SetMusicTempo(int tempo, int frameCount)
 {
 	tempo <<= REDSOUND_FIXED_SHIFT;
 	tempo |= REDSOUND_FIXED_HALF;
@@ -1181,7 +1197,7 @@ inline void SetMusicTempo(int tempo, int frameCount)
  * EN Size: 92b
  * JP Address: TODO
  */
-inline void SetMusicPitch(int pitch, int frameCount)
+void SetMusicPitch(int pitch, int frameCount)
 {
 	pitch <<= REDSOUND_FIXED_SHIFT;
 	pitch |= REDSOUND_FIXED_HALF;
@@ -1204,7 +1220,7 @@ inline void SetMusicPitch(int pitch, int frameCount)
  * EN Size: 476b
  * JP Address: TODO
  */
-inline void MusicPause(int musicId, int pause)
+void MusicPause(int musicId, int pause)
 {
 	RedSoundCONTROL* music;
 	RedVoiceDATA* voice;

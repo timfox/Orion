@@ -34,6 +34,13 @@ enum RedStreamStringLayout {
 	REDSOUND_STREAM_SDATA2_STRING_SIZE = 0x15,
 };
 
+enum RedStreamMapLayout {
+	REDSOUND_STREAM_MAP_RODATA_STRING_OFFSET = 0x00,
+	REDSOUND_STREAM_MAP_RODATA_STRING_SIZE = 0xC6,
+	REDSOUND_STREAM_MAP_SDATA2_STRING_OFFSET = 0x00,
+	REDSOUND_STREAM_MAP_SDATA2_STRING_SIZE = 0x15,
+};
+
 enum RedStreamLayoutSize {
 	REDSOUND_STREAM_SAMPLE_ADVANCE = REDSOUND_STREAM_PAGE_SIZE / REDSOUND_STREAM_STEREO_CHANNEL_FRAME_BYTES,
 	REDSOUND_STREAM_FILE_HEADER_SIZE = sizeof(RedStreamHEAD),
@@ -140,8 +147,12 @@ STATIC_ASSERT(sizeof(sRedStreamBufferDidntSecureFmt) + sizeof(sRedStreamLogPrefi
                   sizeof(sRedStreamMainMemoryDidntCreateFmt) + sizeof(sRedStreamAramMemoryDidntCreateFmt) +
                   sizeof(sRedStreamPauseOnFmt) + sizeof(sRedStreamPauseOffFmt) ==
               REDSOUND_STREAM_RODATA_STRING_SIZE);
+STATIC_ASSERT(REDSOUND_STREAM_MAP_RODATA_STRING_OFFSET == 0);
+STATIC_ASSERT(REDSOUND_STREAM_RODATA_STRING_SIZE == REDSOUND_STREAM_MAP_RODATA_STRING_SIZE);
 STATIC_ASSERT(sizeof(sRedStreamLogErrorColor) + sizeof(sRedStreamLogReset) + sizeof(sRedStreamLogWarnColor) ==
               REDSOUND_STREAM_SDATA2_STRING_SIZE);
+STATIC_ASSERT(REDSOUND_STREAM_MAP_SDATA2_STRING_OFFSET == 0);
+STATIC_ASSERT(REDSOUND_STREAM_SDATA2_STRING_SIZE == REDSOUND_STREAM_MAP_SDATA2_STRING_SIZE);
 
 static RedStreamDATA* _SearchEmptyStreamData();
 static void _StreamStop(RedStreamDATA* streamData);
@@ -447,13 +458,8 @@ int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volu
 {
 	int aramSize;
 	int aramOffset;
-	int streamPitch;
-	int channelIndex;
-	int adpcmSampleOffset;
-	RedStreamFile* streamFile;
 	RedStreamADPCMHeader* adpcmHeader;
 	RedStreamDATA* streamData;
-	RedVoiceDATA* voice;
 
 	streamData = _SearchEmptyStreamData();
 	if (streamData != REDSOUND_STREAM_DATA_NONE) {
@@ -476,21 +482,26 @@ int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volu
 	if ((streamData->m_track != REDSOUND_STREAM_TRACK_NONE) &&
 	    (streamData->m_buffer != REDSOUND_STREAM_BUFFER_NONE) &&
 	    (streamData->m_aramBuffer != REDSOUND_STREAM_ARAM_BUFFER_NONE)) {
-		adpcmSampleOffset = REDSOUND_STREAM_FILE_AUDIO_OFFSET;
-		streamFile = reinterpret_cast<RedStreamFile*>(streamHeader);
-		adpcmHeader = RedStreamFileGetAdpcm(streamFile, REDSOUND_STREAM_LEFT_CHANNEL);
-		adpcmHeader->m_data.pred_scale = (short)RedStreamFileGetSampleByte(streamFile, adpcmSampleOffset);
-		adpcmHeader->m_data.yn1 = adpcmHeader->m_data.yn2 = 0;
-		if (streamData->m_header.m_channelCount == REDSOUND_STREAM_STEREO_CHANNEL_COUNT) {
-			if (streamData->m_header.m_loopStart < REDSOUND_STREAM_LOOP_ENABLED_MIN) {
-				adpcmSampleOffset += REDSOUND_STREAM_PAGE_SIZE;
-			} else {
-				adpcmSampleOffset += REDSOUND_STREAM_STEREO_RIGHT_FRAME_OFFSET;
+		{
+			int adpcmSampleOffset;
+			RedStreamFile* streamFile;
+
+			adpcmSampleOffset = REDSOUND_STREAM_FILE_AUDIO_OFFSET;
+			streamFile = RedStreamFileFromHeader(streamHeader);
+			adpcmHeader = RedStreamFileGetAdpcm(streamFile, REDSOUND_STREAM_LEFT_CHANNEL);
+			adpcmHeader->m_data.pred_scale = RedStreamFileGetSampleByte(streamFile, adpcmSampleOffset);
+			adpcmHeader->m_data.yn1 = adpcmHeader->m_data.yn2 = 0;
+			if (streamData->m_header.m_channelCount == REDSOUND_STREAM_STEREO_CHANNEL_COUNT) {
+				if (streamData->m_header.m_loopStart < REDSOUND_STREAM_LOOP_ENABLED_MIN) {
+					adpcmSampleOffset += REDSOUND_STREAM_PAGE_SIZE;
+				} else {
+					adpcmSampleOffset += REDSOUND_STREAM_STEREO_RIGHT_FRAME_OFFSET;
+				}
+				RedStreamAdpcmHeaderGetChannel(adpcmHeader, REDSOUND_STREAM_RIGHT_CHANNEL)->m_data.pred_scale =
+				    RedStreamFileGetSampleByte(streamFile, adpcmSampleOffset);
+				RedStreamAdpcmHeaderGetChannel(adpcmHeader, REDSOUND_STREAM_RIGHT_CHANNEL)->m_data.yn1 =
+				    RedStreamAdpcmHeaderGetChannel(adpcmHeader, REDSOUND_STREAM_RIGHT_CHANNEL)->m_data.yn2 = 0;
 			}
-			RedStreamAdpcmHeaderGetChannel(adpcmHeader, REDSOUND_STREAM_RIGHT_CHANNEL)->m_data.pred_scale =
-			    (short)RedStreamFileGetSampleByte(streamFile, adpcmSampleOffset);
-			RedStreamAdpcmHeaderGetChannel(adpcmHeader, REDSOUND_STREAM_RIGHT_CHANNEL)->m_data.yn1 =
-			    RedStreamAdpcmHeaderGetChannel(adpcmHeader, REDSOUND_STREAM_RIGHT_CHANNEL)->m_data.yn2 = 0;
 		}
 
 		streamData->m_streamId = streamID;
@@ -505,10 +516,10 @@ int StreamPlay(int streamID, void* streamHeader, int fileSize, int pan, int volu
 		}
 		streamData->m_volume.m_value = volume;
 		streamData->m_volume.m_stepCount = 0;
-		streamPitch = PitchCompute(REDSOUND_STREAM_BASE_PITCH, 0, streamData->m_header.m_pitch, 0);
-		channelIndex = 0;
+		int streamPitch = PitchCompute(REDSOUND_STREAM_BASE_PITCH, 0, streamData->m_header.m_pitch, 0);
+		int channelIndex = 0;
 		do {
-			voice = RedStreamGetVoiceData(streamData, channelIndex);
+			RedVoiceDATA* voice = RedStreamGetVoiceData(streamData, channelIndex);
 			voice->m_track = RedStreamGetTrack(streamData, channelIndex);
 			voice->m_track->m_note.m_allocFlags |= REDSOUND_NOTE_ALLOC_STREAM;
 			voice->m_stateFlags |= REDSOUND_VOICE_STATE_STREAM;
@@ -631,6 +642,45 @@ void SetStreamVolume(int streamID, int volume, int frameCount)
 			} else {
 				streamData->m_volume.m_value = volume;
 				streamData->m_volume.m_stepCount = 0;
+			}
+		}
+		streamData++;
+	} while (streamData < RedStreamDataGetEnd());
+}
+/*
+ * --INFO--
+ * PAL Address: UNUSED
+ * PAL Size: 184b
+ * EN Address: UNUSED
+ * EN Size: 184b
+ * JP Address: TODO
+ * JP Size: TODO
+ */
+void SetStreamPan(int streamID, int pan, int frameCount)
+{
+	volatile RedStreamDATA* streamData;
+
+	if (frameCount < REDSOUND_STREAM_MIN_FRAME_COUNT) {
+		frameCount = REDSOUND_STREAM_MIN_FRAME_COUNT;
+	} else {
+		frameCount *= REDSOUND_STREAM_FADE_TICKS_PER_SECOND;
+		frameCount /= REDSOUND_FRAMES_PER_SECOND;
+	}
+
+	pan &= REDSOUND_PAN_BYTE_MASK;
+	pan <<= REDSOUND_FIXED_SHIFT;
+	pan |= REDSOUND_FIXED_HALF;
+	streamData = RedStreamDataGetBegin();
+	do {
+		if ((streamData->m_streamId != REDSOUND_STREAM_ID_NONE) &&
+		    ((streamID == REDSOUND_STREAM_ID_ALL) || (streamID == streamData->m_streamId))) {
+			if (frameCount > 0) {
+				int panDelta = pan - streamData->m_pan.m_value;
+				streamData->m_pan.m_step = panDelta / frameCount;
+				streamData->m_pan.m_stepCount = frameCount;
+			} else {
+				streamData->m_pan.m_value = pan;
+				streamData->m_pan.m_stepCount = 0;
 			}
 		}
 		streamData++;
@@ -792,45 +842,6 @@ void StreamControl()
 			}
 		}
 
-		streamData++;
-	} while (streamData < RedStreamDataGetEnd());
-}
-/*
- * --INFO--
- * PAL Address: UNUSED
- * PAL Size: 184b
- * EN Address: UNUSED
- * EN Size: 184b
- * JP Address: TODO
- * JP Size: TODO
- */
-void SetStreamPan(int streamID, int pan, int frameCount)
-{
-	volatile RedStreamDATA* streamData;
-
-	if (frameCount < REDSOUND_STREAM_MIN_FRAME_COUNT) {
-		frameCount = REDSOUND_STREAM_MIN_FRAME_COUNT;
-	} else {
-		frameCount *= REDSOUND_STREAM_FADE_TICKS_PER_SECOND;
-		frameCount /= REDSOUND_FRAMES_PER_SECOND;
-	}
-
-	pan &= REDSOUND_PAN_BYTE_MASK;
-	pan <<= REDSOUND_FIXED_SHIFT;
-	pan |= REDSOUND_FIXED_HALF;
-	streamData = RedStreamDataGetBegin();
-	do {
-		if ((streamData->m_streamId != REDSOUND_STREAM_ID_NONE) &&
-		    ((streamID == REDSOUND_STREAM_ID_ALL) || (streamID == streamData->m_streamId))) {
-			if (frameCount > 0) {
-				int panDelta = pan - streamData->m_pan.m_value;
-				streamData->m_pan.m_step = panDelta / frameCount;
-				streamData->m_pan.m_stepCount = frameCount;
-			} else {
-				streamData->m_pan.m_value = pan;
-				streamData->m_pan.m_stepCount = 0;
-			}
-		}
 		streamData++;
 	} while (streamData < RedStreamDataGetEnd());
 }
