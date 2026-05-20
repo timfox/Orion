@@ -55,12 +55,9 @@ struct RedNoteDATA {
 	unsigned char m_reserved03;
 };
 
-inline void RedNoteCopy(RedNoteDATA* dst, const RedNoteDATA* src)
-{
-	*(int*)&dst->m_key = *(int*)&src->m_key;
-}
-
+#define RedNoteCopy(dst, src) (*(int*)&(dst)->m_key = *(int*)&(src)->m_key)
 #define RedNoteGetKey(note) (*(char*)&(note)->m_key)
+#define RedVoiceSetNote(voice, note) (*(int*)&(voice)->m_key = *(int*)&(note)->m_key)
 
 enum RedNoteLayoutOffset {
 	REDSOUND_NOTE_KEY_OFFSET = (unsigned int)&(((RedNoteDATA*)0)->m_key),
@@ -78,10 +75,23 @@ enum RedNoteAllocFlag {
 	REDSOUND_NOTE_ALLOC_NONE = 0,
 	REDSOUND_NOTE_ALLOC_DIRECT = 1,
 	REDSOUND_NOTE_ALLOC_STREAM = 2,
-	REDSOUND_NOTE_ALLOC_RESERVED = 4,
+	REDSOUND_NOTE_ALLOC_FIXED = 4,
 	REDSOUND_NOTE_ALLOC_PRIORITY = 8,
-	REDSOUND_NOTE_ALLOC_DIRECT_MASK = REDSOUND_NOTE_ALLOC_DIRECT | REDSOUND_NOTE_ALLOC_RESERVED,
+	REDSOUND_NOTE_ALLOC_DIRECT_MASK = REDSOUND_NOTE_ALLOC_DIRECT | REDSOUND_NOTE_ALLOC_FIXED,
 };
+
+#define RedNoteAllocClear(flags) ((flags) = REDSOUND_NOTE_ALLOC_NONE)
+#define RedNoteAllocHasDirect(flags) (((flags) & REDSOUND_NOTE_ALLOC_DIRECT) != 0)
+#define RedNoteAllocHasStream(flags) (((flags) & REDSOUND_NOTE_ALLOC_STREAM) != 0)
+#define RedNoteAllocHasPriority(flags) (((flags) & REDSOUND_NOTE_ALLOC_PRIORITY) != 0)
+#define RedNoteAllocHasDirectMask(flags) (((static_cast<s8>(flags)) & REDSOUND_NOTE_ALLOC_DIRECT_MASK) != 0)
+#define RedNoteAllocSetDirectMask(flags) ((flags) = REDSOUND_NOTE_ALLOC_DIRECT_MASK)
+#define RedNoteAllocSetStream(flags) ((flags) |= REDSOUND_NOTE_ALLOC_STREAM)
+#define RedNoteAllocClearStream(flags) ((flags) &= ~REDSOUND_NOTE_ALLOC_STREAM)
+#define RedNoteAllocSetPriority(flags) ((flags) |= REDSOUND_NOTE_ALLOC_PRIORITY)
+#define RedNoteAllocClearPriority(flags) ((flags) &= ~REDSOUND_NOTE_ALLOC_PRIORITY)
+#define RedNoteAllocSetFixed(flags) ((flags) |= REDSOUND_NOTE_ALLOC_FIXED)
+#define RedNoteAllocClearFixed(flags) ((flags) &= ~REDSOUND_NOTE_ALLOC_FIXED)
 
 struct RedWaveADPCMInfo {
 	AXPBADPCM m_data;
@@ -103,6 +113,25 @@ enum RedWaveReservedLayoutSize {
 	REDSOUND_WAVE_RESERVED5C_SIZE = 0x04,
 };
 
+enum RedVoiceLayoutCount {
+	REDSOUND_VOICE_ADSR_TIME_COUNT = 4,
+	REDSOUND_VOICE_ADSR_LEVEL_COUNT = 4,
+	REDSOUND_VOICE_ADSR_TIME_BYTE_STRIDE = sizeof(u16),
+	REDSOUND_VOICE_RESERVED1B_SIZE = 0x01,
+	REDSOUND_VOICE_RESERVED2A_SIZE = 0x02,
+	REDSOUND_VOICE_RESERVED3A_SIZE = 0x02,
+	REDSOUND_VOICE_RESERVED48_SIZE = 0x08,
+	REDSOUND_VOICE_RESERVEDA4_SIZE = 0x04,
+	REDSOUND_VOICE_RESERVEDB4_SIZE = 0x04,
+	REDSOUND_VOICE_RESERVEDBC_SIZE = 0x04,
+	REDSOUND_TERMINATE_NOTE_WORD_COUNT = 1,
+};
+
+struct RedAdsrDATA {
+	unsigned short m_time[REDSOUND_VOICE_ADSR_TIME_COUNT];
+	unsigned char m_level[REDSOUND_VOICE_ADSR_LEVEL_COUNT];
+};
+
 struct RedWaveDATA {
 	unsigned int m_flags;
 	int m_sampleStart;
@@ -117,7 +146,7 @@ struct RedWaveDATA {
 	signed char m_reverbMix;
 	unsigned char m_reserved1D[REDSOUND_WAVE_RESERVED1D_SIZE];
 	RedWaveADPCMInfo m_adpcm;
-	unsigned char m_adsr[REDSOUND_WAVE_ADSR_SIZE];
+	RedAdsrDATA m_adsr;
 	unsigned char m_reserved5C[REDSOUND_WAVE_RESERVED5C_SIZE];
 };
 
@@ -154,25 +183,6 @@ enum RedWaveLayoutOffset {
 
 enum RedWaveLayoutWord {
 	REDSOUND_WAVE_PITCH_WORD_OFFSET = REDSOUND_WAVE_PITCH_OFFSET / sizeof(int),
-};
-
-enum RedVoiceLayoutCount {
-	REDSOUND_VOICE_ADSR_TIME_COUNT = 4,
-	REDSOUND_VOICE_ADSR_LEVEL_COUNT = 4,
-	REDSOUND_VOICE_ADSR_TIME_BYTE_STRIDE = sizeof(u16),
-	REDSOUND_VOICE_RESERVED1B_SIZE = 0x01,
-	REDSOUND_VOICE_RESERVED2A_SIZE = 0x02,
-	REDSOUND_VOICE_RESERVED3A_SIZE = 0x02,
-	REDSOUND_VOICE_RESERVED48_SIZE = 0x08,
-	REDSOUND_VOICE_RESERVEDA4_SIZE = 0x04,
-	REDSOUND_VOICE_RESERVEDB4_SIZE = 0x04,
-	REDSOUND_VOICE_RESERVEDBC_SIZE = 0x04,
-	REDSOUND_TERMINATE_NOTE_WORD_COUNT = 1,
-};
-
-struct RedAdsrDATA {
-	unsigned short m_time[REDSOUND_VOICE_ADSR_TIME_COUNT];
-	unsigned char m_level[REDSOUND_VOICE_ADSR_LEVEL_COUNT];
 };
 
 enum RedAdsrDataLayout {
@@ -384,7 +394,6 @@ enum RedVoiceCleanupMask {
 	REDSOUND_VOICE_SWITCH_CLEAR_SUSTAIN_PAUSE_MASK = ~(REDSOUND_VOICE_SWITCH_SUSTAIN | REDSOUND_VOICE_SWITCH_PAUSE),
 	REDSOUND_VOICE_SWITCH_CLEAR_REVERB_MASK = ~REDSOUND_VOICE_SWITCH_REVERB_STEREO,
 	REDSOUND_VOICE_SWITCH_CLEAR_MIX_MASK = ~REDSOUND_VOICE_SWITCH_MIX_ALL,
-	REDSOUND_VOICE_SWITCH_CLEAR_SE_MASK = 0xfffffff7,
 	REDSOUND_VOICE_FLAGS_START = 1,
 	REDSOUND_VOICE_FLAGS_CLEAR_ACTIVE_MASK = 0xfffffffe,
 	REDSOUND_VOICE_FLAGS_RELEASED = 2,
@@ -399,6 +408,10 @@ enum RedVoiceCleanupMask {
 	    REDSOUND_VOICE_FLAGS_START | REDSOUND_VOICE_FLAGS_ADPCM_DIRTY | REDSOUND_VOICE_FLAGS_PITCH_DIRTY,
 	REDSOUND_VOICE_FLAGS_EXECUTE_KEEP_MASK = 0xFFFFFC24,
 };
+
+#define RedVoiceStateIsPlaying(flags) (((flags) & REDSOUND_VOICE_STATE_PLAYING_MASK) != 0)
+#define RedVoiceIsPlaying(voice) RedVoiceStateIsPlaying((voice)->m_stateFlags)
+#define RedVoiceIsNotPlaying(voice) (!RedVoiceIsPlaying(voice))
 
 enum RedVoiceUpdateFlag {
 	REDSOUND_VOICE_UPDATE_PITCH = 1,

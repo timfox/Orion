@@ -39,10 +39,12 @@ enum RedDmaSearchResult {
 	REDSOUND_DMA_SEARCH_FOUND = 1,
 };
 
+#define RedDmaMainMemoryAddress(memory) ((int)(memory))
+
 struct RedDmaRequest {
 	int m_id;
 	int m_direction;
-	int m_mainMemory;
+	void* m_mainMemory;
 	int m_aramMemory;
 	int m_size;
 	RedDmaCallback m_callback;
@@ -78,6 +80,7 @@ enum RedDmaRequestLayout {
 };
 
 unsigned int DeltaTimeSumup(unsigned char** buffer);
+#define RedTrackCommandReadDeltaTime(track) DeltaTimeSumup((unsigned char**)&(track)->m_command)
 unsigned int GetMyEntryID();
 void RedSleep(int microseconds);
 int RedDmaEntry(int flags, int direction, int mainMemory, int aramMemory, int size,

@@ -24,11 +24,12 @@ enum RedSoundLocalSize {
 	REDSOUND_STANDBY_STATUS_ALLOC_SIZE = REDSOUND_STANDBY_STATUS_SIZE,
 	REDSOUND_STREAM_BANK_COUNT = 4,
 	REDSOUND_BSS_SIZE = REDSOUND_STANDBY_STATUS_OFFSET + REDSOUND_STANDBY_STATUS_ALLOC_SIZE,
-	REDSOUND_STREAM_BANK_RESERVED14_SIZE = sizeof(int),
+	REDSOUND_STREAM_BANK_STANDBY_ID_SIZE = sizeof(int),
 	REDSOUND_STREAM_BANK_ENTRY_SIZE = 0x40,
 	REDSOUND_STREAM_BANK_SIZE = REDSOUND_STREAM_BANK_ENTRY_SIZE * REDSOUND_STREAM_BANK_COUNT,
+	REDSOUND_STREAM_BANK_ALLOC_SIZE = REDSOUND_STREAM_BANK_SIZE,
 	REDSOUND_STREAM_BANK_RESERVED18_SIZE =
-	    REDSOUND_STREAM_BANK_ENTRY_SIZE - (5 * sizeof(int) + REDSOUND_STREAM_BANK_RESERVED14_SIZE),
+	    REDSOUND_STREAM_BANK_ENTRY_SIZE - (5 * sizeof(int) + REDSOUND_STREAM_BANK_STANDBY_ID_SIZE),
 	REDSOUND_AUTO_ID_MASK = 0x7FFFFFFF,
 	REDSOUND_STREAM_BANK_FILE_SIZE_NONE = 0,
 	REDSOUND_STREAM_BANK_POINT_NONE = 0,
@@ -129,10 +130,12 @@ static int m_StandbyStatus[REDSOUND_STANDBY_STATUS_COUNT];
 #define RedStandbyStatusGet(index) (m_StandbyStatus[(index)])
 #define RedStandbyStatusSet(slot, id) (*(slot) = (id))
 #define RedStandbyStatusGetEnd() (m_StandbyStatus + REDSOUND_STANDBY_STATUS_COUNT)
+#define RedStandbyStatusAddress(slot) ((int)(slot))
 volatile unsigned int m_AutoID;
 #define RedAutoIDGet() (m_AutoID)
 #define RedAutoIDInc() (m_AutoID++)
 #define RedAutoIDApplyMask() (m_AutoID &= REDSOUND_AUTO_ID_MASK)
+#define RedAutoIDIsInvalid() ((int)RedAutoIDGet() == 0)
 static RedSoundStreamBank* p_StreamBank;
 #define RedSoundStreamBankGetBegin() (p_StreamBank)
 #define RedSoundStreamBankSetBegin(bank) (p_StreamBank = (bank))
@@ -172,8 +175,8 @@ STATIC_ASSERT(offsetof(RedSoundStreamBank, m_fileSize) == REDSOUND_STREAM_BANK_F
 STATIC_ASSERT(offsetof(RedSoundStreamBank, m_readPoint) == REDSOUND_STREAM_BANK_READ_POINT_OFFSET);
 STATIC_ASSERT(offsetof(RedSoundStreamBank, m_playPoint) == REDSOUND_STREAM_BANK_PLAY_POINT_OFFSET);
 STATIC_ASSERT(offsetof(RedSoundStreamBank, m_standbyId) == REDSOUND_STREAM_BANK_STANDBY_ID_OFFSET);
-STATIC_ASSERT(sizeof(((RedSoundStreamBank*)0)->m_standbyId) == REDSOUND_STREAM_BANK_RESERVED14_SIZE);
-STATIC_ASSERT(REDSOUND_STREAM_BANK_STANDBY_ID_OFFSET + REDSOUND_STREAM_BANK_RESERVED14_SIZE ==
+STATIC_ASSERT(sizeof(((RedSoundStreamBank*)0)->m_standbyId) == REDSOUND_STREAM_BANK_STANDBY_ID_SIZE);
+STATIC_ASSERT(REDSOUND_STREAM_BANK_STANDBY_ID_OFFSET + REDSOUND_STREAM_BANK_STANDBY_ID_SIZE ==
               REDSOUND_STREAM_BANK_RESERVED18_OFFSET);
 STATIC_ASSERT(offsetof(RedSoundStreamBank, m_reserved18) == REDSOUND_STREAM_BANK_RESERVED18_OFFSET);
 STATIC_ASSERT(sizeof(((RedSoundStreamBank*)0)->m_reserved18) == REDSOUND_STREAM_BANK_RESERVED18_SIZE);
@@ -181,6 +184,7 @@ STATIC_ASSERT(REDSOUND_STREAM_BANK_RESERVED18_OFFSET + REDSOUND_STREAM_BANK_RESE
               REDSOUND_STREAM_BANK_ENTRY_SIZE);
 STATIC_ASSERT(sizeof(RedSoundStreamBank) == REDSOUND_STREAM_BANK_ENTRY_SIZE);
 STATIC_ASSERT(REDSOUND_STREAM_BANK_ENTRY_SIZE * REDSOUND_STREAM_BANK_COUNT == REDSOUND_STREAM_BANK_SIZE);
+STATIC_ASSERT(REDSOUND_STREAM_BANK_SIZE == REDSOUND_STREAM_BANK_ALLOC_SIZE);
 STATIC_ASSERT(offsetof(RedSoundBssState, c_DriverDtorChain) == 0);
 STATIC_ASSERT(REDSOUND_MAP_BSS_DRIVER_DTOR_CHAIN_OFFSET == 0);
 STATIC_ASSERT(sizeof(((RedSoundBssState*)0)->c_DriverDtorChain) == REDSOUND_DRIVER_DTOR_CHAIN_SIZE);
@@ -317,7 +321,7 @@ unsigned int CRedSound::GetAutoID()
 	do {
 		RedAutoIDInc();
 		RedAutoIDApplyMask();
-	} while ((int)RedAutoIDGet() == 0);
+	} while (RedAutoIDIsInvalid());
 
 	return RedAutoIDGet();
 }
@@ -392,7 +396,7 @@ int CRedSound::Init(void* mainBuffer, int mainBufferSize, int aramBuffer, int ar
 		AIInit(0);
 		AXInit();
 		AXARTInit();
-        c_RedMemory.Init((int)mainBuffer, mainBufferSize, aramBuffer, aramBufferSize);
+        c_RedMemory.Init(RedMemoryAddress(mainBuffer), mainBufferSize, aramBuffer, aramBufferSize);
 		c_RedEntry.Init();
 		Start();
 		c_Driver.Init();
@@ -426,7 +430,7 @@ int CRedSound::Init(void* mainBuffer, int mainBufferSize, int aramBuffer, int ar
  */
 void CRedSound::Start()
 {
-	RedSoundStreamBankSetBegin((RedSoundStreamBank*)RedNew(REDSOUND_STREAM_BANK_SIZE));
+	RedSoundStreamBankSetBegin((RedSoundStreamBank*)RedNew(REDSOUND_STREAM_BANK_ALLOC_SIZE));
 	memset(RedSoundStreamBankGetBegin(), 0, REDSOUND_STREAM_BANK_SIZE);
 }
 /*
@@ -1003,9 +1007,7 @@ int CRedSound::StreamPlay(void* data, int fileSize, int pan, int volume)
 	int id = 0;
 	RedStreamHEAD* streamHeader = (RedStreamHEAD*)data;
 
-	if (streamHeader->m_signature[REDSOUND_STREAM_SIGNATURE_0_INDEX] == REDSOUND_STREAM_SIGNATURE_0 &&
-	    streamHeader->m_signature[REDSOUND_STREAM_SIGNATURE_1_INDEX] == REDSOUND_STREAM_SIGNATURE_1 &&
-	    streamHeader->m_signature[REDSOUND_STREAM_SIGNATURE_2_INDEX] == REDSOUND_STREAM_SIGNATURE_2) {
+	if (RedStreamHeaderHasValidSignature(streamHeader)) {
 		id = GetAutoID();
 		c_Driver.StreamPlay(id, data, fileSize, pan, volume);
 	} else if (RedReportPrintIsEnabled()) {
@@ -1057,7 +1059,7 @@ unsigned int CRedSound::SetWaveData(int waveID, void* waveData, int waveSize)
 	unsigned int id = GetAutoID();
 	int* slot = EntryStandbyID(id);
 	if (slot != 0) {
-		c_Driver.SetWaveData((int)slot, waveID, waveData, waveSize);
+		c_Driver.SetWaveData(RedStandbyStatusAddress(slot), waveID, waveData, waveSize);
 	}
 	return id;
 }
@@ -1276,13 +1278,11 @@ int CRedSound::GetSeUsedWave(int bank, int seNo)
 
 	if ((bank >= 0) && (bank < REDSOUND_SE_BLOCK_BANK_COUNT)) {
 		RedSeBlockHEAD* block = RedSeBlockDataGet(bank);
-		if ((block != 0) && (seNo >= 0) && (seNo < block->m_seCount)) {
+		if ((block != 0) && (seNo >= 0) && (seNo < RedSeBlockGetSeCount(block))) {
 			int* entries = block->m_entries;
 			if (entries[seNo] != REDSOUND_SE_BLOCK_ENTRY_EMPTY) {
 				RedSeINFO* info = RedSeBlockGetInfoFromEntries(block, entries, seNo);
-				waveNo = info->m_waveNoHi;
-				waveNo *= REDSOUND_SE_INFO_U16_HIGH_SCALE;
-				waveNo |= info->m_waveNoLo;
+				waveNo = RedSeInfoGetWaveNo(info);
 			}
 		}
 	}
@@ -1302,8 +1302,8 @@ int CRedSound::GetSeUsedWave(void* seSepData)
 	RedSeSepHEAD* seSepHead = (RedSeSepHEAD*)seSepData;
 	int waveNo;
 
-	waveNo = seSepHead->m_waveNoHi * REDSOUND_SESEP_WAVE_NO_HIGH_SCALE;
-	return waveNo | seSepHead->m_waveNoLo;
+	waveNo = RedSeSepGetWaveNo(seSepHead);
+	return waveNo;
 }
 /*
  * --INFO--
@@ -1316,16 +1316,14 @@ int CRedSound::GetSeUsedWave(void* seSepData)
 int CRedSound::StreamStandby(void* streamHeader, int fileSize)
 {
 	int streamId = REDSOUND_STREAM_ID_NONE;
-	RedStreamHEAD* header = reinterpret_cast<RedStreamHEAD*>(streamHeader);
+	RedStreamHEAD* header = RedStreamHeaderFromData(streamHeader);
 
-	if (header->m_signature[REDSOUND_STREAM_SIGNATURE_0_INDEX] == REDSOUND_STREAM_SIGNATURE_0 &&
-	    header->m_signature[REDSOUND_STREAM_SIGNATURE_1_INDEX] == REDSOUND_STREAM_SIGNATURE_1 &&
-	    header->m_signature[REDSOUND_STREAM_SIGNATURE_2_INDEX] == REDSOUND_STREAM_SIGNATURE_2) {
+	if (RedStreamHeaderHasValidSignature(header)) {
 		RedSoundStreamBank* bank = _SearchEmptyStreamBank();
 		if (bank != 0) {
 			streamId = GetAutoID();
 			RedSoundStreamBankSetId(bank, streamId);
-			RedSoundStreamBankSetData(bank, reinterpret_cast<RedStreamFile*>(streamHeader));
+			RedSoundStreamBankSetData(bank, RedStreamFileFromHeader(streamHeader));
 			RedSoundStreamBankSetFileSize(bank, fileSize);
 			RedSoundStreamBankSetReadPoint(bank, REDSOUND_STREAM_BANK_POINT_NONE);
 			RedSoundStreamBankSetPlayPoint(bank, REDSOUND_STREAM_BANK_POINT_NONE);
@@ -1767,7 +1765,7 @@ RedMemoryBlock* CRedSound::GetABankAddress()
  */
 RedSoundCONTROL* CRedSound::GetControlAddress()
 {
-	return RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY);
+	return RedSoundControlGetBegin();
 }
 /*
  * --INFO--

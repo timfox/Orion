@@ -330,9 +330,9 @@ void CRedEntry::Init()
 {
 	int bankIndex;
 
-	m_waveBankBase = (RedHistoryBANK*)RedNew(REDSOUND_WAVE_BANK_SIZE);
-	m_seSepBankBase = (RedHistoryBANK*)RedNew(REDSOUND_SESEP_BANK_SIZE);
-	m_musicBankBase = (RedHistoryBANK*)RedNew(REDSOUND_MUSIC_BANK_SIZE);
+	m_waveBankBase = (RedHistoryBANK*)RedNew(REDSOUND_WAVE_BANK_ALLOC_SIZE);
+	m_seSepBankBase = (RedHistoryBANK*)RedNew(REDSOUND_SESEP_BANK_ALLOC_SIZE);
+	m_musicBankBase = (RedHistoryBANK*)RedNew(REDSOUND_MUSIC_BANK_ALLOC_SIZE);
 
 	memset(m_waveBankBase, 0, REDSOUND_WAVE_BANK_SIZE);
 	bankIndex = 0;
@@ -436,7 +436,7 @@ int CRedEntry::SearchWaveSequence(int waveNo)
 	RedHistoryBANK* waveBank = m_waveBankBase;
 
 	while (waveBank < RedEntryWaveBankGetEnd(this)) {
-		if ((waveBank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) && (waveBank->m_id == waveNo)) {
+		if (RedHistoryBankHasData(waveBank) && (waveBank->m_id == waveNo)) {
 			return waveBank - m_waveBankBase;
 		}
 		waveBank += 1;
@@ -465,7 +465,7 @@ int CRedEntry::SearchUseWave(int waveNo)
 			MusicStop(control->m_musicId);
 		}
 		control--;
-	} while ((u32)control >= (u32)RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY));
+	} while ((u32)control >= (u32)RedSoundControlGetBegin());
 
 	control = RedSoundControlGet(REDSOUND_CONTROL_SE);
 	RedTrackDATA* track = control->m_tracks;
@@ -571,8 +571,7 @@ int CRedEntry::WaveOldClear(int offset, int maxSize)
  */
 int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
 {
-	if ((waveHead->m_signature[REDSOUND_WAVE_SIGNATURE_MAGIC0_INDEX] != REDSOUND_WAVE_SIGNATURE_MAGIC0) ||
-	    (waveHead->m_signature[REDSOUND_WAVE_SIGNATURE_MAGIC1_INDEX] != REDSOUND_WAVE_SIGNATURE_MAGIC1)) {
+	if (!RedWaveHeadHasValidSignature(waveHead)) {
 		if (RedReportPrintIsEnabled()) {
 			OSReport(sRedEntryWaveHeaderBrokenFmt, sRedEntryLogPrefix, sRedEntryHeaderErrorColor, sRedEntryResetColor);
 			fflush(__files + 1);
@@ -621,14 +620,14 @@ int CRedEntry::WaveHeadAdd(int waveBankNo, RedWaveHeadWD* waveHead, int waveNo)
 		RedHistoryBANK* allocatedWaveBank;
 		if (waveBankNo < 0) {
 			allocatedWaveBank = RedEntryWaveHistoryGetBegin(this);
-			while ((allocatedWaveBank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) &&
+			while (RedHistoryBankHasData(allocatedWaveBank) &&
 			       (allocatedWaveBank < RedEntryWaveBankGetEnd(this))) {
 				allocatedWaveBank += 1;
 			}
 		} else {
 			waveBankNo &= REDSOUND_WAVE_PRIMARY_BANK_MASK;
 			allocatedWaveBank = RedEntryWaveBankGet(this, waveBankNo);
-			if (allocatedWaveBank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) {
+			if (RedHistoryBankHasData(allocatedWaveBank)) {
 				WaveDelete(allocatedWaveBank);
 			}
 		}
@@ -732,7 +731,7 @@ int CRedEntry::SetWaveData(int waveBankNo, void* waveData, int waveDataSize)
 			    RedWaveHeadGetTableSize(RedWaveHeadFromData(waveData)) + REDSOUND_WAVE_HEADER_COPY_BASE_SIZE;
 			remainingWaveSize = RedWaveHeadFromData(waveData)->m_waveSize;
 			waveDataSize -= waveHeaderCopySize;
-			waveBodyData = (u8*)waveData + waveHeaderCopySize;
+			waveBodyData = RedWaveHeadGetBodyData(waveData, waveHeaderCopySize);
 		}
 	} else {
 		waveAramAddress = m_waveLoadAddress;
@@ -749,7 +748,7 @@ int CRedEntry::SetWaveData(int waveBankNo, void* waveData, int waveDataSize)
 		}
 
 		int dmaId = RedDmaEntry(REDSOUND_DMA_FLAGS_WAVE_LOAD, REDSOUND_DMA_DIRECTION_TO_ARAM,
-		                        (int)waveBodyData, waveAramAddress, waveTransferSize, REDSOUND_DMA_CALLBACK_NONE,
+		                        RedDmaMainMemoryAddress(waveBodyData), waveAramAddress, waveTransferSize, REDSOUND_DMA_CALLBACK_NONE,
 		                        REDSOUND_DMA_CALLBACK_DATA_NONE);
 		remainingWaveSize -= waveTransferSize;
 		waveAramAddress += waveTransferSize;
@@ -880,7 +879,7 @@ void CRedEntry::ClearWaveBank(int waveBankNo)
 				}
 			}
 		}
-	} else if ((waveBankNo >= 0) && (waveBankNo < REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT)) {
+	} else if (RedEntryWavePrimaryBankNoIsValid(waveBankNo)) {
 		WaveDelete(RedEntryWaveBankGet(this, waveBankNo));
 	}
 }
@@ -895,7 +894,7 @@ void CRedEntry::ClearWaveBank(int waveBankNo)
  */
 RedHistoryBANK* CRedEntry::GetWaveBank(int waveNo)
 {
-	if ((waveNo >= 0) && (waveNo < REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT))
+	if (RedEntryWavePrimaryBankNoIsValid(waveNo))
 	{
 		return RedEntryWaveBankGet(this, waveNo);
 	}
@@ -957,8 +956,8 @@ void CRedEntry::WaveHistoryManager(int mode, int waveNo)
 
 	if (mode == REDSOUND_HISTORY_MODE_RELEASE) {
 		used = 0;
-		if ((RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY)->m_activeTrackCount != 0) &&
-		    (RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY)->m_waveNo == waveNo)) {
+		if ((RedSoundControlGetBegin()->m_activeTrackCount != 0) &&
+		    (RedSoundControlGetBegin()->m_waveNo == waveNo)) {
 			used |= 1;
 		}
 		if ((RedSoundControlGet(REDSOUND_CONTROL_MUSIC_SECONDARY)->m_activeTrackCount != 0) &&
@@ -979,7 +978,7 @@ void CRedEntry::WaveHistoryManager(int mode, int waveNo)
 		}
 		if (used == 0) {
 			used = SearchWaveSequence(waveNo);
-			if ((used >= REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT) &&
+			if (RedEntryWaveBankNoIsHistory(used) &&
 			    (RedEntryWaveBankGet(this, used)->m_historyNo == REDSOUND_HISTORY_UNUSED)) {
 				WaveHistoryAdd(REDSOUND_WAVE_RELEASE_HISTORY_NO);
 				RedEntryWaveBankGet(this, used)->m_historyNo = REDSOUND_WAVE_RELEASE_HISTORY_NO;
@@ -987,7 +986,7 @@ void CRedEntry::WaveHistoryManager(int mode, int waveNo)
 		}
 	} else {
 		used = SearchWaveSequence(waveNo);
-		if ((used >= REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT) &&
+		if (RedEntryWaveBankNoIsHistory(used) &&
 		    (RedEntryWaveBankGet(this, used)->m_historyNo != REDSOUND_HISTORY_UNUSED)) {
 			WaveHistoryDelete(RedEntryWaveBankGet(this, used)->m_historyNo);
 			RedEntryWaveBankGet(this, used)->m_historyNo = REDSOUND_HISTORY_UNUSED;
@@ -1037,7 +1036,7 @@ void CRedEntry::DisplayWaveInfo()
 
 				RedHistoryBANK* waveBank = m_waveBankBase;
 				do {
-					if ((waveBank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) &&
+					if (RedHistoryBankHasData(waveBank) &&
 					    (waveBank->m_waveHead->m_aramAddress == aMemoryBlock->m_address)) {
 						break;
 					}
@@ -1045,7 +1044,7 @@ void CRedEntry::DisplayWaveInfo()
 				} while (waveBank < RedEntryWaveBankGetEnd(this));
 
 				if (waveBank < RedEntryWaveBankGetEnd(this)) {
-					if (waveBank < m_waveBankBase + REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT) {
+					if (waveBank < RedEntryWavePrimaryBankGetEnd(this)) {
 						OSReport(sRedEntryAMemoryWaveBankInfoFmt, sRedEntryLogPrefix,
 						         waveBank - m_waveBankBase,
 						         (int)waveBank->m_waveHead->m_waveNo, waveBank->m_waveHead->m_aramAddress, aMemoryBlock->m_size,
@@ -1170,14 +1169,14 @@ int CRedEntry::SearchSeSepSequence(int seNo)
 
 	if (seNo == REDSOUND_SESEP_SEARCH_FIRST) {
 		do {
-			if (seSepBank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) {
+			if (RedHistoryBankHasData(seSepBank)) {
 				return seSepBank - m_seSepBankBase;
 			}
 			seSepBank += 1;
 		} while (seSepBank < RedEntrySeSepBankGetEnd(this));
 	} else {
 		do {
-			if ((seSepBank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) && (seSepBank->m_id == seNo)) {
+			if (RedHistoryBankHasData(seSepBank) && (seSepBank->m_id == seNo)) {
 				return seSepBank - m_seSepBankBase;
 			}
 			seSepBank += 1;
@@ -1227,7 +1226,7 @@ RedHistoryBANK* CRedEntry::SeSepOldDelete()
 	RedHistoryBANK* history = m_seSepBankBase;
 
 	do {
-		if ((history->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) && (historyNo < history->m_historyNo)) {
+		if (RedHistoryBankHasData(history) && (historyNo < history->m_historyNo)) {
 			historyNo = history->m_historyNo;
 			selected = history;
 		}
@@ -1254,7 +1253,7 @@ RedSeSepHEAD* CRedEntry::SeSepHeadAdd(RedSeSepHEAD* seSepHead)
 	RedHistoryBANK* bank = m_seSepBankBase;
 	RedSeSepHEAD* addedHead = 0;
 
-	while ((bank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) &&
+	while (RedHistoryBankHasData(bank) &&
 	       (bank < RedEntrySeSepBankGetEnd(this))) {
 		bank += 1;
 	}
@@ -1288,11 +1287,7 @@ RedSeSepHEAD* CRedEntry::SetSeSepData(RedSeSepHEAD* seSepHead)
 {
 	int entryAddress;
 
-	if ((seSepHead->m_signature[REDSOUND_SESEP_SIGNATURE_0_INDEX] != REDSOUND_SESEP_SIGNATURE_0) ||
-	    (seSepHead->m_signature[REDSOUND_SESEP_SIGNATURE_1_INDEX] != REDSOUND_SESEP_SIGNATURE_1) ||
-	    (seSepHead->m_signature[REDSOUND_SESEP_SIGNATURE_2_INDEX] != REDSOUND_SESEP_SIGNATURE_2) ||
-	    (seSepHead->m_signature[REDSOUND_SESEP_SIGNATURE_3_INDEX] != REDSOUND_SESEP_SIGNATURE_3) ||
-	    (seSepHead->m_signature[REDSOUND_SESEP_SIGNATURE_4_INDEX] != REDSOUND_SESEP_SIGNATURE_4)) {
+	if (!RedSeSepHeadHasValidSignature(seSepHead)) {
 		RedDelete(seSepHead);
 		if (RedReportPrintIsEnabled()) {
 			OSReport(sRedEntrySeSepHeaderBrokenFmt, sRedEntryLogPrefix, sRedEntryHeaderErrorColor, sRedEntryResetColor);
@@ -1331,7 +1326,7 @@ int CRedEntry::ClearSeSepData(int seNo)
 	if (seNo == REDSOUND_SESEP_CLEAR_ALL) {
 		RedHistoryBANK* history = m_seSepBankBase;
 		do {
-			if (history->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) {
+			if (RedHistoryBankHasData(history)) {
 				SeSepMemoryFree(history);
 			}
 			history += 1;
@@ -1360,7 +1355,7 @@ int CRedEntry::ClearSeSepDataMG(int bankNo, int sepNo, int groupNo, int kindNo)
 	RedHistoryBANK* bank = m_seSepBankBase;
 
 	do {
-		if (bank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) {
+		if (RedHistoryBankHasData(bank)) {
 			int seNo = bank->m_id / REDSOUND_SE_MG_ID_DIVISOR;
 			if ((bankNo != seNo) && (sepNo != seNo) && (groupNo != seNo) && (kindNo != seNo)) {
 				SeSepMemoryFree(bank);
@@ -1474,11 +1469,11 @@ void CRedEntry::DisplaySePlayInfo()
 		int displayWaveNo;
 		do {
 			if (seTrack->m_command != REDSOUND_TRACK_COMMAND_NONE) {
-				if ((seTrack->m_seSepId & REDSOUND_SE_BLOCK_DATA_FLAG) != 0) {
+				if (RedSeBlockIdIsBlockData(seTrack->m_seSepId)) {
 					unsigned int seBlockId = (unsigned int)seTrack->m_seSepId;
 					seBlockId &= REDSOUND_SE_BLOCK_ENTRY_MASK;
-					int seBlockBankNo = (int)seBlockId / REDSOUND_SE_BLOCK_SEQUENCE_COUNT;
-					int seBlockSequenceNo = seBlockId & REDSOUND_SE_BLOCK_SEQUENCE_MASK;
+					int seBlockBankNo = RedSeBlockIdGetBankNo(seBlockId);
+					int seBlockSequenceNo = RedSeBlockIdGetSequenceNo(seBlockId);
 					RedSeBlockHEAD* seBlockHead = RedSeBlockDataGet(seBlockBankNo);
 					int* seBlockEntries = seBlockHead->m_entries;
 					RedSeINFO* blockSeInfo = RedSeBlockGetInfoFromEntries(seBlockHead, seBlockEntries, seBlockSequenceNo);
@@ -1587,7 +1582,7 @@ int CRedEntry::SearchMusicSequence(int musicNo)
 	RedHistoryBANK* musicBank = m_musicBankBase;
 
 	do {
-		if ((musicBank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) && (musicBank->m_id == musicNo)) {
+		if (RedHistoryBankHasData(musicBank) && (musicBank->m_id == musicNo)) {
 			return musicBank - m_musicBankBase;
 		}
 		musicBank += 1;
@@ -1659,7 +1654,7 @@ RedHistoryBANK* CRedEntry::MusicOldChoice()
 	RedHistoryBANK* history = m_musicBankBase;
 
 	do {
-		if (history->m_size == REDSOUND_HISTORY_BANK_EMPTY_SIZE) {
+		if (RedHistoryBankIsEmpty(history)) {
 			return history;
 		}
 		if (history->m_historyNo > historyNo) {
@@ -1724,8 +1719,8 @@ void CRedEntry::MusicHistoryManager(int mode, int musicNo)
 
 	if (mode == REDSOUND_HISTORY_MODE_RELEASE) {
 		musicSeq = 0;
-		if ((RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY)->m_activeTrackCount != 0)
-		    && (RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY)->m_musicId == musicNo)) {
+		if ((RedSoundControlGetBegin()->m_activeTrackCount != 0)
+		    && (RedSoundControlGetBegin()->m_musicId == musicNo)) {
 			musicSeq |= 1;
 		}
 		if ((RedSoundControlGet(REDSOUND_CONTROL_MUSIC_SECONDARY)->m_activeTrackCount != 0)
@@ -1765,7 +1760,7 @@ RedMusicHEAD* CRedEntry::MusicHeadAdd(RedMusicHEAD* musicHead)
 {
 	RedMusicHEAD* addedHead = 0;
 	RedHistoryBANK* bank = MusicOldChoice();
-	if ((bank != 0) && (bank->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE)) {
+	if ((bank != 0) && RedHistoryBankHasData(bank)) {
 		MusicOldClear();
 		bank = MusicOldChoice();
 	}
@@ -1773,7 +1768,7 @@ RedMusicHEAD* CRedEntry::MusicHeadAdd(RedMusicHEAD* musicHead)
 	if (bank != 0) {
 		bank->m_musicHead = musicHead;
 		addedHead = musicHead;
-		bank->m_size = musicHead->m_size;
+		bank->m_size = RedMusicHeadGetSize(musicHead);
 		bank->m_id = static_cast<int>(musicHead->m_musicNo);
 		MusicHistoryAdd();
 		bank->m_historyNo = REDSOUND_HISTORY_MOST_RECENT;
@@ -1794,9 +1789,7 @@ RedMusicHEAD* CRedEntry::SetMusicData(RedMusicHEAD* musicHead)
 {
 	int entryAddress;
 
-	if ((musicHead->m_signature[REDSOUND_MUSIC_SIGNATURE_0_INDEX] != REDSOUND_MUSIC_SIGNATURE_0) ||
-	    (musicHead->m_signature[REDSOUND_MUSIC_SIGNATURE_1_INDEX] != REDSOUND_MUSIC_SIGNATURE_1) ||
-	    (musicHead->m_signature[REDSOUND_MUSIC_SIGNATURE_2_INDEX] != REDSOUND_MUSIC_SIGNATURE_2)) {
+	if (!RedMusicHeadHasValidSignature(musicHead)) {
 		RedDelete(musicHead);
 		if (RedReportPrintIsEnabled()) {
 			OSReport(sRedEntryMusicHeaderBrokenFmt, sRedEntryLogPrefix, sRedEntryHeaderErrorColor, sRedEntryResetColor);
@@ -1873,7 +1866,7 @@ void CRedEntry::DisplayMMemoryInfo()
 
 			history = m_musicBankBase;
 			do {
-				if ((history->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) &&
+				if (RedHistoryBankHasData(history) &&
 				    (history->m_address == bankEntry->m_address)) {
 					OSReport(sRedEntryMMemoryMusicInfoFmt, sRedEntryLogPrefix,
 					         RedMusicHeadFromBankAddress(bankEntry->m_address)->m_musicNo, bankEntry->m_address,
@@ -1889,7 +1882,7 @@ void CRedEntry::DisplayMMemoryInfo()
 				seBlockBank = 0;
 				do {
 					if ((RedSeBlockDataGet(seBlockBank) != REDSOUND_SE_BLOCK_DATA_NONE) &&
-					    (bankEntry->m_address == reinterpret_cast<int>(RedSeBlockDataGet(seBlockBank)))) {
+					    (bankEntry->m_address == RedSeBlockHeadAddress(RedSeBlockDataGet(seBlockBank)))) {
 						OSReport(sRedEntryMMemorySeBlockInfoFmt, sRedEntryLogPrefix, bankEntry->m_address,
 						         bankEntry->m_size, freeSize);
 						fflush(__files + 1);
@@ -1903,7 +1896,7 @@ void CRedEntry::DisplayMMemoryInfo()
 			if (matched == REDSOUND_ENTRY_SEARCH_NOT_FOUND) {
 				history = m_waveBankBase;
 				do {
-					if ((history->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) &&
+					if (RedHistoryBankHasData(history) &&
 					    (history->m_address == bankEntry->m_address)) {
 						OSReport(sRedEntryMMemoryWaveInfoFmt, sRedEntryLogPrefix,
 						         RedWaveHeadFromBankAddress(bankEntry->m_address)->m_waveNo, bankEntry->m_address,
@@ -1919,7 +1912,7 @@ void CRedEntry::DisplayMMemoryInfo()
 			if (matched == REDSOUND_ENTRY_SEARCH_NOT_FOUND) {
 				history = m_seSepBankBase;
 				do {
-					if ((history->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) &&
+					if (RedHistoryBankHasData(history) &&
 					    (history->m_address == bankEntry->m_address)) {
 						OSReport(sRedEntryMMemorySeInfoFmt, sRedEntryLogPrefix,
 						         RedSeSepHeadFromBankAddress(bankEntry->m_address)->m_seNo, bankEntry->m_address,
@@ -1984,7 +1977,7 @@ int CRedEntry::ClearMusicData(int musicNo)
 	if (musicNo == REDSOUND_MUSIC_CLEAR_ALL) {
 		RedHistoryBANK* history = m_musicBankBase;
 		do {
-			if (history->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) {
+			if (RedHistoryBankHasData(history)) {
 				if (history->m_historyNo != REDSOUND_HISTORY_UNUSED) {
 					MusicHistoryDelete(history->m_historyNo);
 				}
@@ -2022,10 +2015,10 @@ void CRedEntry::DisplayMusicInfo()
 
 		RedHistoryBANK* history = m_musicBankBase;
 		do {
-			if (history->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE) {
+			if (RedHistoryBankHasData(history)) {
 				int playing = REDSOUND_ENTRY_SEARCH_NOT_FOUND;
-				if ((RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY)->m_activeTrackCount != 0) &&
-				    (RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY)->m_musicId == history->m_id)) {
+				if ((RedSoundControlGetBegin()->m_activeTrackCount != 0) &&
+				    (RedSoundControlGetBegin()->m_musicId == history->m_id)) {
 					playing = REDSOUND_ENTRY_SEARCH_FOUND;
 				}
 				if ((RedSoundControlGet(REDSOUND_CONTROL_MUSIC_SECONDARY)->m_activeTrackCount != 0) &&

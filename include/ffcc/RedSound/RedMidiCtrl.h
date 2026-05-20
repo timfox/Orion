@@ -33,6 +33,9 @@ typedef int (*RedSwingFunc)(int phase);
 #define REDSOUND_SWING_FUNC_NONE ((RedSwingFunc)0)
 #define REDSOUND_WAVE_BANK_DATA_NONE 0
 #define REDSOUND_WAVE_BASE_NONE 0
+#define RedTrackCommandReadU8(track) (*(track)->m_command++)
+#define RedTrackCommandReadS8(track) (*(s8*)(track)->m_command++)
+#define RedTrackReverbDepthGetRamp(track) ((RedControlRamp*)&(track)->m_reverbDepth)
 
 struct RedTrackDATA {
 	unsigned char* m_command;
@@ -412,6 +415,8 @@ struct RedSoundCONTROL {
 };
 
 #define RedSoundControlGetTrackEnd(control) ((control)->m_tracks + (control)->m_trackCount)
+#define RedSoundControlHasTrack(control, track)                                                     \
+	(((track) >= (control)->m_tracks) && ((track) < RedSoundControlGetTrackEnd(control)))
 #define RedSeTrackGetEnd(track) ((track) + REDSOUND_SE_TRACK_COUNT)
 #define RedSeTrackGetLast(track) ((track) + REDSOUND_SE_TRACK_LAST_INDEX)
 #define RedSoundControlGetSeTrackEnd(control) RedSeTrackGetEnd((control)->m_tracks)

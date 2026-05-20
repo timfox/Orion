@@ -89,10 +89,20 @@ struct RedStreamFile {
     u8 m_trailingPadding[REDSOUND_STREAM_FILE_TRAILING_PAD_SIZE];
 };
 
+#define RedStreamHeaderFromData(streamData) reinterpret_cast<RedStreamHEAD*>(streamData)
 #define RedStreamFileFromHeader(streamHeader) reinterpret_cast<RedStreamFile*>(streamHeader)
+#define RedStreamHeaderHasValidSignature(header)                                                   \
+    ((header)->m_signature[REDSOUND_STREAM_SIGNATURE_0_INDEX] == REDSOUND_STREAM_SIGNATURE_0 &&    \
+     (header)->m_signature[REDSOUND_STREAM_SIGNATURE_1_INDEX] == REDSOUND_STREAM_SIGNATURE_1 &&    \
+     (header)->m_signature[REDSOUND_STREAM_SIGNATURE_2_INDEX] == REDSOUND_STREAM_SIGNATURE_2)
 #define RedStreamFileGetAdpcm(streamFile, channel) (&(streamFile)->m_adpcm[(channel)])
 #define RedStreamAdpcmHeaderGetChannel(headerData, channel) ((headerData) + (channel))
 #define RedStreamFileGetSampleByte(streamFile, offset) ((s8*)(streamFile))[(offset)]
+#define RedStreamHeaderHasNoLoop(header) ((header)->m_loopStart < REDSOUND_STREAM_LOOP_ENABLED_MIN)
+#define RedStreamHeaderIsStereo(header) ((header)->m_channelCount == REDSOUND_STREAM_STEREO_CHANNEL_COUNT)
+#define RedStreamHeaderGetAramSize(header) ((header)->m_channelCount * REDSOUND_STREAM_STEREO_PLANE_SIZE)
+#define RedStreamHeaderGetPageAdvance(header) ((header)->m_channelCount * REDSOUND_STREAM_PAGE_SIZE)
+#define RedStreamBufferSideGetCursorBase(side) ((side) * REDSOUND_STREAM_PAGE_SIZE)
 
 #define RedStreamBufferGetPage(buffer, pageIndex) ((buffer) + (pageIndex) * REDSOUND_STREAM_PAGE_SIZE)
 
@@ -104,7 +114,9 @@ struct RedStreamFile {
 
 #define RedStreamAramGetChannelPlane(buffer, channel) ((buffer) + (channel) * REDSOUND_STREAM_STEREO_PLANE_SIZE)
 
-#define RedStreamGetReadCursor(stream) ((stream)->m_fileData + (stream)->m_readOffset)
+#define RedStreamAramSampleGetEnd(sampleStart) ((sampleStart) + REDSOUND_STREAM_STEREO_PLANE_SIZE)
+
+#define RedStreamGetReadCursor(stream) ((u8*)(stream)->m_fileData + (stream)->m_readOffset)
 
 enum RedStreamFileLayoutOffset {
     REDSOUND_STREAM_FILE_HEAD_OFFSET = (unsigned int)&(((RedStreamFile*)0)->m_header),
@@ -125,17 +137,17 @@ enum RedStreamFrameWordIndex {
     REDSOUND_STREAM_STEREO_FRAME_WORD_COUNT = 2,
 };
 
-struct RedStreamStereoFrame {
-    unsigned int m_left[REDSOUND_STREAM_STEREO_FRAME_WORD_COUNT];
-    unsigned int m_right[REDSOUND_STREAM_STEREO_FRAME_WORD_COUNT];
-};
-
 struct RedStreamChannelFrame {
     unsigned int m_word[REDSOUND_STREAM_STEREO_FRAME_WORD_COUNT];
 };
 
-#define RedStreamStereoFrameGetLeftWord(frame, index) ((frame)->m_left[(index)])
-#define RedStreamStereoFrameGetRightWord(frame, index) ((frame)->m_right[(index)])
+struct RedStreamStereoFrame {
+    RedStreamChannelFrame m_left;
+    RedStreamChannelFrame m_right;
+};
+
+#define RedStreamStereoFrameGetLeftWord(frame, index) ((frame)->m_left.m_word[(index)])
+#define RedStreamStereoFrameGetRightWord(frame, index) ((frame)->m_right.m_word[(index)])
 #define RedStreamChannelFrameGetWord(frame, index) ((frame)->m_word[(index)])
 
 enum RedStreamFrameLayoutSize {
@@ -185,7 +197,7 @@ enum RedStreamHeaderFlag {
 struct RedStreamDATA {
     RedTrackDATA* m_track;
     RedVoiceDATA* m_voiceData;
-    u8* m_fileData;
+    RedStreamFile* m_fileData;
     u8* m_buffer;
     RedStreamHEAD m_header;
     RedWaveDATA m_trackData[REDSOUND_STREAM_TRACK_DATA_COUNT];
@@ -212,6 +224,15 @@ struct RedStreamDATA {
 #define RedStreamGetVoiceData(stream, channel) ((stream)->m_voiceData + (channel))
 #define RedStreamGetTrackData(stream, channel) (&(stream)->m_trackData[(channel)])
 #define RedStreamVoiceDataGetChannel(voiceData, channel) ((voiceData) + (channel))
+#define RedStreamDataIsPlaying(stream) ((stream)->m_state == REDSOUND_STREAM_STATE_PLAYING)
+#define RedStreamDataIsLoading(stream) ((stream)->m_state == REDSOUND_STREAM_STATE_LOADING)
+#define RedStreamDataIsEmpty(stream) ((stream)->m_streamId == REDSOUND_STREAM_ID_NONE)
+#define RedStreamDataHasId(stream) ((stream)->m_streamId != REDSOUND_STREAM_ID_NONE)
+#define RedStreamDataMatchesId(stream, streamId)                                                   \
+    (RedStreamDataHasId(stream) && (((streamId) == REDSOUND_STREAM_ID_ALL) || ((streamId) == (stream)->m_streamId)))
+#define RedStreamDataHasBuffer(stream) ((stream)->m_buffer != REDSOUND_STREAM_BUFFER_NONE)
+#define RedStreamDataHasAramBuffer(stream) ((stream)->m_aramBuffer != REDSOUND_STREAM_ARAM_BUFFER_NONE)
+#define RedStreamDataIsAramBufferEmpty(stream) ((stream)->m_aramBuffer == REDSOUND_STREAM_ARAM_BUFFER_NONE)
 
 enum RedStreamDataLayoutOffset {
     REDSOUND_STREAM_TRACK_OFFSET = (unsigned int)&(((RedStreamDATA*)0)->m_track),

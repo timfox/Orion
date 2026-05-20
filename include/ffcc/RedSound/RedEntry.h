@@ -66,6 +66,9 @@ enum RedHistoryMode {
 	REDSOUND_HISTORY_MODE_USE = 1,
 };
 
+#define RedHistoryBankHasData(bank) ((bank)->m_size != REDSOUND_HISTORY_BANK_EMPTY_SIZE)
+#define RedHistoryBankIsEmpty(bank) ((bank)->m_size == REDSOUND_HISTORY_BANK_EMPTY_SIZE)
+
 enum RedHistoryNumber {
 	REDSOUND_HISTORY_UNUSED = 0,
 	REDSOUND_HISTORY_MOST_RECENT = 1,
@@ -125,6 +128,9 @@ enum RedEntryWaveAramLayout {
 	REDSOUND_WAVE_DEFAULT_REGION_OFFSET = (unsigned int)&(((RedWaveAramLayout*)0)->m_defaultRegion),
 	REDSOUND_WAVE_FIXED_REGION_OFFSET = (unsigned int)&(((RedWaveAramLayout*)0)->m_fixedRegion),
 	REDSOUND_WAVE_LARGE_REGION_OFFSET = (unsigned int)&(((RedWaveAramLayout*)0)->m_largeRegion),
+	REDSOUND_WAVE_DEFAULT_REGION_END = REDSOUND_WAVE_DEFAULT_REGION_OFFSET + REDSOUND_WAVE_DEFAULT_REGION_SIZE,
+	REDSOUND_WAVE_FIXED_REGION_END = REDSOUND_WAVE_FIXED_REGION_OFFSET + REDSOUND_WAVE_FIXED_REGION_SIZE,
+	REDSOUND_WAVE_LARGE_REGION_END = REDSOUND_WAVE_LARGE_REGION_OFFSET + REDSOUND_WAVE_LARGE_REGION_SIZE,
 	REDSOUND_WAVE_ARAM_LAYOUT_SIZE = sizeof(RedWaveAramLayout),
 };
 
@@ -228,6 +234,12 @@ enum RedMusicTrackBlockLayout {
 #define RedMusicTrackBlockGetNext(block, blockSize)                                                \
 	((RedMusicTrackBlock*)((unsigned char*)(block) + (blockSize)))
 #define RedMusicGetTrackBlocks(musicHead) reinterpret_cast<RedMusicTrackBlock*>((musicHead) + 1)
+#define RedMusicHeadGetTrackArenaSize(musicHead) ((musicHead)->m_trackCount * REDSOUND_TRACK_SIZE)
+#define RedMusicHeadGetSize(musicHead) ((musicHead)->m_size)
+#define RedMusicHeadHasValidSignature(musicHead)                                                   \
+	((musicHead)->m_signature[REDSOUND_MUSIC_SIGNATURE_0_INDEX] == REDSOUND_MUSIC_SIGNATURE_0 &&  \
+	 (musicHead)->m_signature[REDSOUND_MUSIC_SIGNATURE_1_INDEX] == REDSOUND_MUSIC_SIGNATURE_1 &&  \
+	 (musicHead)->m_signature[REDSOUND_MUSIC_SIGNATURE_2_INDEX] == REDSOUND_MUSIC_SIGNATURE_2)
 
 enum RedMusicHeaderFlag {
 	REDSOUND_MUSIC_HEADER_SIZE = sizeof(RedMusicHEAD),
@@ -285,6 +297,12 @@ enum RedSeSepHeadLayout {
 #define RedSeSepHasFlags(seSepHead) (((seSepHead)->m_sizeAndFlags & REDSOUND_SESEP_FLAGS_MASK) != 0)
 #define RedSeSepGetWaveNo(seSepHead)                                                                  \
 	(((seSepHead)->m_waveNoHi * REDSOUND_SESEP_WAVE_NO_HIGH_SCALE) | (seSepHead)->m_waveNoLo)
+#define RedSeSepHeadHasValidSignature(seSepHead)                                                   \
+	((seSepHead)->m_signature[REDSOUND_SESEP_SIGNATURE_0_INDEX] == REDSOUND_SESEP_SIGNATURE_0 &&  \
+	 (seSepHead)->m_signature[REDSOUND_SESEP_SIGNATURE_1_INDEX] == REDSOUND_SESEP_SIGNATURE_1 &&  \
+	 (seSepHead)->m_signature[REDSOUND_SESEP_SIGNATURE_2_INDEX] == REDSOUND_SESEP_SIGNATURE_2 &&  \
+	 (seSepHead)->m_signature[REDSOUND_SESEP_SIGNATURE_3_INDEX] == REDSOUND_SESEP_SIGNATURE_3 &&  \
+	 (seSepHead)->m_signature[REDSOUND_SESEP_SIGNATURE_4_INDEX] == REDSOUND_SESEP_SIGNATURE_4)
 
 struct RedSeInfoSequence
 {
@@ -366,6 +384,15 @@ enum RedSeBlockEntryLayout {
 
 #define REDSOUND_SE_BLOCK_DATA_NONE 0
 
+#define RedSeBlockIdGetBankNo(seBlockId) ((int)(seBlockId) / REDSOUND_SE_BLOCK_SEQUENCE_COUNT)
+#define RedSeBlockIdGetSequenceNo(seBlockId) ((seBlockId) & REDSOUND_SE_BLOCK_SEQUENCE_MASK)
+#define RedSeBlockIdAddBank(seBlockId, bank) ((seBlockId) += (bank) << REDSOUND_SE_BLOCK_BANK_SHIFT)
+#define RedSeBlockIdSetDataFlag(seBlockId) ((seBlockId) |= REDSOUND_SE_BLOCK_DATA_FLAG)
+#define RedSeBlockIdIsBlockData(seBlockId) (((seBlockId) & REDSOUND_SE_BLOCK_DATA_FLAG) != 0)
+#define RedSeBlockIdIsSeSepData(seBlockId) (((seBlockId) & REDSOUND_SE_BLOCK_DATA_FLAG) == 0)
+
+#define RedSeBlockGetSize(seBlock) ((seBlock)->m_size)
+#define RedSeBlockGetSeCount(seBlock) ((seBlock)->m_seCount)
 #define RedSeBlockGetInfoBase(seBlock) RedSeBlockGetInfoBaseFromEntries(seBlock, (seBlock)->m_entries)
 
 #define RedSeBlockGetInfoBaseFromEntries(seBlock, entries)                                       \
@@ -429,9 +456,15 @@ enum RedWaveHeadLayout {
 #define RedWaveHeadGetWaveData(waveHead, waveIndex)                                               \
 	((RedWaveDATA*)((unsigned char*)(waveHead) + (waveHead)->m_waveOffsets[(waveIndex)]))
 
+#define RedWaveHeadGetBodyData(waveData, waveHeaderSize) ((u8*)(waveData) + (waveHeaderSize))
+#define RedWaveHeadHasValidSignature(waveHead)                                                     \
+	((waveHead)->m_signature[REDSOUND_WAVE_SIGNATURE_MAGIC0_INDEX] == REDSOUND_WAVE_SIGNATURE_MAGIC0 && \
+	 (waveHead)->m_signature[REDSOUND_WAVE_SIGNATURE_MAGIC1_INDEX] == REDSOUND_WAVE_SIGNATURE_MAGIC1)
+
 #define RedMusicHeadFromBankAddress(address) reinterpret_cast<RedMusicHEAD*>(address)
 #define RedMusicHeadFromData(musicData) reinterpret_cast<RedMusicHEAD*>(musicData)
 
+#define RedSeBlockHeadAddress(seBlockHead) ((int)(seBlockHead))
 #define RedSeBlockHeadFromData(seBlockData) reinterpret_cast<RedSeBlockHEAD*>(seBlockData)
 
 #define RedWaveHeadFromBankAddress(address) reinterpret_cast<RedWaveHeadWD*>(address)
@@ -507,7 +540,10 @@ public:
 
 #define RedEntryWaveBankGet(entry, index) ((entry)->m_waveBankBase + (index))
 #define RedEntryWaveBankGetEnd(entry) RedEntryWaveBankGet(entry, REDSOUND_WAVE_BANK_ENTRY_COUNT)
+#define RedEntryWavePrimaryBankGetEnd(entry) RedEntryWaveBankGet(entry, REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT)
 #define RedEntryWaveHistoryGetBegin(entry) RedEntryWaveBankGet(entry, REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT)
+#define RedEntryWavePrimaryBankNoIsValid(bankNo) ((bankNo) >= 0 && (bankNo) < REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT)
+#define RedEntryWaveBankNoIsHistory(bankNo) ((bankNo) >= REDSOUND_WAVE_PRIMARY_BANK_ENTRY_COUNT)
 #define RedEntrySeSepBankGet(entry, index) ((entry)->m_seSepBankBase + (index))
 #define RedEntrySeSepBankGetEnd(entry) RedEntrySeSepBankGet(entry, REDSOUND_SESEP_BANK_ENTRY_COUNT)
 #define RedEntryMusicBankGet(entry, index) ((entry)->m_musicBankBase + (index))

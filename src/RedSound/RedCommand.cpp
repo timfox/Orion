@@ -81,6 +81,9 @@ enum RedCommandVolumeParam {
 	REDSOUND_MUSIC_VOLUME_INPUT_SCALE_SHIFT = 2,
 };
 
+#define RedMusicVolumeFromInput(volume)                                                            \
+	((((volume) + 1) * REDSOUND_MASTER_VOLUME_SCALE - 1) * REDSOUND_FIXED_ONE)
+
 enum RedCommandEraseTrack {
 	REDSOUND_ERASE_TRACK_SENTINEL = 0x100,
 	REDSOUND_SEP_DIRECT_PLAY_ID = 1000000,
@@ -169,11 +172,6 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* waveHead, int musicId, int volume,
                                      int mode);
 
-static inline void RedTrackAdsrFillDefault(RedAdsrDATA* adsr)
-{
-	memset(adsr, REDSOUND_TRACK_ADSR_DEFAULT_BYTE, REDSOUND_TRACK_ADSR_SIZE);
-}
-
 /*
  * --INFO--
  * PAL Address: 0x801ca038
@@ -201,7 +199,7 @@ static void _EraseAttribute(int eraseTrack, int attrMask)
 
 			trackNo = track->m_trackNo;
 			RedVoiceDataGet(trackNo)->m_stateFlags &= REDSOUND_VOICE_STATE_CLEAR_PLAYING_MASK;
-			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_SE_MASK;
+			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_PAUSE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags &= REDSOUND_VOICE_FLAGS_CLEAR_ACTIVE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags |= REDSOUND_VOICE_FLAGS_RELEASED;
 			RedVoiceDataGet(trackNo)->m_active = REDSOUND_VOICE_ACTIVE_OFF;
@@ -272,7 +270,7 @@ static int _EraseTime(int eraseTrack)
 
 			trackNo = track->m_trackNo;
 			RedVoiceDataGet(trackNo)->m_stateFlags &= REDSOUND_VOICE_STATE_CLEAR_PLAYING_MASK;
-			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_SE_MASK;
+			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_PAUSE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags &= REDSOUND_VOICE_FLAGS_CLEAR_ACTIVE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags |= REDSOUND_VOICE_FLAGS_RELEASED;
 			RedVoiceDataGet(trackNo)->m_active = REDSOUND_VOICE_ACTIVE_OFF;
@@ -321,14 +319,14 @@ RedTrackDATA* SearchSeEmptyTrack(int trackCount, int eraseTrack, int attrMask)
 			remaining = trackCount - 1;
 			while (remaining != 0) {
 				if ((track->m_command != REDSOUND_TRACK_COMMAND_NONE) ||
-				    ((track->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_STREAM) != 0)) {
+				    RedNoteAllocHasStream(track->m_note.m_allocFlags)) {
 					break;
 				}
 				track--;
 				remaining--;
 			}
 			if ((track->m_command != REDSOUND_TRACK_COMMAND_NONE) ||
-			    ((track->m_note.m_allocFlags & REDSOUND_NOTE_ALLOC_STREAM) != 0)) {
+			    RedNoteAllocHasStream(track->m_note.m_allocFlags)) {
 				scan = track;
 				remaining = 1;
 			}
@@ -372,7 +370,7 @@ int SeStopID(int seId)
 
 			trackNo = track->m_trackNo;
 			RedVoiceDataGet(trackNo)->m_stateFlags &= REDSOUND_VOICE_STATE_CLEAR_PLAYING_MASK;
-			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_SE_MASK;
+			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_PAUSE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags &= REDSOUND_VOICE_FLAGS_CLEAR_ACTIVE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags |= REDSOUND_VOICE_FLAGS_RELEASED;
 			RedVoiceDataGet(trackNo)->m_track = REDSOUND_VOICE_TRACK_NONE;
@@ -407,7 +405,7 @@ int SeStopMG(int bank, int sep, int group, int kind)
 	track = soundControl->m_tracks;
 	do {
 		if ((track->m_command != REDSOUND_TRACK_COMMAND_NONE) &&
-		    ((track->m_seSepId & REDSOUND_SE_BLOCK_DATA_FLAG) == 0)) {
+		    RedSeBlockIdIsSeSepData(track->m_seSepId)) {
 			int id = track->m_seSepId / REDSOUND_SE_MG_ID_DIVISOR;
 			if ((bank != id) && (sep != id) && (group != id) && (kind != id)) {
 				int trackNo;
@@ -420,7 +418,7 @@ int SeStopMG(int bank, int sep, int group, int kind)
 
 				trackNo = track->m_trackNo;
 				RedVoiceDataGet(trackNo)->m_stateFlags &= REDSOUND_VOICE_STATE_CLEAR_PLAYING_MASK;
-				RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_SE_MASK;
+				RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_PAUSE_MASK;
 				RedVoiceDataGet(trackNo)->m_flags &= REDSOUND_VOICE_FLAGS_CLEAR_ACTIVE_MASK;
 				RedVoiceDataGet(trackNo)->m_flags |= REDSOUND_VOICE_FLAGS_RELEASED;
 				RedVoiceDataGet(trackNo)->m_track = REDSOUND_VOICE_TRACK_NONE;
@@ -485,7 +483,6 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 	remainingSequences = RedSeInfoGetSequenceCount(seInfo);
 	sequenceCommandData = RedSeInfoGetCommandData(sequence, remainingSequences);
 	do {
-		tracksToStart = remainingSequences;
 		if (sepId != REDSOUND_SEP_DIRECT_PLAY_ID) {
 			tracksToStart = 0;
 			do {
@@ -494,6 +491,8 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 					break;
 				}
 			} while ((int)tracksToStart < (int)remainingSequences);
+		} else {
+			tracksToStart = remainingSequences;
 		}
 
 		seTrack = SearchSeEmptyTrack((int)tracksToStart, seInfo->m_eraseTrack, eraseAttrMask);
@@ -507,7 +506,7 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 			seTrack->m_waveBankData = waveHead;
 			seTrack->m_command = sequenceCommandData;
 			sequenceCommandData = RedSeInfoCommandGetNext(sequenceCommandData, sequence);
-			seTrack->m_deltaTime = (int)DeltaTimeSumup((unsigned char**)&seTrack->m_command) + 1;
+			seTrack->m_deltaTime = (int)RedTrackCommandReadDeltaTime(seTrack) + 1;
 			if (RedSeSkipStepIsActive()) {
 				seTrack->m_deltaTime = seTrack->m_deltaTime - RedSeSkipStepGet();
 			}
@@ -563,7 +562,7 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 				seTrack->m_portamentPitch = REDSOUND_TRACK_PORTAMENT_PITCH_NONE;
 				seTrack->m_voiceSwitch = REDSOUND_VOICE_SWITCH_DRY_STEREO;
 				memset(&seTrack->m_adsr, REDSOUND_TRACK_ADSR_DEFAULT_WORD, REDSOUND_TRACK_ADSR_SIZE);
-				seTrack->m_note.m_allocFlags = REDSOUND_NOTE_ALLOC_DIRECT_MASK;
+				RedNoteAllocSetDirectMask(seTrack->m_note.m_allocFlags);
 				seTrack->m_seTickCounter = 1;
 				voice->m_track = seTrack;
 				voice->m_stateFlags = REDSOUND_VOICE_STATE_PLAYING | REDSOUND_VOICE_STATE_SE;
@@ -574,8 +573,8 @@ static int _SePlayStart(RedSeINFO* seInfo, int seId, int sepId, int pan, int vol
 			}
 
 			tracksToStart = tracksToStart - 1;
-			sequence++;
 			remainingSequences = remainingSequences - 1;
+			sequence++;
 			if (tracksToStart == 0) {
 				break;
 			}
@@ -615,16 +614,16 @@ int SeBlockPlay(int seId, int bank, int sequenceNo, int pan, int volume)
 		seBlock = RedSeBlockDataGet(bank);
 		blockSequence = sequenceNo;
 
-		sequenceNo += bank << REDSOUND_SE_BLOCK_BANK_SHIFT;
-		sequenceNo |= REDSOUND_SE_BLOCK_DATA_FLAG;
-		if (blockSequence < seBlock->m_seCount) {
+		RedSeBlockIdAddBank(sequenceNo, bank);
+		RedSeBlockIdSetDataFlag(sequenceNo);
+		if (blockSequence < RedSeBlockGetSeCount(seBlock)) {
 			entries = seBlock->m_entries;
 
 			if (entries[blockSequence] != REDSOUND_SE_BLOCK_ENTRY_EMPTY) {
 				seInfo = RedSeBlockGetInfoFromEntry(seBlock, entries, blockSequence);
 				playInfo = seInfo;
 
-				if (((unsigned int)entries[blockSequence] & REDSOUND_SE_BLOCK_DATA_FLAG) != 0) {
+				if (RedSeBlockIdIsBlockData((unsigned int)entries[blockSequence])) {
 					playInfo->m_flagsAndCount |= REDSOUND_SE_INFO_MULTI_FLAG;
 				}
 				if (_SePlayStart(playInfo, seId, sequenceNo, pan, volume) != 0) {
@@ -851,7 +850,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 		music->m_masterVolumeDelta = 0;
 	}
 
-	RedTrackDATA* track = (RedTrackDATA*)RedNew(musicHead->m_trackCount * REDSOUND_TRACK_SIZE);
+	RedTrackDATA* track = (RedTrackDATA*)RedNew(RedMusicHeadGetTrackArenaSize(musicHead));
 	if (track == 0) {
 		if (RedReportPrintIsEnabled()) {
 			OSReport(sRedCommandMusicTrackCreateErrorFmt,
@@ -859,7 +858,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 			fflush(__files + 1);
 			OSReport(sRedCommandMusicNeedMemoryFmt,
 			         sRedCommandLogPrefix, sRedCommandLogErrorColor,
-			         (int)musicHead->m_musicNo, musicHead->m_trackCount * REDSOUND_TRACK_SIZE, sRedCommandLogReset);
+			         (int)musicHead->m_musicNo, RedMusicHeadGetTrackArenaSize(musicHead), sRedCommandLogReset);
 			fflush(__files + 1);
 		}
 		c_RedEntry.DisplayMMemoryInfo();
@@ -894,7 +893,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 		musicTrackBlock = RedMusicTrackBlockGetCommandBlock(musicTrackBlock);
 		track->m_command = (unsigned char*)musicTrackBlock;
 		musicTrackBlock = RedMusicTrackBlockGetNext(musicTrackBlock, musicTrackBlockSize);
-		track->m_deltaTime = DeltaTimeSumup((unsigned char**)&track->m_command) + 1;
+		track->m_deltaTime = RedTrackCommandReadDeltaTime(track) + 1;
 		track->m_seSepId = REDSOUND_TRACK_SESEP_ID_NONE;
 		signed char* defaultKeySignatureData;
 		if (RedMusicKeySignatureIsEnabled()) {
@@ -940,9 +939,9 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 		track->m_fuzzyVolumeDepth = 0;
 		track->m_fuzzyPitchDepth = 0;
 		track->m_portamentPitch = REDSOUND_TRACK_PORTAMENT_PITCH_NONE;
-		track->m_note.m_allocFlags = REDSOUND_NOTE_ALLOC_NONE;
+		RedNoteAllocClear(track->m_note.m_allocFlags);
 		track->m_voiceSwitch = REDSOUND_VOICE_SWITCH_MUSIC_DEFAULT;
-		memset(&track->m_adsr, REDSOUND_TRACK_ADSR_DEFAULT_WORD, REDSOUND_TRACK_ADSR_SIZE);
+		memset(&track->m_adsr, REDSOUND_TRACK_ADSR_DEFAULT_BYTE, REDSOUND_TRACK_ADSR_SIZE);
 
 		remainingTrackCount--;
 		musicTrackNo++;
@@ -965,7 +964,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
 	music->m_measure = REDSOUND_CONTROL_INITIAL_MEASURE;
 	music->m_elapsedTime = REDSOUND_CONTROL_ELAPSED_TIME_NONE;
 	if (volume != 0) {
-		volume = (((volume + 1) * REDSOUND_MASTER_VOLUME_SCALE) - 1) * REDSOUND_FIXED_ONE;
+		volume = RedMusicVolumeFromInput(volume);
 	}
 	music->m_volume = volume;
 	music->m_volumeDelta = REDSOUND_CONTROL_VOLUME_DELTA_NONE;
@@ -993,7 +992,7 @@ static RedTrackDATA* _MusicPlayStart(RedMusicHEAD* musicHead, RedWaveHeadWD* wav
  */
 int MusicStop(int musicId)
 {
-	RedSoundCONTROL* music = RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY);
+	RedSoundCONTROL* music = RedSoundControlGetBegin();
 
 	do {
 		if ((musicId == REDSOUND_MUSIC_ID_NONE) ||
@@ -1004,8 +1003,7 @@ int MusicStop(int musicId)
 			if (music->m_activeTrackCount != 0) {
 				RedVoiceDATA* voiceData = RedVoiceDataGetBegin();
 				do {
-					if ((voiceData->m_track >= music->m_tracks) &&
-					    (voiceData->m_track < music->m_tracks + music->m_trackCount)) {
+					if (RedSoundControlHasTrack(music, voiceData->m_track)) {
 						voiceData->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_SUSTAIN_PAUSE_MASK;
 						voiceData->m_flags &= REDSOUND_VOICE_FLAGS_CLEAR_ACTIVE_MASK;
 						voiceData->m_flags |= REDSOUND_VOICE_FLAGS_RELEASED;
@@ -1023,7 +1021,7 @@ int MusicStop(int musicId)
 						track->m_command = REDSOUND_TRACK_COMMAND_NONE;
 					}
 					track++;
-				} while (track < music->m_tracks + music->m_trackCount);
+				} while (track < RedSoundControlGetTrackEnd(music));
 
 				music->m_activeTrackCount = 0;
 				music->m_trackCount = 0;
@@ -1036,7 +1034,7 @@ int MusicStop(int musicId)
 		music++;
 	} while (music < RedSoundControlGetMusicPlayEnd());
 
-	music = RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY);
+	music = RedSoundControlGetBegin();
 	if ((music->m_musicId < REDSOUND_MUSIC_ID_MIN) &&
 	    (music[REDSOUND_CONTROL_MUSIC_SECONDARY].m_musicId >= REDSOUND_MUSIC_ID_MIN)) {
 		memcpy(RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY),
@@ -1104,7 +1102,7 @@ void SetMusicVolume(int musicId, int volume, int duration, int mode)
 		duration /= REDSOUND_FRAMES_PER_SECOND;
 	}
 
-	music = RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY);
+	music = RedSoundControlGetBegin();
 	do {
 		if ((musicId == REDSOUND_MUSIC_ID_NONE) || (musicId == music->m_musicId) ||
 		    (music->m_musicId < REDSOUND_MUSIC_ID_MIN)) {
@@ -1137,7 +1135,7 @@ int SeStopG(int group)
 	track = soundControl->m_tracks;
 	do {
 		if ((track->m_command != REDSOUND_TRACK_COMMAND_NONE) &&
-		    ((track->m_seSepId & REDSOUND_SE_BLOCK_DATA_FLAG) == 0) &&
+		    RedSeBlockIdIsSeSepData(track->m_seSepId) &&
 		    (track->m_seSepId / REDSOUND_SE_MG_ID_DIVISOR == group)) {
 			int trackNo;
 
@@ -1149,7 +1147,7 @@ int SeStopG(int group)
 
 			trackNo = track->m_trackNo;
 			RedVoiceDataGet(trackNo)->m_stateFlags &= REDSOUND_VOICE_STATE_CLEAR_PLAYING_MASK;
-			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_SE_MASK;
+			RedVoiceDataGet(trackNo)->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_PAUSE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags &= REDSOUND_VOICE_FLAGS_CLEAR_ACTIVE_MASK;
 			RedVoiceDataGet(trackNo)->m_flags |= REDSOUND_VOICE_FLAGS_RELEASED;
 			RedVoiceDataGet(trackNo)->m_track = REDSOUND_VOICE_TRACK_NONE;
@@ -1234,7 +1232,7 @@ void MusicPause(int musicId, int pause)
 		fflush(__files + 1);
 	}
 
-	music = RedSoundControlGet(REDSOUND_CONTROL_MUSIC_PRIMARY);
+	music = RedSoundControlGetBegin();
 	do {
 		if ((musicId == REDSOUND_MUSIC_ID_NONE) ||
 		    ((music->m_musicId >= REDSOUND_MUSIC_ID_MIN) && (music->m_musicId == musicId))) {
@@ -1242,8 +1240,7 @@ void MusicPause(int musicId, int pause)
 				if (music->m_activeTrackCount != 0) {
 					voice = RedVoiceDataGetBegin();
 					do {
-						if ((voice->m_track >= music->m_tracks) &&
-						    (voice->m_track < music->m_tracks + music->m_trackCount)) {
+						if (RedSoundControlHasTrack(music, voice->m_track)) {
 							if (voice->m_axVoice != REDSOUND_AX_VOICE_NONE) {
 								voice->m_targetPitch = 0;
 								voice->m_flags |= REDSOUND_VOICE_FLAGS_PAUSE_DIRTY;
@@ -1258,8 +1255,7 @@ void MusicPause(int musicId, int pause)
 			} else {
 				voice = RedVoiceDataGetBegin();
 				do {
-					if ((voice->m_track >= music->m_tracks) &&
-					    (voice->m_track < music->m_tracks + music->m_trackCount)) {
+					if (RedSoundControlHasTrack(music, voice->m_track)) {
 						voice->m_updateFlags |= REDSOUND_VOICE_UPDATE_ALL;
 						voice->m_track->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_PAUSE_MASK;
 						voice->m_voiceSwitch &= REDSOUND_VOICE_SWITCH_CLEAR_PAUSE_MASK;
