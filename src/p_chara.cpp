@@ -17,6 +17,12 @@ extern u8* gCharaPartWorkPtr;
 
 extern const float FLOAT_80330288;
 extern const float FLOAT_8033028c;
+extern const float FLOAT_8033030C;
+extern const float FLOAT_80330310;
+extern const float FLOAT_80330314;
+extern const float FLOAT_80330318;
+extern const float FLOAT_8033031C;
+extern const float FLOAT_80330320;
 
 #include "PowerPC_EABI_Support/Msl/MSL_C/MSL_Common/string.h"
 #include <PowerPC_EABI_Support/Msl/MSL_C/MSL_Common/stdio.h>
@@ -407,9 +413,9 @@ static inline unsigned int& LoadStreamCursor(CCharaPcs* self)
     return *reinterpret_cast<unsigned int*>(Ptr(self, 0x714));
 }
 
-static inline unsigned int& CurrentSceneId()
+static inline int& CurrentSceneId()
 {
-    return *reinterpret_cast<unsigned int*>(Ptr(&Game, 0xC7F0));
+    return *reinterpret_cast<int*>(Ptr(&Game, 0xC7F0));
 }
 
 static inline unsigned int& CharaAmemSize()
@@ -875,21 +881,36 @@ void CCharaPcs::create()
     StageAt(this, 0xD4) = CreateStage__7CMemoryFUlPci(
         &Memory, CurrentSceneId() == 4 ? 0x190000UL : 0x1E0000UL, s_CCharaPcs_loadAnim, 0);
 
-    unsigned char* sentinel = reinterpret_cast<unsigned char*>(
-        _Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(&Memory, 0x194, StageAt(this, 0xC0), const_cast<char*>(s_p_chara_cpp), 0xDB, 0));
+    CHandle* sentinel = reinterpret_cast<CHandle*>(
+        _Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(&Memory, 0x194, StageAt(&CharaPcs, 0xC0), const_cast<char*>(s_p_chara_cpp), 0xDB, 0));
     if (sentinel != 0) {
-        memset(sentinel, 0, 0x194);
-        *reinterpret_cast<int*>(sentinel + 0x110) = -1;
-        *reinterpret_cast<float*>(sentinel + 0x11C) = 1.0f;
-        *reinterpret_cast<float*>(sentinel + 0x154) = 0.0f;
-        sentinel[0x190] = static_cast<unsigned char>(sentinel[0x190] | 0x80);
+        sentinel->m_previous = 0;
+        sentinel->m_next = 0;
+        sentinel->m_model = 0;
+        sentinel->m_textureSet = 0;
+        sentinel->m_modelLoadRef = 0;
+        sentinel->m_texLoadRef = 0;
+
+        for (int i = 0; i < 64; i++) {
+            sentinel->m_animSlot[i] = 0;
+        }
+
+        sentinel->m_pdtLoadRef = 0;
+        sentinel->m_currentAnimIndex = -1;
+        sentinel->m_flags = 0;
+        sentinel->m_colorPhase = FLOAT_8033028c;
+        sentinel->m_sortZ = FLOAT_80330288;
+        sentinel->m_shadowTexturePtr = 0;
+        sentinel->m_asyncState = 0;
+        sentinel->m_asyncFileHandle = 0;
+        sentinel->m_fogBlend = FLOAT_80330288;
+        sentinel->m_unk0x158 = 0;
+        sentinel->m_drawListFlags = static_cast<unsigned char>(__rlwimi(sentinel->m_drawListFlags, 1, 7, 24, 24));
     }
 
-    HandleListHead(this) = reinterpret_cast<CHandle*>(sentinel);
-    if (HandleListHead(this) != 0) {
-        HandleListHead(this)->m_previous = HandleListHead(this);
-        HandleListHead(this)->m_next = HandleListHead(this);
-    }
+    HandleListHead(this) = sentinel;
+    HandleListHead(this)->m_previous = HandleListHead(this);
+    HandleListHead(this)->m_next = HandleListHead(this);
 
     for (int i = 0; i < 4; i++) {
         CameraCountAt(this, i) = 0;
@@ -897,27 +918,21 @@ void CCharaPcs::create()
     }
 
     CLightPcs::CBumpLight bumpLight;
-    Vec lightPos = {0.0f, 40.0f, 60.0f};
-    Vec lightTarget = {0.0f, 0.0f, 0.0f};
-    Vec lightDir;
-
-    PSVECSubtract(&lightTarget, &lightPos, &lightDir);
-    PSVECNormalize(&lightDir, &lightDir);
 
     bumpLight.m_type = 1;
+    bumpLight.m_position.x = FLOAT_8033030C;
+    bumpLight.m_position.y = FLOAT_80330310;
+    bumpLight.m_position.z = FLOAT_80330314;
+    bumpLight.m_targetPosition.x = FLOAT_80330318;
+    bumpLight.m_targetPosition.y = FLOAT_8033031C;
+    bumpLight.m_targetPosition.z = FLOAT_80330320;
+    PSVECSubtract(reinterpret_cast<Vec*>(&bumpLight.m_targetPosition), reinterpret_cast<Vec*>(&bumpLight.m_position),
+                  reinterpret_cast<Vec*>(&bumpLight.m_direction));
+    PSVECNormalize(reinterpret_cast<Vec*>(&bumpLight.m_direction), reinterpret_cast<Vec*>(&bumpLight.m_direction));
     bumpLight.m_bumpShade[0] = 0x80;
     bumpLight.m_bumpShade[1] = 0x80;
     bumpLight.m_bumpShade[2] = 0x00;
     bumpLight.m_bumpShade[3] = 0xFF;
-    bumpLight.m_position.x = lightPos.x;
-    bumpLight.m_position.y = lightPos.y;
-    bumpLight.m_position.z = lightPos.z;
-    bumpLight.m_targetPosition.x = lightTarget.x;
-    bumpLight.m_targetPosition.y = lightTarget.y;
-    bumpLight.m_targetPosition.z = lightTarget.z;
-    bumpLight.m_direction.x = lightDir.x;
-    bumpLight.m_direction.y = lightDir.y;
-    bumpLight.m_direction.z = lightDir.z;
     bumpLight.m_offsetX = 0.0f;
     bumpLight.m_offsetZ = 0.0f;
 
@@ -2861,6 +2876,13 @@ void CCharaPcs::CHandle::draw(int drawPass, int immediatePass)
     if ((flags & 1) == 0 || (flags & 0x400000) != 0) {
         return;
     }
+    const float lightAlpha = m_model->m_lightAlpha;
+    if (lightAlpha == FLOAT_80330288 && (flags & 0x80) == 0) {
+        return;
+    }
+    if ((flags & 0x100) != 0 && drawPass != 5) {
+        return;
+    }
     if (drawPass == 1 && (flags & 0x40) != 0) {
         return;
     }
@@ -2877,13 +2899,10 @@ void CCharaPcs::CHandle::draw(int drawPass, int immediatePass)
         return;
     }
 
-    if (immediatePass == 0 && drawPass == 0 && (flags & 0x40000) == 0) {
+    if (immediatePass != 0 && drawPass == 0 && (lightAlpha < FLOAT_8033028c || (flags & 0x40000) != 0)) {
         ppvDrawMng.AddPrim(-m_sortZ, this);
         return;
     }
-
-    Mtx viewMtx;
-    PSMTXCopy(*reinterpret_cast<Mtx*>(Ptr(&CameraPcs, 4)), viewMtx);
 
     if (drawPass != 1 && drawPass != 2 && (flags & 0x200000) == 0) {
         const unsigned int lightBank = (flags >> 19) & 1;
@@ -2895,9 +2914,17 @@ void CCharaPcs::CHandle::draw(int drawPass, int immediatePass)
         if (phaseIndex > 3) {
             phaseIndex = 3;
         }
-        const float blendT = phase - static_cast<float>(phaseIndex);
-        _GXColor* phaseColors = reinterpret_cast<_GXColor*>(Ptr(&CharaPcs, 0x12C));
-        const _GXColor shade = BlendColor(phaseColors[phaseIndex], phaseColors[phaseIndex + 1], blendT);
+        _GXColor shade;
+        if ((flags & 0x20000) == 0 || drawPass == 3) {
+            const float blendT = phase - static_cast<float>(phaseIndex);
+            _GXColor* phaseColors = reinterpret_cast<_GXColor*>(Ptr(&CharaPcs, 0x12C));
+            shade = BlendColor(phaseColors[phaseIndex], phaseColors[phaseIndex + 1], blendT);
+        } else {
+            shade.r = 0xFF;
+            shade.g = 0xFF;
+            shade.b = 0xFF;
+            shade.a = 0xFF;
+        }
         const _GXColor ambientBase = *reinterpret_cast<_GXColor*>(Ptr(&CharaPcs, 0xE8 + lightBank * 4));
         const _GXColor ambientColor = ModulateColor(ambientBase, shade);
         LightPcs.SetAmbient(ambientColor);
@@ -2915,6 +2942,9 @@ void CCharaPcs::CHandle::draw(int drawPass, int immediatePass)
         lightPos.z = (*modelMtx)[2][3];
         LightPcs.SetPosition(static_cast<CLightPcs::TARGET>(0), &lightPos, 0xFFFFFFFF);
     }
+
+    Mtx viewMtx;
+    PSMTXCopy(*reinterpret_cast<Mtx*>(Ptr(&CameraPcs, 4)), viewMtx);
 
     if (drawPass == 3) {
         if ((flags & 4) != 0) {
