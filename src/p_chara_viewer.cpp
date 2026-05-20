@@ -81,7 +81,6 @@ extern "C" void SRTToMatrix__5CMathFPA4_fP3SRT(void*, Mtx, void*);
 extern "C" void Printf__8CGraphicFPce(void*, const char*, ...);
 extern "C" void Destroy__6CCharaFv(CChara*);
 extern "C" void Create__6CCharaFv(CChara*);
-extern "C" void DestroyBumpLightAll__9CLightPcsFQ29CLightPcs6TARGET(void*, int);
 extern "C" void DestroyStage__7CMemoryFPQ27CMemory6CStage(void*, void*);
 extern "C" void* CreateStage__7CMemoryFUlPci(void*, unsigned long, const char*, int);
 extern "C" void* createTextureSet__9CCharaPcsFPvi(void*, void*, int);
@@ -96,11 +95,6 @@ extern "C" void SetFrame__Q26CChara6CModelFf(float, void*);
 extern "C" void* __ct__Q26CChara5CAnimFv(void*);
 extern "C" void Create__Q26CChara5CAnimFPvPQ27CMemory6CStage(void*, void*, void*);
 extern "C" void __ct__Q29CLightPcs10CBumpLightFv(void*);
-extern "C" int AddBump__9CLightPcsFPQ29CLightPcs6CLightQ29CLightPcs6TARGETPQ27CMemory6CStagei(
-    void*, void*, int, void*, int);
-extern "C" void* __ct__6CColorFUcUcUcUc(void*, unsigned char, unsigned char, unsigned char, unsigned char);
-extern "C" void __ct__6CColorFv(void*);
-extern "C" void __ct__6CColorFR6CColor(void*, void*);
 extern "C" float FLOAT_80330BEC;
 extern "C" float FLOAT_80330BF0;
 extern "C" double fmod(double, double);
@@ -757,7 +751,7 @@ void CCharaPcs::destroyViewer()
     unsigned int j;
 
     Destroy__6CCharaFv(&Chara);
-    DestroyBumpLightAll__9CLightPcsFQ29CLightPcs6TARGET(&LightPcs, 0);
+    LightPcs.DestroyBumpLightAll(static_cast<CLightPcs::TARGET>(0));
     gCharaPartWorkPtr = 0;
 
     ReleaseShared(m_viewerSavedAnim);
@@ -798,9 +792,6 @@ void CCharaPcs::createViewer()
     unsigned char* p = reinterpret_cast<unsigned char*>(self);
     register const char* viewerStrings = s_no_texture____801da7e8;
     unsigned int i;
-    unsigned char colorTmp[4];
-    unsigned char colorCopy[4];
-    unsigned char white[4];
     char pathBuf[256];
     CFile::CHandle* fileHandle;
 
@@ -830,19 +821,18 @@ void CCharaPcs::createViewer()
     }
 
     for (int colorIndex = 0; colorIndex < 5; colorIndex++) {
-        unsigned char* whiteChannels =
-            reinterpret_cast<unsigned char*>(__ct__6CColorFUcUcUcUc(reinterpret_cast<CColor*>(white), 0xFF, 0xFF, 0xFF, 0xFF));
-        __ct__6CColorFv(reinterpret_cast<CColor*>(colorTmp));
+        CColor white(0xFF, 0xFF, 0xFF, 0xFF);
+        CColor colorTmp;
         float scale = static_cast<float>(colorIndex) * kCharaViewerLerpScale;
-        colorTmp[0] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[0]) * scale));
-        colorTmp[1] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[1]) * scale));
-        colorTmp[2] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[2]) * scale));
-        colorTmp[3] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[3]) * scale));
-        __ct__6CColorFR6CColor(reinterpret_cast<CColor*>(colorCopy), reinterpret_cast<CColor*>(colorTmp));
-        p[0x12C + colorIndex * 4 + 0] = colorCopy[0];
-        p[0x12C + colorIndex * 4 + 1] = colorCopy[1];
-        p[0x12C + colorIndex * 4 + 2] = colorCopy[2];
-        p[0x12C + colorIndex * 4 + 3] = colorCopy[3];
+        colorTmp.color.r = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.r) * scale));
+        colorTmp.color.g = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.g) * scale));
+        colorTmp.color.b = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.b) * scale));
+        colorTmp.color.a = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.a) * scale));
+        CColor colorCopy(colorTmp);
+        p[0x12C + colorIndex * 4 + 0] = colorCopy.color.r;
+        p[0x12C + colorIndex * 4 + 1] = colorCopy.color.g;
+        p[0x12C + colorIndex * 4 + 2] = colorCopy.color.b;
+        p[0x12C + colorIndex * 4 + 3] = colorCopy.color.a;
     }
 
     _GXColor clearColor;
@@ -918,8 +908,9 @@ void CCharaPcs::createViewer()
     bumpLight.m_bumpShade[3] = 0xFF;
     bumpLight.m_offsetX = kCharaViewerZero;
     bumpLight.m_offsetZ = kCharaViewerZero;
-    gCharaPartWorkPtr = reinterpret_cast<u8*>(AddBump__9CLightPcsFPQ29CLightPcs6CLightQ29CLightPcs6TARGETPQ27CMemory6CStagei(
-        &LightPcs, &bumpLight, 0, *(void**)(reinterpret_cast<unsigned char*>(&Chara) + 0x2058), 4));
+    gCharaPartWorkPtr = reinterpret_cast<u8*>(LightPcs.AddBump(
+        &bumpLight, static_cast<CLightPcs::TARGET>(0),
+        *reinterpret_cast<CMemory::CStage**>(reinterpret_cast<unsigned char*>(&Chara) + 0x2058), 4));
 
     Create__6CCharaFv(&Chara);
 }

@@ -181,7 +181,7 @@ CTexAnimSeq::~CTexAnimSeq()
     CTexAnimSeqStorage* self = reinterpret_cast<CTexAnimSeqStorage*>(this);
 
     if (self->keys != 0) {
-        __dla__FPv(self->keys);
+        delete[] self->keys;
         self->keys = 0;
     }
 }
@@ -609,9 +609,8 @@ void CTexAnimSet::Create(CChunkFile& chunkFile, CMemory::CStage* stage)
                     }
                 } else {
                     seq->keyCount = innerChunk.m_size / 0x30;
-                    int keys = (int)_Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(
-                        &Memory, innerChunk.m_size, stage, const_cast<char*>(s_texanim_cpp_801d7adc), 0x1D4, 0);
-                    seq->keys = reinterpret_cast<unsigned int*>(keys);
+                    seq->keys = new (stage, const_cast<char*>(s_texanim_cpp_801d7adc), 0x1D4)
+                        unsigned int[innerChunk.m_size / sizeof(unsigned int)];
                     memcpy(seq->keys, chunkFile.GetAddress(), innerChunk.m_size);
                 }
             }

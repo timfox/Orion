@@ -42,8 +42,6 @@ extern "C" void* __register_global_object(void* object, void* destructor, void* 
 extern "C" void AfterFrame__12CFlatRuntimeFi(CFlatRuntime*, int);
 extern "C" void __dt__9CFlatDataFv(void*, int);
 extern "C" void __dt__12CFlatRuntimeFv(CFlatRuntime*, int);
-extern "C" void* __nwa__FUlPQ27CMemory6CStagePci(unsigned long, CMemory::CStage*, char*, int);
-extern "C" void __dla__FPv(void*);
 extern "C" void* __vt__13CFlatRuntime2[];
 extern "C" CFlatRuntime2* __ct__13CFlatRuntime2Fv(CFlatRuntime2*);
 extern "C" void __dt__13CFlatRuntime2Fv(void*);
@@ -1398,8 +1396,7 @@ void CFlatRuntime2::Calc()
 	if (*reinterpret_cast<int*>(runtime + 0x10418) != 0) {
 		Graphic.Printf(2, 3, const_cast<char*>(sCFlatRuntime2SaveSceneMsg));
 
-		u32* saveData = reinterpret_cast<u32*>(
-			__nwa__FUlPQ27CMemory6CStagePci(0xFFC, getStage(), const_cast<char*>(sCFlatRuntime2FileTag), 0x36F));
+		u32* saveData = new (getStage(), const_cast<char*>(sCFlatRuntime2FileTag), 0x36F) u32[0x3FF];
 		u32* objectData = saveData + 8;
 
 		saveData[0] = SwapF32(CameraPcs._224_4_);
@@ -1451,7 +1448,7 @@ void CFlatRuntime2::Calc()
 		objectData[4] = lastRotY;
 		objectData[5] = lastUnknown188;
 		objectData[6] = lastBodyRadius;
-		__dla__FPv(saveData);
+		delete[] saveData;
 	}
 
 	*reinterpret_cast<int*>(runtime + 0xCD1C) = 0;
@@ -2292,9 +2289,9 @@ void CFlatRuntime2::SetParticleWorkSe(int seNo, int seKind, int seParam)
  * Address:	TODO
  * Size:	TODO
  */
-void CFlatRuntime2::GetFreeParticleSlot()
+int CFlatRuntime2::GetFreeParticleSlot()
 {
-	PartMng.pppGetFreeSlot();
+	return PartMng.pppGetFreeSlot();
 }
 
 /*
@@ -2624,7 +2621,7 @@ void CFlatRuntime2::resetChangeScript()
 	*reinterpret_cast<u32*>(runtime + 0x12E8) = 0;
 	*reinterpret_cast<u32*>(runtime + 0x12EC) = 0;
 	memset(runtime + 0x1041C, 0, 0x14);
-	memset(reinterpret_cast<void*>(0x8030014C), 0, 0x8C);
+	memset(m_boss__8CGMonObj, 0, sizeof(m_boss__8CGMonObj));
 	runtime[0x12E4] &= 0xFD;
 	runtime[0x12E4] &= 0xF7;
 	runtime[0x12E4] &= 0xFE;

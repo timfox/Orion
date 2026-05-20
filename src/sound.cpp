@@ -72,14 +72,11 @@ extern "C" void __ct__9CRedSoundFv(void*);
 extern "C" void __dt__6CSoundFv(void*);
 extern "C" CMemory::CStage* CreateStage__7CMemoryFUlPci(CMemory*, unsigned long, char*, int);
 extern "C" void DestroyStage__7CMemoryFPQ27CMemory6CStage(CMemory*, CMemory::CStage*);
-extern "C" void* __nwa__FUlPQ27CMemory6CStagePci(unsigned long, CMemory::CStage*, char*, int);
-extern "C" void __dla__FPv(void*);
 extern "C" int Printf__7CSystemFPce(CSystem*, const char*, ...);
 extern "C" void _GXSetBlendMode__F12_GXBlendMode14_GXBlendFactor14_GXBlendFactor10_GXLogicOp(int, int, int, int);
 extern "C" void _GXSetAlphaCompare__F10_GXCompareUc10_GXAlphaOp10_GXCompareUc(int, int, int, int, int);
 extern "C" void _GXSetTevOp__F13_GXTevStageID10_GXTevMode(int, int);
 extern "C" void _GXSetTevOrder__F13_GXTevStageID13_GXTexCoordID11_GXTexMapID12_GXChannelID(int, int, int, int);
-extern "C" void* __ct__6CColorFUcUcUcUc(void*, unsigned char, unsigned char, unsigned char, unsigned char);
 CSound Sound;
 
 struct CLineSegment {
@@ -387,10 +384,10 @@ void CSound::Init()
 {
     SoundData(this).m_stage = CreateStage__7CMemoryFUlPci(&Memory, 0xA4000, const_cast<char*>(s_CSound_80330ce0), 0);
 
-    SoundData(this).m_aramBuffer = static_cast<u8*>(__nwa__FUlPQ27CMemory6CStagePci(
-        0x80000, SoundData(this).m_stage, const_cast<char*>(s_sound_cpp_801db2d4), 0x2E));
-    SoundData(this).m_streamBuffer = static_cast<u8*>(__nwa__FUlPQ27CMemory6CStagePci(
-        0x20000, SoundData(this).m_stage, const_cast<char*>(s_sound_cpp_801db2d4), 0x2F));
+    SoundData(this).m_aramBuffer =
+        new (SoundData(this).m_stage, const_cast<char*>(s_sound_cpp_801db2d4), 0x2E) u8[0x80000];
+    SoundData(this).m_streamBuffer =
+        new (SoundData(this).m_stage, const_cast<char*>(s_sound_cpp_801db2d4), 0x2F) u8[0x20000];
 
     SoundData(this).m_bgmMasterVolume = 0x7F;
     SoundData(this).m_seMasterVolume = 0x7F;
@@ -480,13 +477,13 @@ void CSound::Quit()
 
     u8*& streamBuffer = sound.m_streamBuffer;
     if (streamBuffer != 0) {
-        __dla__FPv(streamBuffer);
+        delete[] streamBuffer;
         streamBuffer = 0;
     }
 
     u8*& aramBuffer = sound.m_aramBuffer;
     if (aramBuffer != 0) {
-        __dla__FPv(aramBuffer);
+        delete[] aramBuffer;
         aramBuffer = 0;
     }
 
@@ -890,12 +887,12 @@ void CSound::Draw()
     unsigned char* se = sound.m_seWork;
     for (u32 i = 0; i < 0x80; i++, se += 0x28) {
         if (((static_cast<u8>(*se) >> 7) & 1) != 0) {
-            u32 innerColor;
-            u32 outerColor;
+            CColor innerColor(0xC0, 0xC0, 0xC0, 0x80);
+            CColor outerColor(0x80, 0x80, 0x80, 0x80);
             Graphic.DrawSphere(cameraMatrix, reinterpret_cast<Vec*>(se + 0x18), *reinterpret_cast<float*>(se + 0x10),
-                               static_cast<_GXColor*>(__ct__6CColorFUcUcUcUc(&innerColor, 0xC0, 0xC0, 0xC0, 0x80)));
+                               &innerColor.color);
             Graphic.DrawSphere(cameraMatrix, reinterpret_cast<Vec*>(se + 0x18), *reinterpret_cast<float*>(se + 0x14),
-                               static_cast<_GXColor*>(__ct__6CColorFUcUcUcUc(&outerColor, 0x80, 0x80, 0x80, 0x80)));
+                               &outerColor.color);
         }
     }
 

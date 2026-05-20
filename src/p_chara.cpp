@@ -1,5 +1,6 @@
 #include "ffcc/p_chara.h"
 #include "ffcc/chunkfile.h"
+#include "ffcc/color.h"
 #include "ffcc/graphic.h"
 #include "ffcc/linkage.h"
 #include "ffcc/memory.h"
@@ -38,7 +39,6 @@ extern "C" void __dl__FPv(void*);
 extern "C" int __cntlzw(unsigned int);
 extern "C" void* __nw__FUlPQ27CMemory6CStagePci(unsigned long, CMemory::CStage*, char*, int);
 extern "C" void* __nw__11CTextureSetFUlPQ27CMemory6CStagePci(unsigned long, CMemory::CStage*, char*, int);
-extern "C" void* __nwa__FUlPQ27CMemory6CStagePci(unsigned long, CMemory::CStage*, char*, int);
 extern "C" void __dt__Q29CCharaPcs7CHandleFv(void*, int);
 extern "C" void __ct__6CColorFv(void*);
 extern "C" void __construct_array(void*, void (*)(void*), void (*)(void*, int), unsigned long, unsigned long);
@@ -60,8 +60,6 @@ extern "C" void SetNumDiffuse__9CLightPcsFUl(void*, unsigned long);
 extern "C" void SetDiffuse__9CLightPcsFUl8_GXColorP3Veci(void*, unsigned long, void*, void*, int);
 extern "C" void SetPosition__9CLightPcsFQ29CLightPcs6TARGETP3VecUl(void*, int, Vec*, unsigned long);
 extern "C" void __ct__Q29CLightPcs10CBumpLightFv(void*);
-extern "C" int AddBump__9CLightPcsFPQ29CLightPcs6CLightQ29CLightPcs6TARGETPQ27CMemory6CStagei(
-    void*, void*, int, void*, int);
 extern "C" void Create__6CCharaFv(void*);
 extern "C" void Destroy__6CCharaFv(void*);
 extern "C" void Printf__7CSystemFPce(void*, const char*, ...);
@@ -80,10 +78,7 @@ extern "C" void* __ct__Q26CChara5CAnimFv(void*);
 extern "C" void Create__Q26CChara5CAnimFPvPQ27CMemory6CStage(void*, void*, void*);
 extern "C" void LoadSe__6CSoundFPv(void*, void*);
 extern "C" void LoadWave__6CSoundFPv(void*, void*);
-extern "C" void* __ct__6CColorFUcUcUcUc(void*, unsigned char, unsigned char, unsigned char, unsigned char);
-extern "C" void __ct__6CColorFR6CColor(void*, void*);
 extern "C" void* __ct__7CVectorFfff(void*, float, float, float);
-extern "C" void DestroyBumpLightAll__9CLightPcsFQ29CLightPcs6TARGET(void*, int);
 extern "C" void DestroyStage__7CMemoryFPQ27CMemory6CStage(void*, void*);
 extern "C" void loadModelASyncFrame__Q29CCharaPcs7CHandleFv(CCharaPcs::CHandle*);
 extern "C" int GetBackBufferRect__8CGraphicFRiRiRiRii(CGraphic*, int&, int&, int&, int&, int);
@@ -209,7 +204,7 @@ template <class T>
 CPtrArray<T>::~CPtrArray()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     m_size = 0;
@@ -309,8 +304,8 @@ int CPtrArray<T>::setSize(unsigned long newSize)
             m_size = m_size << 1;
         }
 
-        newItems = (T*)_Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(
-            &Memory, (unsigned long)(m_size << 2), m_stage, s_p_chara_collection_ptrarray_h, 0xFA, 0);
+        newItems = static_cast<T*>(
+            Memory._Alloc(static_cast<unsigned long>(m_size << 2), m_stage, s_p_chara_collection_ptrarray_h, 0xFA, 0));
         if (newItems == 0) {
             return 0;
         }
@@ -319,7 +314,7 @@ int CPtrArray<T>::setSize(unsigned long newSize)
             memcpy(newItems, m_items, m_numItems << 2);
         }
         if (m_items != 0) {
-            __dla__FPv(m_items);
+            delete[] m_items;
             m_items = 0;
         }
         m_items = newItems;
@@ -338,7 +333,7 @@ template <class T>
 void CPtrArray<T>::RemoveAll()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     m_size = 0;
@@ -798,36 +793,27 @@ void CCharaPcs::Init()
 
     unsigned char* fadeColor = reinterpret_cast<unsigned char*>(this);
     for (int i = 0; i < 5; i++) {
-        unsigned char shadeCopy[4];
-        unsigned char white[4];
-        unsigned char shade[4];
-        unsigned char* whiteChannels =
-            reinterpret_cast<unsigned char*>(__ct__6CColorFUcUcUcUc(white, 0xFF, 0xFF, 0xFF, 0xFF));
-        __ct__6CColorFv(shade);
+        CColor white(0xFF, 0xFF, 0xFF, 0xFF);
+        CColor shade;
 
         float scale = static_cast<float>(i) * 0.25f;
-        shade[0] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[0]) * scale));
-        shade[1] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[1]) * scale));
-        shade[2] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[2]) * scale));
-        shade[3] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[3]) * scale));
-        __ct__6CColorFR6CColor(shadeCopy, shade);
+        shade.color.r = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.r) * scale));
+        shade.color.g = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.g) * scale));
+        shade.color.b = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.b) * scale));
+        shade.color.a = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.a) * scale));
+        CColor shadeCopy(shade);
 
-        fadeColor[0x12C] = shadeCopy[0];
-        fadeColor[0x12D] = shadeCopy[1];
-        fadeColor[0x12E] = shadeCopy[2];
-        fadeColor[0x12F] = shadeCopy[3];
+        fadeColor[0x12C] = shadeCopy.color.r;
+        fadeColor[0x12D] = shadeCopy.color.g;
+        fadeColor[0x12E] = shadeCopy.color.b;
+        fadeColor[0x12F] = shadeCopy.color.a;
         fadeColor += 4;
     }
 
     *reinterpret_cast<int*>(Ptr(this, 0xE4)) = 0;
     *reinterpret_cast<int*>(Ptr(this, 0x24)) = 0;
-    unsigned char baseColor[4];
-    unsigned int colorValue =
-        *reinterpret_cast<unsigned int*>(__ct__6CColorFUcUcUcUc(baseColor, 0x00, 0x00, 0x40, 0x40));
-    reinterpret_cast<_GXColor*>(Ptr(this, 0x18C))->r = static_cast<unsigned char>(colorValue >> 24);
-    reinterpret_cast<_GXColor*>(Ptr(this, 0x18C))->g = static_cast<unsigned char>(colorValue >> 16);
-    reinterpret_cast<_GXColor*>(Ptr(this, 0x18C))->b = static_cast<unsigned char>(colorValue >> 8);
-    reinterpret_cast<_GXColor*>(Ptr(this, 0x18C))->a = static_cast<unsigned char>(colorValue);
+    CColor baseColor(0x00, 0x00, 0x40, 0x40);
+    *reinterpret_cast<_GXColor*>(Ptr(this, 0x18C)) = baseColor.color;
 
     Vec baseVec;
     Vec* constructedVec = reinterpret_cast<Vec*>(__ct__7CVectorFfff(&baseVec, 0.0f, 10.0f, 0.0f));
@@ -936,8 +922,9 @@ void CCharaPcs::create()
     bumpLight.m_offsetX = FLOAT_80330288;
     bumpLight.m_offsetZ = FLOAT_80330288;
 
-    gCharaPartWorkPtr = reinterpret_cast<u8*>(AddBump__9CLightPcsFPQ29CLightPcs6CLightQ29CLightPcs6TARGETPQ27CMemory6CStagei(
-        &LightPcs, &bumpLight, 0, *reinterpret_cast<void**>(Ptr(&Chara, 0x2058)), 4));
+    gCharaPartWorkPtr = reinterpret_cast<u8*>(LightPcs.AddBump(
+        &bumpLight, static_cast<CLightPcs::TARGET>(0),
+        *reinterpret_cast<CMemory::CStage**>(Ptr(&Chara, 0x2058)), 4));
     Create__6CCharaFv(&Chara);
 }
 
@@ -970,7 +957,7 @@ void CCharaPcs::createLoad()
 void CCharaPcs::destroy()
 {
     Reset(static_cast<RESET>(1));
-    DestroyBumpLightAll__9CLightPcsFQ29CLightPcs6TARGET(&LightPcs, 0);
+    LightPcs.DestroyBumpLightAll(static_cast<CLightPcs::TARGET>(0));
     gCharaPartWorkPtr = 0;
 
     if (*reinterpret_cast<void**>(Ptr(this, 0x4C)) != 0) {
@@ -1012,7 +999,7 @@ void CCharaPcs::Reset(CCharaPcs::RESET mode)
     for (int i = 0; i < 4; i++) {
         CameraCountAt(this, i) = 0;
         if (CameraDataAt(this, i) != 0) {
-            __dla__FPv(CameraDataAt(this, i));
+            delete[] static_cast<u8*>(CameraDataAt(this, i));
             CameraDataAt(this, i) = 0;
         }
     }
@@ -1164,24 +1151,20 @@ void CCharaPcs::onScriptChanging(char*)
     unsigned char* fadeColor = reinterpret_cast<unsigned char*>(this);
 
     for (int i = 0; i < 5; i++) {
-        unsigned char shadeCopy[4];
-        unsigned char white[4];
-        unsigned char shade[4];
-        unsigned char* whiteChannels =
-            reinterpret_cast<unsigned char*>(__ct__6CColorFUcUcUcUc(white, 0xFF, 0xFF, 0xFF, 0xFF));
-        __ct__6CColorFv(shade);
+        CColor white(0xFF, 0xFF, 0xFF, 0xFF);
+        CColor shade;
 
         float scale = static_cast<float>(i) * 0.25f;
-        shade[0] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[0]) * scale));
-        shade[1] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[1]) * scale));
-        shade[2] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[2]) * scale));
-        shade[3] = static_cast<unsigned char>(static_cast<int>(static_cast<float>(whiteChannels[3]) * scale));
-        __ct__6CColorFR6CColor(shadeCopy, shade);
+        shade.color.r = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.r) * scale));
+        shade.color.g = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.g) * scale));
+        shade.color.b = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.b) * scale));
+        shade.color.a = static_cast<unsigned char>(static_cast<int>(static_cast<float>(white.color.a) * scale));
+        CColor shadeCopy(shade);
 
-        fadeColor[0x12C] = shadeCopy[0];
-        fadeColor[0x12D] = shadeCopy[1];
-        fadeColor[0x12E] = shadeCopy[2];
-        fadeColor[0x12F] = shadeCopy[3];
+        fadeColor[0x12C] = shadeCopy.color.r;
+        fadeColor[0x12D] = shadeCopy.color.g;
+        fadeColor[0x12E] = shadeCopy.color.b;
+        fadeColor[0x12F] = shadeCopy.color.a;
         fadeColor += 4;
     }
 
@@ -1821,7 +1804,7 @@ void CCharaPcs::LoadCam(int index, char* fileName)
     void*& cameraBuffer = cameraData[index];
 
     if (cameraBuffer != 0) {
-        __dla__FPv(cameraBuffer);
+        delete[] static_cast<u8*>(cameraBuffer);
         cameraBuffer = 0;
     }
 
@@ -1843,8 +1826,7 @@ void CCharaPcs::LoadCam(int index, char* fileName)
         cameraCounts[index] = static_cast<int>(chunk.m_arg0);
 
         CMemory::CStage* stage = *reinterpret_cast<CMemory::CStage**>(reinterpret_cast<unsigned char*>(this) + 0xD4);
-        cameraBuffer = __nwa__FUlPQ27CMemory6CStagePci(
-            static_cast<unsigned long>(cameraCounts[index] << 5), stage, s_p_chara_cpp, 0x4D4);
+        cameraBuffer = new (stage, s_p_chara_cpp, 0x4D4) u8[static_cast<unsigned long>(cameraCounts[index] << 5)];
 
         float* values = reinterpret_cast<float*>(cameraBuffer);
         for (int i = 0; i < cameraCounts[index] * 8; i++) {

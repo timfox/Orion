@@ -1,8 +1,10 @@
 #include "ffcc/cmake.h"
 #include "ffcc/chara.h"
+#include "ffcc/color.h"
 #include "ffcc/fontman.h"
 #include "ffcc/game.h"
 #include "ffcc/pad.h"
+#include "ffcc/memory.h"
 #include "ffcc/sound.h"
 #include "ffcc/system.h"
 #include "ffcc/linkage.h"
@@ -11,7 +13,6 @@
 #include <string.h>
 #include <PowerPC_EABI_Support/Msl/MSL_C/MSL_Common/stdio.h>
 
-extern "C" void __dl__FPv(void*);
 extern "C" void freeTexture__8CMenuPcsFiiii(CMenuPcs*, int, int, int, int);
 extern "C" void CmakeVillageDraw__8CMenuPcsFv(CMenuPcs*);
 extern "C" unsigned short CmakeVillageCtrl__8CMenuPcsFv(CMenuPcs*);
@@ -99,13 +100,11 @@ extern "C" int DAT_8032ef10;
 extern "C" char* GetLangString__5CGameFv(void*);
 extern "C" void loadFont__8CMenuPcsFiPcii(CMenuPcs*, int, char*, int, int);
 extern "C" void loadTexture__8CMenuPcsFPPciiPQ28CMenuPcs4CTmpiii(CMenuPcs*, char**, int, int, void*, int, int, int);
-extern "C" void* __nw__FUlPQ27CMemory6CStagePci(unsigned long, void*, char*, int);
 extern "C" void _GXSetBlendMode__F12_GXBlendMode14_GXBlendFactor14_GXBlendFactor10_GXLogicOp(int, int, int, int);
 extern "C" void SetAttrFmt__8CMenuPcsFQ28CMenuPcs3FMT(void*, int);
 extern "C" void SetTexture__8CMenuPcsFQ28CMenuPcs3TEX(void*, int);
 extern "C" void DrawRect__8CMenuPcsFUlfffffffff(void*, unsigned long, float, float, float, float, float, float, float, float, float);
 extern "C" void DrawInit__8CMenuPcsFv(void*);
-extern "C" void* __ct__6CColorFUcUcUcUc(void*, unsigned char, unsigned char, unsigned char, unsigned char);
 extern "C" const char* GetMenuStr__8CMenuPcsFi(CMenuPcs*, int);
 extern "C" void DrawCursor__8CMenuPcsFiif(CMenuPcs*, int, int, float);
 extern "C" void DrawWMFrame0__8CMenuPcsFif(CMenuPcs*, int, float);
@@ -1176,9 +1175,8 @@ void CMenuPcs::DrawCmakeDecision(int yesNoSel, float alpha)
     font->DrawInit();
     font->SetTlut(7);
 
-    unsigned char rgba[8];
-    __ct__6CColorFUcUcUcUc(rgba, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
-    font->SetColor(*reinterpret_cast<GXColor*>(rgba));
+    CColor rgba(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
+    font->SetColor(rgba);
 
     const char* txt = GetMenuStr__8CMenuPcsFi(this, 0x29);
     float w = static_cast<float>(font->GetWidth(txt));
@@ -1234,9 +1232,8 @@ void CMenuPcs::DrawCmakeCharaText(int page, float alpha)
         a = 0xFF;
     }
 
-    unsigned char rgba[8];
-    __ct__6CColorFUcUcUcUc(rgba, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
-    labelFont->SetColor(*reinterpret_cast<GXColor*>(rgba));
+    CColor rgba(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
+    labelFont->SetColor(rgba);
 
     float labelWidths[4];
     for (int i = 0; i < 4; i++) {
@@ -1256,7 +1253,7 @@ void CMenuPcs::DrawCmakeCharaText(int page, float alpha)
     valueFont->SetShadow(1);
     valueFont->SetScale(FLOAT_80333258);
     valueFont->DrawInit();
-    valueFont->SetColor(*reinterpret_cast<GXColor*>(rgba));
+    valueFont->SetColor(rgba);
     valueFont->SetTlut(6);
 
     for (int i = 0; i < 4; i++) {
@@ -1376,10 +1373,10 @@ void CMenuPcs::DrawCmakeName(int x, int y, char* text, float alpha)
     font->renderFlags = (font->renderFlags & 0xEF) | 0x10;
     font->SetMargin(FLOAT_80333258);
 
-    unsigned char rgba[8];
-    __ct__6CColorFUcUcUcUc(rgba, 0xFF, 0xFF, 0xFF,
+    CColor rgba(
+        0xFF, 0xFF, 0xFF,
         static_cast<unsigned char>(static_cast<int>(static_cast<double>(FLOAT_80333240) * alpha)));
-    font->SetColor(*reinterpret_cast<GXColor*>(rgba));
+    font->SetColor(rgba);
     font->SetTlut(6);
 
     float textW = static_cast<float>(font->GetWidth(text));
@@ -1472,9 +1469,8 @@ void CMenuPcs::DrawCmakeYesNo(int yesNoSel, float alpha)
     font->DrawInit();
     font->SetTlut(7);
 
-    unsigned char rgba[8];
-    __ct__6CColorFUcUcUcUc(rgba, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
-    font->SetColor(*reinterpret_cast<GXColor*>(rgba));
+    CColor rgba(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
+    font->SetColor(rgba);
 
     const char* yesStr = GetMenuStr__8CMenuPcsFi(this, 1);
     float yesW = static_cast<float>(font->GetWidth(yesStr));
@@ -2123,9 +2119,8 @@ void CMenuPcs::CmakeSexDraw()
     font->DrawInit();
 
     int a = static_cast<int>(static_cast<double>(FLOAT_80333240) * alpha);
-    unsigned char rgba[8];
-    __ct__6CColorFUcUcUcUc(rgba, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
-    font->SetColor(*reinterpret_cast<GXColor*>(rgba));
+    CColor rgba(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
+    font->SetColor(rgba);
 
     float maxWidth = 0.0f;
     for (int i = 0; i < 2; ++i) {
@@ -2410,9 +2405,8 @@ void CMenuPcs::CmakeTribeDraw()
     tribeFont->SetShadow(0);
     tribeFont->SetScale(FLOAT_80333258);
     tribeFont->DrawInit();
-    unsigned char tribeRgba[8];
-    __ct__6CColorFUcUcUcUc(tribeRgba, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
-    tribeFont->SetColor(*reinterpret_cast<GXColor*>(tribeRgba));
+    CColor tribeRgba(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(a));
+    tribeFont->SetColor(tribeRgba);
 
     for (int i = 0; i < 4; i++) {
         const char* txt = GetTribeStr__8CMenuPcsFi(this, i);
@@ -2429,7 +2423,7 @@ void CMenuPcs::CmakeTribeDraw()
     hairFont->SetShadow(1);
     hairFont->SetScale(FLOAT_80333258);
     hairFont->DrawInit();
-    hairFont->SetColor(*reinterpret_cast<GXColor*>(tribeRgba));
+    hairFont->SetColor(tribeRgba);
     hairFont->SetTlut(6);
 
     int hairBase = MenuS16(this, 0x862) * 8;
@@ -2747,8 +2741,7 @@ void CMenuPcs::CmakeJobDraw()
     font->SetScale(FLOAT_80333258);
     font->DrawInit();
 
-    GXColor textColor;
-    __ct__6CColorFUcUcUcUc(&textColor, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(panelAlpha));
+    CColor textColor(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(panelAlpha));
     font->SetColor(textColor);
 
     for (int i = 0; i < 8; ++i) {
@@ -2968,8 +2961,7 @@ void CMenuPcs::CmakeResultDraw()
     labelFont->DrawInit();
 
     int textColor = static_cast<int>(static_cast<double>(FLOAT_80333240) * textAlpha);
-    GXColor color;
-    __ct__6CColorFUcUcUcUc(&color, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(textColor));
+    CColor color(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(textColor));
     labelFont->SetColor(color);
 
     float labelWidths[4];
@@ -3207,8 +3199,7 @@ void CMenuPcs::CmakeResultDraw1()
     labelFont->DrawInit();
 
     int textColor = static_cast<int>(static_cast<double>(FLOAT_80333240) * textAlpha);
-    GXColor color;
-    __ct__6CColorFUcUcUcUc(&color, 0xFF, 0xFF, 0xFF, static_cast<unsigned char>(textColor));
+    CColor color(0xFF, 0xFF, 0xFF, static_cast<unsigned char>(textColor));
     labelFont->SetColor(color);
 
     float labelWidths[4];
@@ -3604,7 +3595,7 @@ void CMenuPcs::destroyVillageMenu()
 
         void*& villageWork = *reinterpret_cast<void**>(reinterpret_cast<unsigned char*>(this) + 0x830);
         if (villageWork != nullptr) {
-            __dl__FPv(villageWork);
+            delete[] static_cast<unsigned char*>(villageWork);
             villageWork = nullptr;
         }
 
@@ -3635,10 +3626,9 @@ void CMenuPcs::calcVillageMenu()
             loadTexture__8CMenuPcsFPPciiPQ28CMenuPcs4CTmpiii(
                 this, PTR_s_world2_802159a4, 8, 1, &DAT_802159c8, 0x60, 9, 3);
 
-            void* stage = *reinterpret_cast<void**>(reinterpret_cast<unsigned char*>(this) + 0xEC);
+            CMemory::CStage* stage = *reinterpret_cast<CMemory::CStage**>(reinterpret_cast<unsigned char*>(this) + 0xEC);
             int& villageWork = MenuS32(this, 0x830);
-            villageWork =
-                reinterpret_cast<int>(__nw__FUlPQ27CMemory6CStagePci(0x48, stage, const_cast<char*>(s_cmake_cpp_801e3038), 0xCB3));
+            villageWork = reinterpret_cast<int>(new (stage, const_cast<char*>(s_cmake_cpp_801e3038), 0xCB3) unsigned char[0x48]);
             memset(reinterpret_cast<void*>(villageWork), 0, 0x48);
             LoadCmakeVillageName();
             MenuS16(this, 0x86C) = 1;
@@ -3660,7 +3650,7 @@ void CMenuPcs::calcVillageMenu()
                 freeTexture__8CMenuPcsFiiii(this, 8, 1, 0x60, 9);
                 int& villageWork = MenuS32(this, 0x830);
                 if (villageWork != 0) {
-                    __dl__FPv(reinterpret_cast<void*>(villageWork));
+                    delete[] reinterpret_cast<unsigned char*>(villageWork);
                     villageWork = 0;
                 }
                 MenuS16(this, 0x86C) = 0;

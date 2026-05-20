@@ -3,8 +3,6 @@
 #include "ffcc/zlist.h"
 
 extern "C" {
-void* __nw__FUlPQ27CMemory6CStagePci(unsigned long, CMemory::CStage*, const char*, int);
-void __dl__FPv(void*);
 void __dla__FPv(void*);
 void* memset(void*, int, unsigned int);
 }
@@ -111,17 +109,17 @@ int CMaterialEditorPcs::SetRsdFlag()
 int CMaterialEditorPcs::AddRsdList(ZLIST* zlist)
 {
     RSDLISTITEM* listItem =
-        (RSDLISTITEM*)__nw__FUlPQ27CMemory6CStagePci(0x10, MaterialEditorStage(), s_ME_AppRequest_cpp_801d7da8, 0x61);
+        new (MaterialEditorStage(), const_cast<char*>(s_ME_AppRequest_cpp_801d7da8), 0x61) RSDLISTITEM;
     if (listItem == 0) {
         return 0;
     }
 
     memset(listItem, 0, 0x10);
     RSDITEM* rsdItem =
-        (RSDITEM*)__nw__FUlPQ27CMemory6CStagePci(0x1c, MaterialEditorStage(), s_ME_AppRequest_cpp_801d7da8, 0x67);
+        new (MaterialEditorStage(), const_cast<char*>(s_ME_AppRequest_cpp_801d7da8), 0x67) RSDITEM;
     if (rsdItem == 0) {
         if (listItem != 0) {
-            __dl__FPv(listItem);
+            delete listItem;
         }
         return 0;
     }
@@ -183,23 +181,23 @@ void CMaterialEditorPcs::DeleteRsdItem(RSDLISTITEM* listItem)
             rsdItem->ptrC = 0;
         }
         if (rsdItem->ptr10 != (void*)0) {
-            __dla__FPv(rsdItem->ptr10);
+            delete[] static_cast<u8*>(rsdItem->ptr10);
             rsdItem->ptr10 = 0;
         }
         if (rsdItem->ptr14 != (void*)0) {
-            __dla__FPv(rsdItem->ptr14);
+            delete[] static_cast<u8*>(rsdItem->ptr14);
             rsdItem->ptr14 = 0;
         }
         if (rsdItem->ptr18 != (void*)0) {
-            __dla__FPv(rsdItem->ptr18);
+            delete[] static_cast<u8*>(rsdItem->ptr18);
             rsdItem->ptr18 = 0;
         }
-        __dl__FPv(rsdItem);
+        delete rsdItem;
         listItem->rsdItem = (RSDITEM*)0;
     }
 
     DeleteColAnmData(&listItem->colAnmData, listItem->colAnmCount);
-    __dl__FPv(listItem);
+    delete listItem;
 }
 #endif
 
@@ -249,19 +247,19 @@ void CMaterialEditorPcs::ResetRsdList(ZLIST* zlist)
                 rsdItem->ptrC = 0;
             }
             if (rsdItem->ptr10 != (void*)0) {
-                __dla__FPv(rsdItem->ptr10);
+                delete[] static_cast<u8*>(rsdItem->ptr10);
                 rsdItem->ptr10 = 0;
             }
             if (rsdItem->ptr14 != (void*)0) {
-                __dla__FPv(rsdItem->ptr14);
+                delete[] static_cast<u8*>(rsdItem->ptr14);
                 rsdItem->ptr14 = 0;
             }
             if (rsdItem->ptr18 != (void*)0) {
-                __dla__FPv(rsdItem->ptr18);
+                delete[] static_cast<u8*>(rsdItem->ptr18);
                 rsdItem->ptr18 = 0;
             }
             if (rsdItem != (RSDITEM*)0) {
-                __dl__FPv(rsdItem);
+                delete rsdItem;
             }
         }
         colAnmCount = listItem->colAnmCount;
@@ -279,7 +277,7 @@ void CMaterialEditorPcs::ResetRsdList(ZLIST* zlist)
             }
             listItem->colAnmData = (ZCANMGRP*)0;
         }
-        __dl__FPv(listItem);
+        delete listItem;
     }
     list->DeleteList();
 }

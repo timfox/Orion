@@ -140,7 +140,7 @@ public:
 	void SetParticleWorkParam(int, CFlatRuntime::CObject*);
 	void SetParticleWorkSe(int, int, int);
 
-	void GetFreeParticleSlot();
+	int GetFreeParticleSlot();
 	void EndParticleSlot(int, int);
 	void EndParticle(CCharaPcs::CHandle*);
 	void DeleteParticleSlot(int, int);
@@ -155,6 +155,15 @@ public:
 	void resetSpawnBit(int);
 	void resetChangeScript();
 	void ResetNewGame();
+
+private:
+	void onClassSystemFunc(CFlatRuntime::CObject*, int, int, int&);
+	CFlatRuntime::CVal* onClassSystemVal(CFlatRuntime::CObject*, int);
+	void onSetClassSystemVal(int, CFlatRuntime::CObject*, CFlatRuntime::CStack*, int);
+
+	void onSystemFunc(CFlatRuntime::CObject*, int, int, int&);
+	CFlatRuntime::CVal* onSystemVal(CFlatRuntime::CObject*, int);
+	void onSetSystemVal(int, CFlatRuntime::CStack*, int);
 };
 
 extern CFlatRuntime2& gCFlatRuntime2;

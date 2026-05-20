@@ -8,16 +8,12 @@
 
 extern "C" void __ct__Q26CChara9CAnimNodeFv(void*);
 extern "C" void __dt__Q26CChara9CAnimNodeFv(void*, int);
-extern "C" void* __nwa__FUlPQ27CMemory6CStagePci(unsigned long, CMemory::CStage*, char*, int);
-extern "C" void __dla__FPv(void*);
-extern "C" void __dl__FPv(void*);
 extern "C" const char s_CChara_CAnim_801DA970[] = "CChara::CAnim";
 extern "C" const char s_charaAnimSourceFile[] = "chara_anim.cpp";
 extern "C" const char s_charaAnimAllocWarn[32] =
     "\214\303\202\242\203\101\203\152\203\201\201\133\203\126\203\207\203\223"
     "\214\140\216\256\202\305\202\267\201\102\n";
 extern "C" void gqrInit__6CCharaFUlUlUl(void*, unsigned long, unsigned long, unsigned long);
-extern "C" void* _Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(CMemory*, unsigned long, CMemory::CStage*, char*, int, int);
 extern "C" void SetGroup__7CMemoryFPvi(CMemory*, void*, int);
 extern "C" void CopyFromAMemorySync__7CMemoryFPvPvUl(CMemory*, void*, void*, unsigned long);
 extern "C" int TryReleaseAnimBank__9CCharaPcsFi(void*, int);
@@ -177,12 +173,12 @@ CChara::CAnim::CAnim()
 CChara::CAnim::~CAnim()
 {
 	if (m_nodes != 0) {
-		__destroy_new_array(m_nodes, (ConstructorDestructor)__dt__Q26CChara9CAnimNodeFv);
+		delete[] m_nodes;
 		m_nodes = 0;
 	}
 
 	if (m_bank != 0) {
-		__dla__FPv(m_bank);
+		delete[] static_cast<unsigned char*>(m_bank);
 		m_bank = 0;
 	}
 }
@@ -226,12 +222,7 @@ void CChara::CAnim::Create(void* data, CMemory::CStage* stage)
 			m_nodeCount = static_cast<unsigned short>(chunk.m_arg0);
 			unsigned short nodeCount = m_nodeCount;
 
-			void* nodeArray = __nwa__FUlPQ27CMemory6CStagePci(
-			    (unsigned long)nodeCount * 0x18 + 0x10, stage, const_cast<char*>(s_charaAnimSourceFile), 0x5F);
-			nodeArray = __construct_new_array(
-			    nodeArray, reinterpret_cast<ConstructorDestructor>(__ct__Q26CChara9CAnimNodeFv),
-			    reinterpret_cast<ConstructorDestructor>(__dt__Q26CChara9CAnimNodeFv), 0x18, nodeCount);
-			m_nodes = reinterpret_cast<CChara::CAnimNode*>(nodeArray);
+			m_nodes = new (stage, const_cast<char*>(s_charaAnimSourceFile), 0x5F) CChara::CAnimNode[nodeCount];
 
 			int nodeOffset = 0;
 			chunkFile.PushChunk();
@@ -304,8 +295,7 @@ void CChara::CAnim::Create(void* data, CMemory::CStage* stage)
 				}
 				case 0x42414E4B:
 					m_bankSize = (chunk.m_size + 0x1F) & 0xFFFFFFE0;
-					m_bank = __nwa__FUlPQ27CMemory6CStagePci(
-					    chunk.m_size, stage, const_cast<char*>(s_charaAnimSourceFile), 0x7C);
+					m_bank = new (stage, const_cast<char*>(s_charaAnimSourceFile), 0x7C) unsigned char[chunk.m_size];
 					chunkFile.Get(m_bank, chunk.m_size);
 
 					Memory.CopyToAMemorySync(
@@ -316,7 +306,7 @@ void CChara::CAnim::Create(void* data, CMemory::CStage* stage)
 					m_bankAddress = Chara.m_animBankAddress;
 					Chara.m_animBankAddress += m_bankSize;
 					if (m_bank != 0) {
-						__dl__FPv(m_bank);
+						delete[] static_cast<unsigned char*>(m_bank);
 						m_bank = 0;
 					}
 					break;
@@ -381,8 +371,8 @@ void CChara::CAnimNode::Interp(CChara::CAnim* anim, SRT* srt, float frame)
 {
 	if (anim->m_bank == 0) {
 		while (anim->m_bank == 0) {
-			anim->m_bank = _Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(
-			    &Memory, anim->m_bankSize, anim->m_stage, const_cast<char*>(s_charaAnimSourceFile), 0x160, 1);
+			anim->m_bank =
+			    new (anim->m_stage, const_cast<char*>(s_charaAnimSourceFile), 0x160) unsigned char[anim->m_bankSize];
 
 			if (anim->m_bank != 0) {
 				break;

@@ -99,7 +99,6 @@ extern char g_MsgFlashy[];
 extern const char DAT_8032f984[] = "\n";
 extern "C" unsigned char Vec_80245758[];
 extern "C" void __ct__Q29CLightPcs6CLightFv(void*);
-extern "C" void DestroyBumpLightAll__9CLightPcsFQ29CLightPcs6TARGET(void*, int);
 extern "C" void SetLink__7CMapObjFv();
 extern "C" int ReadOtmOctTree__8COctTreeFR10CChunkFile(void*, CChunkFile&);
 extern "C" CPtrArray<CMapLightHolder*>* dtor_80034414(CPtrArray<CMapLightHolder*>*, short);
@@ -259,26 +258,21 @@ CMapIdGrp::CMapIdGrp()
  */
 CMapKeyFrame::~CMapKeyFrame()
 {
-    void*& junTable = *reinterpret_cast<void**>(Ptr(this, 0x18));
-    void*& keyFrame = *reinterpret_cast<void**>(Ptr(this, 0x1C));
-    void*& keyValue = *reinterpret_cast<void**>(Ptr(this, 0x20));
-    void*& splineTable = *reinterpret_cast<void**>(Ptr(this, 0x24));
-
-    if (junTable != 0) {
-        __dla__FPv(junTable);
-        junTable = 0;
+    if (m_junTable != 0) {
+        delete[] m_junTable;
+        m_junTable = 0;
     }
-    if (keyFrame != 0) {
-        __dla__FPv(keyFrame);
-        keyFrame = 0;
+    if (m_keyFrame != 0) {
+        delete[] m_keyFrame;
+        m_keyFrame = 0;
     }
-    if (keyValue != 0) {
-        __dla__FPv(keyValue);
-        keyValue = 0;
+    if (m_keyValue != 0) {
+        delete[] m_keyValue;
+        m_keyValue = 0;
     }
-    if (splineTable != 0) {
-        __dla__FPv(splineTable);
-        splineTable = 0;
+    if (m_splineTable != 0) {
+        delete[] m_splineTable;
+        m_splineTable = 0;
     }
 }
 
@@ -457,7 +451,7 @@ template <>
 void CPtrArray<CMapLightHolder*>::RemoveAll()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     *reinterpret_cast<int*>(Ptr(this, 8)) = 0;
@@ -499,8 +493,8 @@ int CPtrArray<CMapLightHolder*>::setSize(unsigned long newSize)
             m_size = m_size << 1;
         }
 
-        newItems = (CMapLightHolder**)_Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(
-            &Memory, m_size << 2, m_stage, const_cast<char*>(s_map_collection_ptrarray_h), 0xFA, 0);
+        newItems = static_cast<CMapLightHolder**>(
+            Memory._Alloc(m_size << 2, m_stage, const_cast<char*>(s_map_collection_ptrarray_h), 0xFA, 0));
         if (newItems == 0) {
             return 0;
         }
@@ -509,7 +503,7 @@ int CPtrArray<CMapLightHolder*>::setSize(unsigned long newSize)
             memcpy(newItems, m_items, m_numItems << 2);
         }
         if (m_items != 0) {
-            __dla__FPv(m_items);
+            delete[] m_items;
             m_items = 0;
         }
 
@@ -570,7 +564,7 @@ template <>
 void CPtrArray<CMapAnim*>::RemoveAll()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     *reinterpret_cast<int*>(Ptr(this, 8)) = 0;
@@ -712,7 +706,7 @@ template <>
 void CPtrArray<CMapAnimKeyDt*>::RemoveAll()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     *reinterpret_cast<int*>(Ptr(this, 8)) = 0;
@@ -758,8 +752,8 @@ int CPtrArray<CMapAnim*>::setSize(unsigned long newSize)
             m_size = m_size << 1;
         }
 
-        newItems = (CMapAnim**)_Alloc__7CMemoryFUlPQ27CMemory6CStagePcii(
-            &Memory, m_size << 2, m_stage, const_cast<char*>(s_map_collection_ptrarray_h), 0xFA, 0);
+        newItems = static_cast<CMapAnim**>(
+            Memory._Alloc(m_size << 2, m_stage, const_cast<char*>(s_map_collection_ptrarray_h), 0xFA, 0));
         if (newItems == 0) {
             return 0;
         }
@@ -768,7 +762,7 @@ int CPtrArray<CMapAnim*>::setSize(unsigned long newSize)
             memcpy(newItems, m_items, m_numItems << 2);
         }
         if (m_items != 0) {
-            __dla__FPv(m_items);
+            delete[] m_items;
             m_items = 0;
         }
 
@@ -811,7 +805,7 @@ template <>
 CPtrArray<CMapAnimRun*>::~CPtrArray()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     m_size = 0;
@@ -882,7 +876,7 @@ template <>
 CPtrArray<CMapAnim*>::~CPtrArray()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
 
@@ -954,7 +948,7 @@ template <>
 CPtrArray<CMapAnimKeyDt*>::~CPtrArray()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
 
@@ -1026,7 +1020,7 @@ template <>
 CPtrArray<CMapShadow*>::~CPtrArray()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
 
@@ -1105,7 +1099,7 @@ template <>
 void CPtrArray<CMapAnimRun*>::RemoveAll()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     *reinterpret_cast<int*>(Ptr(this, 8)) = 0;
@@ -1186,7 +1180,7 @@ template <>
 void CPtrArray<CMapShadow*>::RemoveAll()
 {
     if (m_items != 0) {
-        __dla__FPv(m_items);
+        delete[] m_items;
         m_items = 0;
     }
     *reinterpret_cast<int*>(Ptr(this, 8)) = 0;
@@ -1331,13 +1325,11 @@ int CMapKeyFrame::IsRun()
  */
 void CMapKeyFrame::ReadJun(CChunkFile& chunkFile, int count)
 {
-    *reinterpret_cast<unsigned char*>(Ptr(this, 1)) = static_cast<unsigned char>(count);
-    *reinterpret_cast<void**>(Ptr(this, 0x18)) = __nwa__FUlPQ27CMemory6CStagePci(
-        static_cast<unsigned long>(*reinterpret_cast<unsigned char*>(Ptr(this, 1))),
-        *reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xC1);
+    m_junCount = static_cast<unsigned char>(count);
+    m_junTable = new (*reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xC1) unsigned char[m_junCount];
 
-    for (int i = 0; i < static_cast<int>(*reinterpret_cast<unsigned char*>(Ptr(this, 1))); i++) {
-        (*reinterpret_cast<unsigned char**>(Ptr(this, 0x18)))[i] = chunkFile.Get1();
+    for (int i = 0; i < static_cast<int>(m_junCount); i++) {
+        m_junTable[i] = chunkFile.Get1();
     }
 }
 
@@ -1366,29 +1358,19 @@ void CMapKeyFrame::ReadFrame(CChunkFile& chunkFile, int)
  */
 void CMapKeyFrame::ReadKey(CChunkFile& chunkFile, int count)
 {
-    *reinterpret_cast<unsigned char*>(Ptr(this, 4)) = 1;
-    *reinterpret_cast<unsigned char*>(Ptr(this, 2)) = static_cast<unsigned char>(count);
-    *reinterpret_cast<void**>(Ptr(this, 0x1C)) = __nwa__FUlPQ27CMemory6CStagePci(
-        static_cast<unsigned long>(static_cast<unsigned int>(*reinterpret_cast<unsigned char*>(Ptr(this, 2))) << 2),
-        *reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xD5);
-    *reinterpret_cast<void**>(Ptr(this, 0x20)) = __nwa__FUlPQ27CMemory6CStagePci(
-        static_cast<unsigned long>(static_cast<unsigned int>(*reinterpret_cast<unsigned char*>(Ptr(this, 2))) << 2),
-        *reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xD6);
+    m_isRun = 1;
+    m_keyCount = static_cast<unsigned char>(count);
+    m_keyFrame = new (*reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xD5) float[m_keyCount];
+    m_keyValue = new (*reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xD6) float[m_keyCount];
 
-    for (int i = 0; i < static_cast<int>(*reinterpret_cast<unsigned char*>(Ptr(this, 2))); i++) {
-        reinterpret_cast<float*>(*reinterpret_cast<void**>(Ptr(this, 0x1C)))[i] = chunkFile.GetF4();
-        reinterpret_cast<float*>(*reinterpret_cast<void**>(Ptr(this, 0x20)))[i] = chunkFile.GetF4();
+    for (int i = 0; i < static_cast<int>(m_keyCount); i++) {
+        m_keyFrame[i] = chunkFile.GetF4();
+        m_keyValue[i] = chunkFile.GetF4();
     }
 
-    if (*reinterpret_cast<unsigned char*>(Ptr(this, 0)) == 1) {
-        *reinterpret_cast<void**>(Ptr(this, 0x24)) = __nwa__FUlPQ27CMemory6CStagePci(
-            static_cast<unsigned long>(
-                (static_cast<unsigned int>(*reinterpret_cast<unsigned char*>(Ptr(this, 2))) & 0xFF) << 2),
-            *reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xDE);
-        MakeSpline1Dtable__5CMathFiPfPfPf(&Math, static_cast<int>(*reinterpret_cast<unsigned char*>(Ptr(this, 2))) - 1,
-            reinterpret_cast<float*>(*reinterpret_cast<void**>(Ptr(this, 0x20))),
-            reinterpret_cast<float*>(*reinterpret_cast<void**>(Ptr(this, 0x1C))),
-            reinterpret_cast<float*>(*reinterpret_cast<void**>(Ptr(this, 0x24))));
+    if (m_mode == 1) {
+        m_splineTable = new (*reinterpret_cast<CMemory::CStage**>(&MapMng), const_cast<char*>(s_map_cpp), 0xDE) float[m_keyCount];
+        MakeSpline1Dtable__5CMathFiPfPfPf(&Math, static_cast<int>(m_keyCount) - 1, m_keyValue, m_keyFrame, m_splineTable);
     }
 }
 
@@ -1641,7 +1623,7 @@ void CMapMng::DestroyMap()
         mapLightHolderArray->RemoveAll();
     }
 
-    DestroyBumpLightAll__9CLightPcsFQ29CLightPcs6TARGET(&LightPcs, 1);
+    LightPcs.DestroyBumpLightAll(static_cast<CLightPcs::TARGET>(1));
     *reinterpret_cast<void**>(self + 0x228E8) = 0;
 }
 
@@ -3856,7 +3838,7 @@ CMapMng::~CMapMng()
 {
     __destroy_arr(
         Ptr(this, 0x21450), reinterpret_cast<void*>(dtor_80034414), 0x1C, 2);
-    if (this != reinterpret_cast<CMapMng*>(0xFFFDEBCC)) {
+    if (Ptr(this, 0x21434) != 0) {
         *reinterpret_cast<void***>(Ptr(this, 0x21434)) = __vt__8CPtrArrayIP10CMapShadow;
         void* items = *reinterpret_cast<void**>(Ptr(this, 0x21444));
         if (items != 0) {
@@ -3866,7 +3848,7 @@ CMapMng::~CMapMng()
         *reinterpret_cast<int*>(Ptr(this, 0x2143C)) = 0;
         *reinterpret_cast<int*>(Ptr(this, 0x21438)) = 0;
     }
-    if (this != reinterpret_cast<CMapMng*>(0xFFFDEBE8)) {
+    if (Ptr(this, 0x21418) != 0) {
         *reinterpret_cast<void***>(Ptr(this, 0x21418)) = __vt__8CPtrArrayIP13CMapAnimKeyDt;
         void* items = *reinterpret_cast<void**>(Ptr(this, 0x21428));
         if (items != 0) {
@@ -3876,7 +3858,7 @@ CMapMng::~CMapMng()
         *reinterpret_cast<int*>(Ptr(this, 0x21420)) = 0;
         *reinterpret_cast<int*>(Ptr(this, 0x2141C)) = 0;
     }
-    if (this != reinterpret_cast<CMapMng*>(0xFFFDEC04)) {
+    if (Ptr(this, 0x213FC) != 0) {
         *reinterpret_cast<void***>(Ptr(this, 0x213FC)) = __vt__8CPtrArrayIP7CMapAnim;
         void* items = *reinterpret_cast<void**>(Ptr(this, 0x2140C));
         if (items != 0) {
@@ -3886,7 +3868,7 @@ CMapMng::~CMapMng()
         *reinterpret_cast<int*>(Ptr(this, 0x21404)) = 0;
         *reinterpret_cast<int*>(Ptr(this, 0x21400)) = 0;
     }
-    if (this != reinterpret_cast<CMapMng*>(0xFFFDEC20)) {
+    if (Ptr(this, 0x213E0) != 0) {
         *reinterpret_cast<void***>(Ptr(this, 0x213E0)) = __vt__8CPtrArrayIP11CMapAnimRun;
         void* items = *reinterpret_cast<void**>(Ptr(this, 0x213F0));
         if (items != 0) {
